@@ -3387,6 +3387,29 @@ html.native-app select{
   font-size:16px !important;
 }
 
+/* Add Holding alignment — keep full-width controls inside the form bounds */
+#addScreen input,
+#addScreen select,
+#addScreen textarea{
+  box-sizing:border-box;
+  max-width:100%;
+}
+#addScreen .money{
+  box-sizing:border-box;
+  width:100%;
+}
+#addScreen .money input{
+  flex:1 1 auto;
+  width:0;
+  min-width:0;
+  box-sizing:border-box;
+}
+#addScreen #date{
+  width:100%;
+  min-width:0;
+  box-sizing:border-box;
+}
+
 
 /* v77 — global Add Bullion portal: keep every add surface above every app tab */
 #addScreen{z-index:2147482998 !important;}
