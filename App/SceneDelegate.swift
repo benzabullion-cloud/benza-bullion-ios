@@ -68,26 +68,24 @@ final class BenzaStoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func restorePurchases(_ call: CAPPluginCall) {
         Task { @MainActor in
-            do {
-                try await AppStore.sync()
-                var restored: [[String: Any]] = []
+            var restored: [[String: Any]] = []
 
-                for await verification in Transaction.currentEntitlements {
-                    guard case .verified(let transaction) = verification,
-                          allowedProducts.contains(transaction.productID),
-                          transaction.revocationDate == nil else { continue }
+            for await verification in Transaction.currentEntitlements {
+                guard case .verified(let transaction) = verification,
+                      allowedProducts.contains(transaction.productID),
+                      transaction.revocationDate == nil else { continue }
 
-                    restored.append([
-                        "productId": transaction.productID,
-                        "transactionId": String(transaction.id),
-                        "signedTransaction": verification.jwsRepresentation
-                    ])
-                }
-
-                call.resolve(["transactions": restored])
-            } catch {
-                call.reject(error.localizedDescription)
+                restored.append([
+                    "productId": transaction.productID,
+                    "transactionId": String(transaction.id),
+                    "signedTransaction": verification.jwsRepresentation
+                ])
             }
+
+            // On the same TestFlight device, currentEntitlements already contains
+            // completed sandbox purchases. Avoid forcing AppStore.sync(), which can
+            // surface a generic "Unable to Complete Request" sandbox error.
+            call.resolve(["transactions": restored])
         }
     }
 
