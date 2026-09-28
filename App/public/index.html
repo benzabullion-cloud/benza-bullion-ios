@@ -3489,6 +3489,80 @@ html.native-app select{
 }
 
 
+/* Add Holding mobile scroll lock — vertical only, one consistent content width */
+#addScreen{
+  overflow:hidden !important;
+  overscroll-behavior-x:none !important;
+  touch-action:pan-y !important;
+}
+#addScreen > .sheet{
+  box-sizing:border-box !important;
+  width:min(100vw,430px) !important;
+  max-width:430px !important;
+  min-width:0 !important;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  overscroll-behavior-x:none !important;
+  overscroll-behavior-y:contain !important;
+  -webkit-overflow-scrolling:touch;
+  touch-action:pan-y !important;
+}
+#addScreen .sheetTop{
+  box-sizing:border-box;
+  width:100%;
+  max-width:100%;
+  left:0;
+  right:0;
+  overflow:hidden;
+}
+#addScreen .form{
+  box-sizing:border-box !important;
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  overflow-x:hidden !important;
+  padding-left:22px !important;
+  padding-right:22px !important;
+}
+#addScreen .form > *{
+  box-sizing:border-box;
+  max-width:100%;
+  min-width:0;
+}
+#addScreen .metalSwitch{
+  box-sizing:border-box;
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  overflow:hidden !important;
+}
+#addScreen .metalSwitch button{
+  box-sizing:border-box;
+  flex:1 1 0 !important;
+  min-width:0 !important;
+  max-width:20% !important;
+  padding-left:4px !important;
+  padding-right:4px !important;
+  overflow:hidden;
+}
+#addScreen .row{
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+}
+#addScreen .inventoryDetails,
+#addScreen .inventoryLockedRow,
+#addScreen .preview,
+#addScreen .save,
+#addScreen .dateField,
+#addScreen .money{
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  box-sizing:border-box !important;
+}
+
+
 /* v77 — global Add Bullion portal: keep every add surface above every app tab */
 #addScreen{z-index:2147482998 !important;}
 #addChoiceBackdrop{z-index:2147483000 !important;}
