@@ -6282,7 +6282,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
           </div>
         </div>
         <div id="notificationPrefsStatus" role="status" aria-live="polite" class="settingsNotificationPrefsStatus"></div>
-        <button id="notificationTestButton" class="settingsNotificationTest" type="button" style="display:none">Send Test Notification</button>
+        <button id="notificationTestButton" class="settingsNotificationTest" type="button" onclick="this.textContent='Sending…';this.disabled=true;sendBenzaTestNotification().finally(()=>{this.disabled=false;this.textContent='Send Test Notification';})" style="display:none">Send Test Notification</button>
         <div id="settingsNotificationNote" class="settingsNotificationNote">Notification preferences are saved to your Benza Bullion account.</div>
       </div>
 
@@ -7135,23 +7135,6 @@ async function onSignedIn(){
   repairLegacyLiveChartShock();
   await loadPortfolioSnapshots(activeChartRange);
   await loadBenzaWatchlist();
-document.addEventListener('DOMContentLoaded',()=>{
-  const btn=document.getElementById('notificationTestButton');
-  if(btn&&!btn.dataset.boundNativeTest){
-    btn.dataset.boundNativeTest='1';
-    btn.addEventListener('click',async()=>{
-      const status=document.getElementById('notificationStatus');
-      if(status)status.textContent='Sending test notification…';
-      btn.disabled=true;
-      try{
-        await sendBenzaTestNotification();
-      }finally{
-        btn.disabled=false;
-      }
-    });
-  }
-});
-
   await loadNotificationPreferences();
   await updateNotificationUI();
 }
@@ -10377,6 +10360,8 @@ async function toggleBenzaNotifications(){
   }catch(e){console.warn(e);await updateNotificationUI('Could not enable notifications: '+(e?.message||'Unknown error'))}
 }
 async function sendBenzaTestNotification(){
+  const status=document.getElementById('notificationStatus');
+  if(status)status.textContent='Sending test notification…';
   if(isBenzaNativeRuntime()){
     try{
       if(!supabaseClient||!currentUser)throw new Error('Log in first.');
