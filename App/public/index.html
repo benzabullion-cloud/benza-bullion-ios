@@ -3442,14 +3442,50 @@ html.native-app select{
   background:transparent !important;
   box-shadow:none !important;
 }
-#addScreen #date{
+#addScreen .money input:focus,
+#addScreen .money input:focus-visible{
+  outline:none !important;
+}
+#addScreen .money:focus-within{
+  border-color:var(--gold);
+}
+#addScreen .dateField{
+  box-sizing:border-box;
+  width:100%;
+  max-width:100%;
+  height:48px;
+  overflow:hidden;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:var(--surface);
+}
+#addScreen .dateField:focus-within{
+  border-color:var(--gold);
+}
+#addScreen .dateField #date{
+  -webkit-appearance:none !important;
+  appearance:none !important;
   display:block !important;
+  box-sizing:border-box !important;
   inline-size:100% !important;
   width:100% !important;
   min-inline-size:0 !important;
   min-width:0 !important;
   max-width:100% !important;
+  height:100% !important;
   margin:0 !important;
+  padding:0 13px !important;
+  border:0 !important;
+  border-radius:0 !important;
+  outline:none !important;
+  background:transparent !important;
+  box-shadow:none !important;
+  color:var(--text) !important;
+  text-align:center;
+}
+#addScreen .dateField #date:focus,
+#addScreen .dateField #date:focus-visible{
+  outline:none !important;
 }
 
 
@@ -6258,7 +6294,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
       <div class="money"><span>$</span><input id="cost" type="number" min="0" step=".01" value="3450"></div>
 
       <label>Purchase date</label>
-      <input id="date" type="date">
+      <div class="dateField"><input id="date" type="date"></div>
       <details id="proInventoryFields" class="inventoryDetails" hidden>
         <summary>
           <span><strong>Inventory &amp; records</strong><small>Optional Pro details</small></span>
