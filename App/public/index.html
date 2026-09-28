@@ -10362,10 +10362,21 @@ async function toggleBenzaNotifications(){
 async function sendBenzaTestNotification(){
   if(isBenzaNativeRuntime()){
     try{
-      const plugin=nativeBenzaNotifications();
-      if(!plugin)throw new Error('Native notification support is unavailable.');
-      await plugin.test();
-      await updateNotificationUI('Test notification scheduled. It should appear in a moment.');
+      if(!supabaseClient||!currentUser)throw new Error('Log in first.');
+      const {data:{session},error:sessionError}=await supabaseClient.auth.getSession();
+      if(sessionError||!session?.access_token)throw new Error('Your Benza Bullion session has expired. Please sign in again.');
+      const response=await fetch(`${SUPABASE_URL}/functions/v1/benza-price-alerts`,{
+        method:'POST',
+        headers:{
+          apikey:SUPABASE_PUBLISHABLE_KEY,
+          Authorization:`Bearer ${session.access_token}`,
+          'Content-Type':'application/json'
+        },
+        body:JSON.stringify({action:'test-native'})
+      });
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok||data?.success===false)throw new Error(data?.error||`Push test failed (${response.status}).`);
+      await updateNotificationUI('Test push sent through Apple. It should appear in a moment.');
     }catch(e){await updateNotificationUI('Could not send the test notification: '+(e?.message||'Unknown error'))}
     return;
   }
