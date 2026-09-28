@@ -3361,6 +3361,29 @@ html.native-app .content{padding-bottom:calc(90px + env(safe-area-inset-bottom,0
 html.native-app .settingsHeader,html.native-app .activityHeader{padding-top:max(28px,calc(14px + env(safe-area-inset-top,0px)))}
 html.native-app .settingsOverlay,html.native-app .activityOverlay{padding-bottom:calc(88px + env(safe-area-inset-bottom,0px))}
 html.native-app .sheet{padding-bottom:env(safe-area-inset-bottom,0px)}
+html.native-app .proUpgradeModal{
+  box-sizing:border-box;
+  padding-top:calc(10px + env(safe-area-inset-top,0px));
+  padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));
+  overflow:hidden;
+  align-items:flex-end;
+}
+html.native-app .proUpgradeSheet{
+  box-sizing:border-box;
+  max-height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 20px);
+  overflow-y:auto;
+  overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  touch-action:pan-y;
+  padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));
+}
+html.native-app input,
+html.native-app textarea,
+html.native-app select{
+  font-size:16px !important;
+}
+
 
 /* v77 — global Add Bullion portal: keep every add surface above every app tab */
 #addScreen{z-index:2147482998 !important;}
@@ -7579,15 +7602,73 @@ function selectProPlan(plan){
   const button=document.getElementById('proStartTrialBtn');
   if(button)button.textContent=selectedProPlan==='founder'?'Get Founder Lifetime Access':'Start 7-Day Free Trial';
 }
-function startNativeProPurchase(){
-  if(selectedProPlan==='founder'){
-    closeProUpgrade();
-    alert('Apple StoreKit will open the limited-time $25 Founder purchase here in the native iPhone build. This one-time, non-renewing purchase grants lifetime Benza Bullion Pro access, including future features released as part of Pro, plus the exclusive Founding Member badge on Home. No web purchase is being simulated.');
+function nativeStoreKitPlugin(){
+  return window.Capacitor?.Plugins?.BenzaStoreKit||null;
+}
+async function verifyNativeStoreTransaction(result){
+  const signedTransaction=String(result?.signedTransaction||'');
+  if(!signedTransaction)throw new Error('Apple did not return a signed transaction.');
+  if(!supabaseClient||!currentUser)throw new Error('Please sign in before purchasing Benza Bullion Pro.');
+
+  const {data,error}=await supabaseClient.functions.invoke('benza-storekit-entitlement',{
+    body:{signedTransaction}
+  });
+  if(error)throw error;
+
+  const plugin=nativeStoreKitPlugin();
+  if(plugin&&result?.transactionId){
+    await plugin.finishTransaction({transactionId:String(result.transactionId)});
+  }
+
+  await loadBenzaEntitlement();
+  if(!isProActive())throw new Error(data?.error||'The purchase was verified, but Pro access has not refreshed yet.');
+  renderProAnalytics();
+  updateProIntegratedUI();
+  return data;
+}
+async function startNativeProPurchase(){
+  const plugin=nativeStoreKitPlugin();
+  if(!isBenzaNativeRuntime()||!plugin){
+    alert('App Store purchases are available in the native iPhone app.');
     return;
   }
-  const plan=selectedProPlan==='annual'?'$39.99/year':'$4.99/month';
-  closeProUpgrade();
-  alert(`Apple StoreKit will open a 7-day free trial for the selected ${plan} plan here in the native iPhone build. After the trial, the selected plan renews at its displayed price unless canceled. No web purchase is being simulated.`);
+  if(!currentUser){
+    alert('Please sign in before purchasing Benza Bullion Pro.');
+    return;
+  }
+
+  const productId=selectedProPlan==='annual'
+    ?'benza_pro_annual'
+    :selectedProPlan==='founder'
+      ?'benza_pro_founder_lifetime'
+      :'benza_pro_monthly';
+
+  const button=document.getElementById('proStartTrialBtn');
+  const previousText=button?.textContent||'Continue';
+  if(button){button.disabled=true;button.textContent='Opening App Store…';}
+
+  try{
+    const result=await plugin.purchase({productId,appAccountToken:currentUser.id});
+    if(result?.state==='cancelled')return;
+    if(result?.state==='pending'){
+      closeProUpgrade();
+      alert('Your purchase is pending with Apple. Pro will activate after Apple approves the transaction.');
+      return;
+    }
+    if(result?.state!=='purchased')throw new Error('The App Store purchase did not complete.');
+
+    if(button)button.textContent='Verifying purchase…';
+    await verifyNativeStoreTransaction(result);
+    closeProUpgrade();
+    alert(selectedProPlan==='founder'
+      ?'Founder Lifetime Pro is now active.'
+      :'Benza Bullion Pro is now active.');
+  }catch(error){
+    console.error('StoreKit purchase failed:',error);
+    alert(error?.message||'The App Store purchase could not be completed.');
+  }finally{
+    if(button){button.disabled=false;button.textContent=previousText;}
+  }
 }
 function isFounderPro(){
   return getProPlanType()==='founder';
@@ -7611,7 +7692,7 @@ function getProPlanPresentation(){
   if(type==='pro')return {title:'Benza Bullion Pro',status:`PRO · ${state}`,meta:'ACTIVE PRO ACCESS',manage:'Manage Subscription',sub:'Pro access is active, including deeper analytics, realized sales, unlimited alerts, private inventory, detailed reports, and future Pro releases.'};
   return {title:'More control over your stack',status:'INACTIVE',meta:'',manage:'Manage Subscription',sub:'Go beyond the Free performance snapshot with deeper analytics, realized sales, unlimited alerts, private inventory, detailed reports, and future Pro releases.'};
 }
-function manageProSubscription(){
+async function manageProSubscription(){
   const type=getProPlanType();
   if(type==='founder'){
     alert('Founder Pro access is active on this account and does not expire.');
@@ -7621,7 +7702,17 @@ function manageProSubscription(){
     alert('Regular internal Pro access is active on this account. This account is not a Founder account and has no App Store subscription to manage.');
     return;
   }
-  alert('The native iPhone build will open Apple’s subscription management screen here.');
+  const plugin=nativeStoreKitPlugin();
+  if(!isBenzaNativeRuntime()||!plugin){
+    alert('Subscription management is available in the native iPhone app.');
+    return;
+  }
+  try{
+    await plugin.manageSubscriptions();
+  }catch(error){
+    console.error('Subscription management failed:',error);
+    alert(error?.message||'Apple subscription management could not be opened.');
+  }
 }
 
 function openFounderAccessDetails(){
@@ -7741,14 +7832,51 @@ async function loadBenzaEntitlement(){
 }
 
 async function restoreProPurchases(){
-  // The web/PWA cannot restore App Store purchases itself. Native StoreKit
-  // will refresh the server entitlement and then this app state reloads it.
-  await loadBenzaEntitlement();
-  if(isProActive()){
-    renderProAnalytics();
-    alert('Benza Bullion Pro is active on this account.');
-  }else{
-    alert('No active Pro entitlement is currently linked to this account.');
+  const plugin=nativeStoreKitPlugin();
+  if(!isBenzaNativeRuntime()||!plugin){
+    await loadBenzaEntitlement();
+    alert(isProActive()
+      ?'Benza Bullion Pro is active on this account.'
+      :'Restore Purchases is available in the native iPhone app.');
+    return;
+  }
+  if(!currentUser){
+    alert('Please sign in before restoring purchases.');
+    return;
+  }
+
+  try{
+    const result=await plugin.restorePurchases();
+    const transactions=Array.isArray(result?.transactions)?result.transactions:[];
+    if(!transactions.length){
+      await loadBenzaEntitlement();
+      alert(isProActive()
+        ?'Benza Bullion Pro is active on this account.'
+        :'Apple did not find an active Benza Bullion Pro purchase to restore.');
+      return;
+    }
+
+    let verified=false;
+    for(const transaction of transactions){
+      try{
+        await verifyNativeStoreTransaction(transaction);
+        verified=true;
+      }catch(error){
+        console.warn('Restore verification failed:',error);
+      }
+    }
+
+    await loadBenzaEntitlement();
+    if(verified&&isProActive()){
+      renderProAnalytics();
+      updateProIntegratedUI();
+      alert('Your Benza Bullion Pro purchase has been restored.');
+    }else{
+      alert('Apple found a purchase, but Pro access could not be verified. Please try again.');
+    }
+  }catch(error){
+    console.error('Restore Purchases failed:',error);
+    alert(error?.message||'Restore Purchases could not be completed.');
   }
 }
 
