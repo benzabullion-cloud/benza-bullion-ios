@@ -3363,19 +3363,22 @@ html.native-app .settingsOverlay,html.native-app .activityOverlay{padding-bottom
 html.native-app .sheet{padding-bottom:env(safe-area-inset-bottom,0px)}
 html.native-app .proUpgradeModal{
   box-sizing:border-box;
-  padding-top:calc(10px + env(safe-area-inset-top,0px));
-  padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));
-  overflow:hidden;
-  align-items:flex-end;
-}
-html.native-app .proUpgradeSheet{
-  box-sizing:border-box;
-  max-height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 20px);
-  overflow-y:auto;
+  display:none;
+  padding:calc(10px + env(safe-area-inset-top,0px)) 18px calc(10px + env(safe-area-inset-bottom,0px));
+  overflow-y:scroll;
   overflow-x:hidden;
   -webkit-overflow-scrolling:touch;
   overscroll-behavior:contain;
   touch-action:pan-y;
+  align-items:flex-start;
+}
+html.native-app .proUpgradeModal.show{display:block}
+html.native-app .proUpgradeSheet{
+  box-sizing:border-box;
+  width:min(430px,100%);
+  max-height:none;
+  overflow:visible;
+  margin:0 auto;
   padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));
 }
 html.native-app input,
@@ -7591,8 +7594,13 @@ function openProUpgrade(context='general'){
   const copy=document.getElementById('proUpgradeContext');
   if(copy)copy.textContent=proContextCopy(context);
   modal?.classList.add('show');
+  if(modal)modal.scrollTop=0;
+  if(isBenzaNativeRuntime())document.body.style.overflow='hidden';
 }
-function closeProUpgrade(){document.getElementById('proUpgradeModal')?.classList.remove('show')}
+function closeProUpgrade(){
+  document.getElementById('proUpgradeModal')?.classList.remove('show');
+  if(isBenzaNativeRuntime())document.body.style.overflow='';
+}
 let selectedProPlan='monthly';
 function selectProPlan(plan){
   selectedProPlan=['monthly','annual','founder'].includes(plan)?plan:'monthly';
