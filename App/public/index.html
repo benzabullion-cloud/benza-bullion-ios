@@ -3458,30 +3458,48 @@ html.native-app select{
   border:1px solid var(--border);
   border-radius:12px;
   background:var(--surface);
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
 }
+#addScreen .dateField #dateDisplay{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  pointer-events:none;
+  color:var(--text);
+  font-size:16px;
+  line-height:1;
+  text-align:center;
+  white-space:nowrap;
+}
+
 #addScreen .dateField:focus-within{
   border-color:var(--gold);
 }
 #addScreen .dateField #date{
   -webkit-appearance:none !important;
   appearance:none !important;
+  position:absolute !important;
+  inset:0 !important;
   display:block !important;
   box-sizing:border-box !important;
-  inline-size:100% !important;
   width:100% !important;
-  min-inline-size:0 !important;
-  min-width:0 !important;
-  max-width:100% !important;
   height:100% !important;
   margin:0 !important;
-  padding:0 13px !important;
+  padding:0 !important;
   border:0 !important;
   border-radius:0 !important;
   outline:none !important;
   background:transparent !important;
   box-shadow:none !important;
-  color:var(--text) !important;
-  text-align:center;
+  color:transparent !important;
+  -webkit-text-fill-color:transparent !important;
+  opacity:.001 !important;
+  cursor:pointer;
 }
 #addScreen .dateField #date:focus,
 #addScreen .dateField #date:focus-visible{
@@ -3538,12 +3556,11 @@ html.native-app select{
 }
 #addScreen .metalSwitch button{
   box-sizing:border-box;
-  flex:1 1 0 !important;
   min-width:0 !important;
-  max-width:20% !important;
-  padding-left:4px !important;
-  padding-right:4px !important;
-  overflow:hidden;
+  width:100% !important;
+  max-width:none !important;
+  padding:8px 1px !important;
+  overflow:visible !important;
 }
 #addScreen .row{
   width:100% !important;
@@ -6368,7 +6385,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
       <div class="money"><span>$</span><input id="cost" type="number" min="0" step=".01" value="3450"></div>
 
       <label>Purchase date</label>
-      <div class="dateField"><input id="date" type="date"></div>
+      <div class="dateField"><span id="dateDisplay" aria-hidden="true"></span><input id="date" type="date" aria-label="Purchase date"></div>
       <details id="proInventoryFields" class="inventoryDetails" hidden>
         <summary>
           <span><strong>Inventory &amp; records</strong><small>Optional Pro details</small></span>
@@ -6731,7 +6748,20 @@ function editHolding(i){
   update();
   addScreen.classList.add('show');
 }
+function syncPurchaseDateDisplay(){
+  const input=document.getElementById('date');
+  const display=document.getElementById('dateDisplay');
+  if(!input||!display)return;
+  const value=input.value;
+  if(!value){display.textContent='';return;}
+  const parsed=new Date(value+'T12:00:00');
+  display.textContent=parsed.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+}
+document.getElementById('date')?.addEventListener('input',syncPurchaseDateDisplay);
+document.getElementById('date')?.addEventListener('change',syncPurchaseDateDisplay);
+
 function update(){
+  syncPurchaseDateDisplay();
   const c=Number(cost.value)||0, q=Number(qty.value)||0, w=Number(weight.value)||0;
   // Use the latest live or cached reference price for the selected metal.
   const spot=livePrices[metal]||0;
