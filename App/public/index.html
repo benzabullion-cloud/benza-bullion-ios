@@ -7876,11 +7876,13 @@ async function restoreProPurchases(){
     }
 
     let verified=false;
+    let verificationError='';
     for(const transaction of transactions){
       try{
         await verifyNativeStoreTransaction(transaction);
         verified=true;
       }catch(error){
+        verificationError=verificationError||String(error?.message||error||'');
         console.warn('Restore verification failed:',error);
       }
     }
@@ -7891,7 +7893,7 @@ async function restoreProPurchases(){
       updateProIntegratedUI();
       alert('Your Benza Bullion Pro purchase has been restored.');
     }else{
-      alert('Apple found a purchase, but Pro access could not be verified. Please try again.');
+      alert(verificationError||'Apple found a purchase, but Pro access could not be verified. Please try again.');
     }
   }catch(error){
     console.error('Restore Purchases failed:',error);
