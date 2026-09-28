@@ -1,6 +1,111 @@
 import UIKit
 import Capacitor
 import StoreKit
+import UserNotifications
+
+@objc(BenzaNotificationsPlugin)
+final class BenzaNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
+    let identifier = "BenzaNotificationsPlugin"
+    let jsName = "BenzaNotifications"
+    let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "enable", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "disable", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "test", returnType: CAPPluginReturnPromise)
+    ]
+
+    private let tokenKey = "benza.apnsToken"
+    private let errorKey = "benza.apnsRegistrationError"
+
+    private func permissionName(_ status: UNAuthorizationStatus) -> String {
+        switch status {
+        case .authorized, .provisional, .ephemeral: return "granted"
+        case .denied: return "denied"
+        case .notDetermined: return "prompt"
+        @unknown default: return "prompt"
+        }
+    }
+
+    @objc func status(_ call: CAPPluginCall) {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                let token = UserDefaults.standard.string(forKey: self.tokenKey) ?? ""
+                call.resolve([
+                    "permission": self.permissionName(settings.authorizationStatus),
+                    "token": token,
+                    "registered": UIApplication.shared.isRegisteredForRemoteNotifications && !token.isEmpty
+                ])
+            }
+        }
+    }
+
+    @objc func enable(_ call: CAPPluginCall) {
+        Task { @MainActor in
+            do {
+                let center = UNUserNotificationCenter.current()
+                let granted = try await center.requestAuthorization(options: [.alert, .badge, .sound])
+                guard granted else {
+                    call.resolve(["permission": "denied", "token": ""])
+                    return
+                }
+
+                UserDefaults.standard.removeObject(forKey: errorKey)
+                UIApplication.shared.registerForRemoteNotifications()
+
+                if let existing = UserDefaults.standard.string(forKey: tokenKey), !existing.isEmpty {
+                    call.resolve(["permission": "granted", "token": existing])
+                    return
+                }
+
+                for _ in 0..<40 {
+                    try await Task.sleep(nanoseconds: 250_000_000)
+                    if let token = UserDefaults.standard.string(forKey: tokenKey), !token.isEmpty {
+                        call.resolve(["permission": "granted", "token": token])
+                        return
+                    }
+                    if let message = UserDefaults.standard.string(forKey: errorKey), !message.isEmpty {
+                        call.reject(message)
+                        return
+                    }
+                }
+
+                call.reject("Apple did not return a notification device token. Please try again.")
+            } catch {
+                call.reject(error.localizedDescription)
+            }
+        }
+    }
+
+    @objc func disable(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            UIApplication.shared.unregisterForRemoteNotifications()
+            UserDefaults.standard.removeObject(forKey: self.tokenKey)
+            UserDefaults.standard.removeObject(forKey: self.errorKey)
+            call.resolve()
+        }
+    }
+
+    @objc func test(_ call: CAPPluginCall) {
+        let content = UNMutableNotificationContent()
+        content.title = "Benza Bullion"
+        content.body = "Native iPhone notifications are working on this device."
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: "benza-native-test-\(UUID().uuidString)",
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        )
+
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error {
+                call.reject(error.localizedDescription)
+            } else {
+                call.resolve()
+            }
+        }
+    }
+}
 
 @objc(BenzaStoreKitPlugin)
 final class BenzaStoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -128,6 +233,7 @@ final class BenzaBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
         bridge?.registerPluginInstance(BenzaStoreKitPlugin())
+        bridge?.registerPluginInstance(BenzaNotificationsPlugin())
     }
 }
 

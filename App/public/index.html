@@ -6283,7 +6283,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
         </div>
         <div id="notificationPrefsStatus" role="status" aria-live="polite" class="settingsNotificationPrefsStatus"></div>
         <button id="notificationTestButton" class="settingsNotificationTest" type="button" onclick="sendBenzaTestNotification()" style="display:none">Send Test Notification</button>
-        <div class="settingsNotificationNote">On iPhone, install Benza Bullion to your Home Screen for push notifications. Notification preferences are saved to your Benza account.</div>
+        <div id="settingsNotificationNote" class="settingsNotificationNote">Notification preferences are saved to your Benza Bullion account.</div>
       </div>
 
     </div>
@@ -10237,9 +10237,67 @@ async function removeBenzaPushSubscription(sub){
   }catch(e){console.warn('Could not remove old push subscription from cloud:',e?.message||e)}
   try{await sub.unsubscribe()}catch(e){}
 }
+function nativeBenzaNotifications(){
+  return isBenzaNativeRuntime()?window.Capacitor?.Plugins?.BenzaNotifications:null;
+}
+function nativeBenzaEndpoint(token){return token?'apns:'+String(token):''}
+async function getSavedNativeBenzaSubscription(token){
+  if(!supabaseClient||!currentUser||!token)return null;
+  const {data,error}=await supabaseClient.from('notification_subscriptions')
+    .select('endpoint,enabled')
+    .eq('user_id',currentUser.id)
+    .eq('endpoint',nativeBenzaEndpoint(token))
+    .maybeSingle();
+  if(error)throw error;
+  return data||null;
+}
+async function saveNativeBenzaSubscription(token){
+  if(!supabaseClient||!currentUser||!token)throw new Error('Notification device token is missing.');
+  const {error}=await supabaseClient.from('notification_subscriptions').upsert({
+    user_id:currentUser.id,
+    endpoint:nativeBenzaEndpoint(token),
+    p256dh:'native-apns',
+    auth:'native-apns',
+    enabled:true,
+    updated_at:new Date().toISOString()
+  },{onConflict:'endpoint'});
+  if(error)throw error;
+}
+async function removeNativeBenzaSubscriptions(){
+  if(!supabaseClient||!currentUser)return;
+  const {error}=await supabaseClient.from('notification_subscriptions')
+    .delete().eq('user_id',currentUser.id).like('endpoint','apns:%');
+  if(error)throw error;
+}
 async function updateNotificationUI(message=''){
-  const status=document.getElementById('notificationStatus'),btn=document.getElementById('notificationToggle'),test=document.getElementById('notificationTestButton');
+  const status=document.getElementById('notificationStatus'),btn=document.getElementById('notificationToggle'),test=document.getElementById('notificationTestButton'),note=document.getElementById('settingsNotificationNote');
   if(!status||!btn)return;
+
+  if(isBenzaNativeRuntime()){
+    if(note)note.textContent='Native iPhone alerts can notify you even when Benza Bullion is closed. Notification preferences are saved to your Benza Bullion account.';
+    if(!currentUser){status.textContent=message||'Log in to enable notifications.';btn.textContent='Enable';btn.style.display='';if(test)test.style.display='none';return}
+    const plugin=nativeBenzaNotifications();
+    if(!plugin){status.textContent='Native notification support is loading. Reopen this screen in a moment.';btn.style.display='none';if(test)test.style.display='none';return}
+    try{
+      const state=await plugin.status();
+      const token=state?.token||'';
+      const saved=token?await getSavedNativeBenzaSubscription(token):null;
+      const enabled=state?.permission==='granted'&&!!token&&!!saved&&saved.enabled!==false;
+      status.textContent=message||(state?.permission==='denied'
+        ?'Notifications are blocked in iPhone Settings.'
+        :enabled?'Notifications are enabled on this iPhone.':'Notifications are off on this iPhone.');
+      btn.textContent=enabled?'Disable':'Enable';
+      btn.classList.toggle('off',enabled);
+      btn.style.display='';
+      if(test)test.style.display=enabled?'block':'none';
+    }catch(e){
+      status.textContent=message||'Could not read iPhone notification status.';
+      btn.textContent='Enable';btn.style.display='';if(test)test.style.display='none';
+    }
+    return;
+  }
+
+  if(note)note.textContent='On iPhone Safari, add Benza Bullion to your Home Screen for web push notifications. Notification preferences are saved to your Benza Bullion account.';
   if(!('Notification' in window)||!('serviceWorker' in navigator)||!('PushManager' in window)){
     status.textContent='Push notifications are not supported in this browser.';btn.style.display='none';if(test)test.style.display='none';return;
   }
@@ -10254,13 +10312,36 @@ async function updateNotificationUI(message=''){
     ?'Notifications are blocked in your device settings.'
     :needsRefresh
       ?'Notification setup needs a quick refresh. Tap Enable to reconnect this device.'
-      :enabled
-        ?'Notifications are enabled on this device.'
-        :'Notifications are off on this device.');
+      :enabled?'Notifications are enabled on this device.':'Notifications are off on this device.');
   btn.textContent=enabled?'Disable':'Enable';btn.classList.toggle('off',enabled);btn.style.display='';if(test)test.style.display=enabled?'block':'none';
 }
 async function toggleBenzaNotifications(){
-  if(!currentUser){await updateNotificationUI('Log in to enable price notifications.');return}
+  if(!currentUser){await updateNotificationUI('Log in to enable notifications.');return}
+  if(isBenzaNativeRuntime()){
+    try{
+      const plugin=nativeBenzaNotifications();
+      if(!plugin)throw new Error('Native notification support is unavailable.');
+      const state=await plugin.status();
+      const token=state?.token||'';
+      const saved=token?await getSavedNativeBenzaSubscription(token):null;
+      const enabled=state?.permission==='granted'&&!!token&&!!saved&&saved.enabled!==false;
+      if(enabled){
+        await removeNativeBenzaSubscriptions();
+        await plugin.disable();
+        await updateNotificationUI('Notifications are off on this iPhone.');
+        return;
+      }
+      const result=await plugin.enable();
+      if(result?.permission!=='granted'||!result?.token){
+        await updateNotificationUI(result?.permission==='denied'?'Notifications were blocked. You can enable them in iPhone Settings.':'Notification permission was not granted.');
+        return;
+      }
+      await saveNativeBenzaSubscription(result.token);
+      await updateNotificationUI('Notifications are enabled. Benza Bullion can alert you even when the app is closed.');
+    }catch(e){console.warn(e);await updateNotificationUI('Could not enable notifications: '+(e?.message||'Unknown error'))}
+    return;
+  }
+
   try{
     const publicKey=await getBenzaVapidPublicKey(true);
     let existing=await getBenzaPushSubscription();
@@ -10279,6 +10360,15 @@ async function toggleBenzaNotifications(){
   }catch(e){console.warn(e);await updateNotificationUI('Could not enable notifications: '+(e?.message||'Unknown error'))}
 }
 async function sendBenzaTestNotification(){
+  if(isBenzaNativeRuntime()){
+    try{
+      const plugin=nativeBenzaNotifications();
+      if(!plugin)throw new Error('Native notification support is unavailable.');
+      await plugin.test();
+      await updateNotificationUI('Test notification scheduled. It should appear in a moment.');
+    }catch(e){await updateNotificationUI('Could not send the test notification: '+(e?.message||'Unknown error'))}
+    return;
+  }
   if(Notification.permission!=='granted')return updateNotificationUI('Enable notifications first.');
   try{const reg=await navigator.serviceWorker.ready;await reg.showNotification('Benza Bullion',{body:'Benza Bullion notifications are enabled on this device.',icon:'./icon-192.png',badge:'./icon-192.png',tag:'benza-test',data:{url:'./'}})}catch(e){updateNotificationUI('Could not send the test notification.')}
 }
