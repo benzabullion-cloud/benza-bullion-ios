@@ -86,6 +86,10 @@ final class BenzaNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func test(_ call: CAPPluginCall) {
+        if let appDelegate = UIApplication.shared.delegate as? AppDelegate {
+            UNUserNotificationCenter.current().delegate = appDelegate
+        }
+
         let content = UNMutableNotificationContent()
         content.title = "Benza Bullion"
         content.body = "Native iPhone notifications are working on this device."
@@ -246,6 +250,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window = UIWindow(windowScene: windowScene)
         window?.rootViewController = BenzaBridgeViewController()
         window?.makeKeyAndVisible()
+
+        if let appDelegate = UIApplication.shared.delegate as? AppDelegate {
+            UNUserNotificationCenter.current().delegate = appDelegate
+        }
 
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
     }
