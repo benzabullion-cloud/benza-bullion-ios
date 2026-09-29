@@ -6234,7 +6234,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
         <a class="settingsLegalLink" href="mailto:benzabullion@gmail.com"><span>Contact Support</span><span>›</span></a>
         <div class="settingsAboutMeta">
           <div class="settingsAboutName">Benza Bullion</div>
-          <div class="settingsAboutVersion">Version 1.0.0 · Build 125</div>
+          <div class="settingsAboutVersion">Version 1.0</div>
           <div class="settingsAboutNote">Hold · Track · Grow. Portfolio tracking and market information are provided for informational purposes and are not investment advice.</div>
         </div>
 
@@ -7129,6 +7129,7 @@ async function onSignedIn(){
 
   await loadHoldingsFromSupabase();
   await loadBenzaEntitlement();
+  refreshNativeProEntitlementSilently().catch(()=>{});
   restoreLiveChartPoints();
   await loadLiveChartFromCloud();
   await loadActivityFromSupabase();
@@ -7194,7 +7195,24 @@ function closeActivity(){
   setSettingsTab('settings');
 }
 
-async function signOut(){if(supabaseClient) await supabaseClient.auth.signOut();currentUser=null;updateWelcomeBack();holdings=[];holdingsLoaded=false;activities=[];chartSnapshots=[];liveChartPoints=[];liveCloudLoaded=false;lastLiveCloudSync=0;renderHoldings();renderActivity();document.getElementById('authScreen').style.display='flex';document.getElementById('authStatus').textContent='';setAuthError('')}
+async function signOut(){
+  try{
+    if(isBenzaNativeRuntime()&&supabaseClient&&currentUser){
+      await removeNativeBenzaSubscriptions();
+    }
+  }catch(e){
+    console.warn('Could not detach this iPhone from the signed-out account:',e?.message||e);
+  }
+  if(supabaseClient) await supabaseClient.auth.signOut();
+  currentUser=null;
+  benzaEntitlement={tier:'free',status:'inactive',expires_at:null,trial_ends_at:null};
+  updateWelcomeBack();
+  holdings=[];holdingsLoaded=false;activities=[];chartSnapshots=[];liveChartPoints=[];liveCloudLoaded=false;lastLiveCloudSync=0;
+  renderHoldings();renderActivity();updateProIntegratedUI();
+  document.getElementById('authScreen').style.display='flex';
+  document.getElementById('authStatus').textContent='';
+  setAuthError('');
+}
 function handleBenzaDeepLink(){
   const params=new URLSearchParams(location.search);
   const requested=params.get('open');
@@ -7850,6 +7868,39 @@ async function verifyNativeStoreTransaction(result){
   updateProIntegratedUI();
   return data;
 }
+function sortStoreKitTransactionsForVerification(transactions){
+  return [...(transactions||[])].sort((a,b)=>{
+    const priority=t=>{
+      const id=String(t?.productId||'');
+      if(id==='benza_pro_founder_lifetime')return 3;
+      if(id==='benza_pro_annual')return 2;
+      if(id==='benza_pro_monthly')return 1;
+      return 0;
+    };
+    return priority(a)-priority(b);
+  });
+}
+async function refreshNativeProEntitlementSilently(){
+  const plugin=nativeStoreKitPlugin();
+  if(!isBenzaNativeRuntime()||!plugin||!currentUser)return;
+  try{
+    const result=await plugin.restorePurchases();
+    const transactions=sortStoreKitTransactionsForVerification(
+      Array.isArray(result?.transactions)?result.transactions:[]
+    );
+    if(!transactions.length)return;
+    for(const transaction of transactions){
+      try{
+        await verifyNativeStoreTransaction(transaction);
+      }catch(error){
+        console.warn('Silent StoreKit entitlement refresh failed for a transaction:',error);
+      }
+    }
+    await loadBenzaEntitlement();
+  }catch(error){
+    console.warn('Silent StoreKit entitlement refresh unavailable:',error);
+  }
+}
 async function startNativeProPurchase(){
   const plugin=nativeStoreKitPlugin();
   if(!isBenzaNativeRuntime()||!plugin){
@@ -8071,7 +8122,9 @@ async function restoreProPurchases(){
 
   try{
     const result=await plugin.restorePurchases();
-    const transactions=Array.isArray(result?.transactions)?result.transactions:[];
+    const transactions=sortStoreKitTransactionsForVerification(
+      Array.isArray(result?.transactions)?result.transactions:[]
+    );
     if(!transactions.length){
       await loadBenzaEntitlement();
       alert(isProActive()
