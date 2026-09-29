@@ -5743,7 +5743,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
       <button class="addChoiceOption smartCameraChoice" onclick="openSmartCamera()">
         <div class="addChoiceIcon">⌾</div>
         <div class="addChoiceText">
-          <strong>Smart Camera</strong>
+          <strong>Smart Camera <span style="font-size:9px;color:#d6a53a">BETA</span></strong>
           <span>Intelligent bullion recognition</span>
         </div>
         <div class="smartCameraBadge">PRO</div>
@@ -5768,21 +5768,21 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
     </div>
     <div class="smartCameraBody">
       <div class="smartCameraHero">
-        <div class="smartCameraEyebrow">Benza Bullion Pro</div>
+        <div class="smartCameraEyebrow">Benza Bullion Pro · Beta</div>
         <div class="smartCameraVisual" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M4 8.5h3l1.4-2h7.2l1.4 2h3v10H4Z"/><circle cx="12" cy="13.5" r="3.4"/><path d="m18.2 5.2.5 1.1 1.1.5-1.1.5-.5 1.1-.5-1.1-1.1-.5 1.1-.5Z"/></svg>
         </div>
         <h2 class="smartCameraTitle">Add bullion in a smarter way</h2>
-        <p class="smartCameraCopy">Photograph supported bullion and Smart Camera uses on-device Apple Vision recognition to read visible markings, suggest the item details, and let you confirm everything before it reaches your portfolio.</p>
+        <p class="smartCameraCopy">Photograph supported bullion and Smart Camera Beta combines on-device text recognition with visual cues to suggest the item details, then lets you confirm everything before it reaches your portfolio.</p>
       </div>
       <div class="smartCameraGrid">
-        <div class="smartCameraFeature"><div class="smartCameraFeatureIcon">◎</div><div><strong>Recognize supported bullion</strong><span>Use visible bullion markings to suggest the metal and product from the captured item.</span></div></div>
-        <div class="smartCameraFeature"><div class="smartCameraFeatureIcon">✦</div><div><strong>Prefill key details</strong><span>Prepare supported product, metal, weight, and year information when those markings are readable.</span></div></div>
+        <div class="smartCameraFeature"><div class="smartCameraFeatureIcon">◎</div><div><strong>Recognize supported bullion</strong><span>Use visible markings plus visual cues such as color and object appearance to suggest the metal and product.</span></div></div>
+        <div class="smartCameraFeature"><div class="smartCameraFeatureIcon">✦</div><div><strong>Prefill key details</strong><span>Prepare supported product, metal, weight, year, mint/refiner, purity, and serial information when confidence is sufficient.</span></div></div>
         <div class="smartCameraFeature"><div class="smartCameraFeatureIcon">✓</div><div><strong>You stay in control</strong><span>Review and edit every suggestion before choosing to add the holding. Nothing saves automatically.</span></div></div>
       </div>
       <div id="smartCameraPromise" class="smartCameraPromise">
         <strong>Included with Benza Bullion Pro</strong>
-        Smart Camera runs on your iPhone using Apple Vision. Recognition suggestions are always reviewed before anything is saved.
+        Smart Camera Beta runs on your iPhone using Apple Vision. Recognition can be imperfect, so every suggestion is reviewed before anything is saved.
       </div>
       <div class="smartCameraActions">
         <button id="smartCameraProButton" class="smartCameraPrimary" type="button" onclick="handleSmartCameraProAction()">Scan Bullion</button>
@@ -6817,11 +6817,38 @@ function smartCameraDenominationGuess(text){
 function interpretSmartCameraScan(result){
   const raw=Array.isArray(result?.lines)?result.lines.join(' '):(result?.text||'');
   const text=normalizeSmartCameraText(raw);
+  const visualLabels=Array.isArray(result?.visualLabels)?result.visualLabels:[];
+  const visualColor=result?.visualColor||{};
+  const visualText=visualLabels.map(v=>String(v?.identifier||'').toLowerCase()).join(' ');
   let metal=smartCameraMetalGuess(text);
+  if(!metal){
+    if(visualColor.tone==='golden')metal='gold';
+    else if(visualColor.tone==='copper')metal='copper';
+    else if(visualColor.tone==='silvery'){
+      if(/platinum/.test(visualText))metal='platinum';
+      else if(/palladium/.test(visualText))metal='palladium';
+      else metal='silver';
+    }
+  }
   let catalogMatch=smartCameraCatalogMatch(text,metal||'');
   if(!metal && catalogMatch)metal=catalogMatch.item.metal;
   if(metal && (!catalogMatch || catalogMatch.item.metal!==metal))catalogMatch=smartCameraCatalogMatch(text,metal);
-  const product=catalogMatch?.item?.product || (metal?smartCameraProductGuess(text,metal):'');
+  let product=catalogMatch?.item?.product || (metal?smartCameraProductGuess(text,metal):'');
+  if(!product && metal){
+    const visualProductHints=[
+      ['maple leaf','Canadian '+METAL_NAMES[metal]+' Maple Leaf'],
+      ['panda',METAL_NAMES[metal]==='Silver'?'Chinese Silver Panda':METAL_NAMES[metal]==='Gold'?'Chinese Gold Panda':''],
+      ['kangaroo',METAL_NAMES[metal]==='Silver'?'Australian Silver Kangaroo':METAL_NAMES[metal]==='Gold'?'Australian Gold Kangaroo':METAL_NAMES[metal]==='Platinum'?'Australian Platinum Kangaroo':''],
+      ['kookaburra','Australian Silver Kookaburra'],
+      ['koala','Australian Silver Koala'],
+      ['britannia','British '+METAL_NAMES[metal]+' Britannia'],
+      ['krugerrand',METAL_NAMES[metal]==='Silver'?'South African Silver Krugerrand':METAL_NAMES[metal]==='Gold'?'South African Gold Krugerrand':''],
+      ['eagle',METAL_NAMES[metal]==='Silver'?'American Silver Eagle':METAL_NAMES[metal]==='Gold'?'American Gold Eagle':METAL_NAMES[metal]==='Platinum'?'American Platinum Eagle':METAL_NAMES[metal]==='Palladium'?'American Palladium Eagle':'']
+    ];
+    for(const [hint,name] of visualProductHints){
+      if(name && visualText.includes(hint) && (PRODUCT_MAP[metal]||[]).includes(name)){product=name;break;}
+    }
+  }
   let weight=metal?smartCameraWeightGuess(text,metal):0;
   if(!weight && catalogMatch?.item?.weight)weight=catalogMatch.item.weight;
   const years=smartCameraYearCandidates(text);
@@ -6837,7 +6864,8 @@ function interpretSmartCameraScan(result){
   const matchStrength=catalogMatch
     ? Math.min(1,(catalogMatch.strongHits.length*0.65)+(catalogMatch.supportHits.length*0.12))
     : 0;
-  let confidence=(ocrConfidence*.38)+(matchStrength*.47)+(metal?.length?0.08:0)+(weight>0?0.07:0);
+  const visualConfidence=Math.max(0,...visualLabels.map(v=>Number(v?.confidence)||0));
+  let confidence=(ocrConfidence*.30)+(matchStrength*.45)+(visualConfidence*.10)+(metal?.length?0.08:0)+(weight>0?0.07:0);
   if(!product)confidence=Math.min(confidence,.62);
   if(product && catalogMatch?.strongHits.length===0)confidence=Math.min(confidence,.68);
   if(years.length>1 && !year)confidence=Math.min(confidence,.84);
@@ -6845,6 +6873,7 @@ function interpretSmartCameraScan(result){
   return {
     metal,product,weight,year,mint,serial,purity,denomination,text,raw,confidence,
     matchedTerms:[...(catalogMatch?.strongHits||[]),...(catalogMatch?.supportHits||[])],
+    visualLabels,visualColor,
     usable:!!metal
   };
 }
@@ -6897,8 +6926,12 @@ function renderSmartCameraAnalysis(suggestion){
     ['Already tracked',suggestion.product?sameProduct+' '+(sameProduct===1?'holding':'holdings'):'—']
   ].map(([label,value])=>'<div class="smartAnalysisMetric"><span>'+label+'</span><strong>'+value+'</strong></div>').join('');
   const evidence=(suggestion.matchedTerms||[]).slice(0,4);
+  const visualEvidence=[];
+  if(suggestion.visualColor?.tone && suggestion.visualColor.tone!=='neutral')visualEvidence.push('visual tone: '+suggestion.visualColor.tone);
+  (suggestion.visualLabels||[]).slice(0,2).forEach(v=>{if(v?.identifier)visualEvidence.push('visual: '+String(v.identifier));});
+  const combinedEvidence=[...evidence,...visualEvidence].slice(0,5);
   document.getElementById('smartAnalysisNotes').innerHTML=
-    '<strong>What Benza Bullion used:</strong> '+(evidence.length?escapeBullionHtml(evidence.join(' · ')):'visible text and bullion markings')+
+    '<strong>What Benza Bullion used:</strong> '+(combinedEvidence.length?escapeBullionHtml(combinedEvidence.join(' · ')):'visible text, color, and object cues')+
     (suggestion.raw?'<br><strong>Recognized text:</strong> '+escapeBullionHtml(String(suggestion.raw).replace(/\s+/g,' ').slice(0,180)):'');
   panel.classList.add('show');
   panel.scrollIntoView({behavior:'smooth',block:'start'});
