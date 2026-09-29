@@ -6304,7 +6304,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
         <div class="settingsProFeatureList">
           <div><strong>Advanced analytics</strong><span>Profit/loss attribution, break-even distance, realized sales, acquisition history, and independent scenarios—beyond the Free performance snapshot.</span></div>
           <div><strong>Unlimited price alerts</strong><span>Track as many active price targets as you want.</span></div>
-          <div><strong>Inventory records</strong><span>Save serial numbers, private notes, item photos, and receipts.</span></div>
+          <div><strong>Smart Camera</strong><span>Scan supported bullion markings on iPhone to prefill metal, product, weight, and year for review.</span></div><div><strong>Inventory records</strong><span>Save serial numbers, private notes, item photos, and receipts.</span></div>
           <div><strong>Portfolio report</strong><span>Create a detailed inventory and performance report.</span></div>
           <div><strong>Future Pro releases</strong><span>Active subscriptions and Founder access automatically receive new features added to Benza Bullion Pro, including planned Future Potential tools.</span></div>
         </div>
@@ -6665,8 +6665,7 @@ function smartCameraMetalGuess(text){
 function smartCameraWeightGuess(text,metal){
   const fractions=[['1/20',0.05],['1/10',0.1],['1/4',0.25],['1/2',0.5]];
   for(const [token,value] of fractions){
-    if(new RegExp(token.replace('/','\\/ ')+'?\\s*(?:troy\\s*)?(?:oz|ounce)').test(text) ||
-       text.includes(token+' oz') || text.includes(token+' ounce'))return value;
+    if(text.includes(token+' oz') || text.includes(token+' ounce') || text.includes(token+' troy oz'))return value;
   }
   const oz=text.match(/\b(\d+(?:\.\d+)?)\s*(?:troy\s*)?(?:oz|ounce|ounces)\b/);
   if(oz)return Number(oz[1]);
@@ -6695,6 +6694,11 @@ function interpretSmartCameraScan(result){
   return {metal,product,weight,year,text,confidence:Number(result?.confidence)||0};
 }
 function applySmartCameraSuggestion(suggestion){
+  if(!suggestion?.metal){
+    const status=document.getElementById('smartCameraStatus');
+    if(status)status.textContent='Smart Camera could not confidently identify the metal from those markings. Try another photo with the weight/metal text in focus, or add the holding manually.';
+    return false;
+  }
   closeSmartCamera();
   openAdd();
   if(suggestion.metal){
@@ -6714,9 +6718,8 @@ function applySmartCameraSuggestion(suggestion){
   }
   update();
   const found=[suggestion.product||suggestion.metal,suggestion.weight>0?Number(suggestion.weight.toFixed(4))+' oz':'',suggestion.year||''].filter(Boolean);
-  alert(found.length
-    ? 'Smart Camera prepared '+found.join(' · ')+'. Review the details and enter what you paid before adding it.'
-    : 'Smart Camera could not identify enough markings with confidence. Review the form and complete the details manually.');
+  alert('Smart Camera prepared '+found.join(' · ')+'. Review every detail and enter what you paid before adding it.');
+  return true;
 }
 async function runSmartCameraScan(){
   if(!isProActive()){
@@ -7982,7 +7985,7 @@ function proContextCopy(context){
     inventory:'Keep serial numbers, private notes, item photos, and receipts with your holdings.',
     sale:'Track partial or full sales and preserve realized gain/loss automatically.',
     report:'Create polished portfolio and inventory reports for your records.',
-    'smart-camera':'Smart Camera is a planned Pro feature that will recognize supported bullion, prefill details, and let you review everything before adding it.',
+    'smart-camera':'Smart Camera uses on-device Apple Vision to recognize supported bullion markings, prefill details, and let you review everything before adding it.',
     analytics:'Add deeper portfolio intelligence today and receive future Pro releases with an active subscription or permanent Founder access.'
   };
   return map[context]||'Get deeper analytics, unlimited alerts, private inventory, detailed reports, and future features released as part of Benza Bullion Pro.';
