@@ -5791,7 +5791,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
       <div id="smartCameraStatus" class="smartCameraFine">For best results, fill the frame with one item and keep weight, metal, mint, or product markings clearly visible. You will review every suggestion before saving.</div>
       <div id="smartCameraAnalysis" class="smartCameraAnalysis" aria-live="polite">
         <div class="smartAnalysisTop">
-          <div class="smartAnalysisEyebrow">Benza Smart Analysis</div>
+          <div class="smartAnalysisEyebrow">Benza Bullion Smart Analysis</div>
           <h3 id="smartAnalysisTitle" class="smartAnalysisTitle">Bullion identified</h3>
           <div id="smartAnalysisSub" class="smartAnalysisSub"></div>
           <div id="smartAnalysisConfidence" class="smartAnalysisConfidence"><i></i><span>Analysis ready</span></div>
@@ -5800,7 +5800,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
         <div id="smartAnalysisGrid" class="smartAnalysisGrid"></div>
         <div id="smartAnalysisNotes" class="smartAnalysisNotes"></div>
         <div class="smartAnalysisActions">
-          <button class="smartAnalysisUse" type="button" onclick="useSmartCameraAnalysis()">Use Suggested Details</button>
+          <button id="smartAnalysisUseButton" class="smartAnalysisUse" type="button" onclick="useSmartCameraAnalysis()">Use Suggested Details</button>
           <button class="smartAnalysisAgain" type="button" onclick="runSmartCameraScan()">Scan Again</button>
         </div>
         <div class="smartAnalysisDisclosure">Smart Camera interprets visible markings and known bullion specifications. It does not authenticate, grade, or guarantee an item's identity or value.</div>
@@ -6633,52 +6633,52 @@ function normalizeSmartCameraText(value){
 }
 let pendingSmartCameraSuggestion=null;
 const SMART_CAMERA_CATALOG=[
-  {product:'American Silver Eagle',metal:'silver',terms:['walking liberty','1 oz fine silver','one dollar'],mint:'United States Mint',purity:'.999 fine silver',weight:1},
-  {product:'American Gold Eagle',metal:'gold',terms:['50 dollars','1 oz fine gold','united states of america'],mint:'United States Mint',purity:'22K gold',weight:1},
-  {product:'American Gold Buffalo',metal:'gold',terms:['50 dollars','.9999 fine gold','1 oz .9999'],mint:'United States Mint',purity:'.9999 fine gold',weight:1},
-  {product:'American Platinum Eagle',metal:'platinum',terms:['platinum','100 dollars','1 oz'],mint:'United States Mint',purity:'.9995 platinum',weight:1},
-  {product:'American Palladium Eagle',metal:'palladium',terms:['palladium','25 dollars','1 oz'],mint:'United States Mint',purity:'.9995 palladium',weight:1},
-  {product:'Canadian Gold Maple Leaf',metal:'gold',terms:['maple leaf','canada','9999'],mint:'Royal Canadian Mint',purity:'.9999 fine gold'},
-  {product:'Canadian Silver Maple Leaf',metal:'silver',terms:['maple leaf','canada','fine silver'],mint:'Royal Canadian Mint',purity:'.9999 fine silver'},
-  {product:'Canadian Platinum Maple Leaf',metal:'platinum',terms:['maple leaf','canada','platinum'],mint:'Royal Canadian Mint',purity:'.9995 platinum'},
-  {product:'Canadian Palladium Maple Leaf',metal:'palladium',terms:['maple leaf','canada','palladium'],mint:'Royal Canadian Mint',purity:'.9995 palladium'},
-  {product:'British Gold Britannia',metal:'gold',terms:['britannia','fine gold'],mint:'The Royal Mint',purity:'.9999 fine gold'},
-  {product:'British Silver Britannia',metal:'silver',terms:['britannia','fine silver'],mint:'The Royal Mint',purity:'.999 fine silver'},
-  {product:'British Platinum Britannia',metal:'platinum',terms:['britannia','platinum'],mint:'The Royal Mint',purity:'.9995 platinum'},
-  {product:'British Silver Queen’s Beasts',metal:'silver',terms:["queen's beasts",'queens beasts'],mint:'The Royal Mint',purity:'.9999 fine silver'},
-  {product:'South African Gold Krugerrand',metal:'gold',terms:['krugerrand','suid afrika'],mint:'South African Mint',purity:'22K gold'},
-  {product:'South African Silver Krugerrand',metal:'silver',terms:['krugerrand','fine silver'],mint:'South African Mint',purity:'.999 fine silver'},
-  {product:'Austrian Gold Philharmonic',metal:'gold',terms:['philharmoniker','wiener philharmoniker','republik osterreich'],mint:'Austrian Mint',purity:'.9999 fine gold'},
-  {product:'Austrian Silver Philharmonic',metal:'silver',terms:['philharmoniker','wiener philharmoniker','silver'],mint:'Austrian Mint',purity:'.999 fine silver'},
-  {product:'Austrian Platinum Philharmonic',metal:'platinum',terms:['philharmoniker','platinum'],mint:'Austrian Mint',purity:'.9995 platinum'},
-  {product:'Australian Gold Kangaroo',metal:'gold',terms:['kangaroo','australia','fine gold'],mint:'Perth Mint',purity:'.9999 fine gold'},
-  {product:'Australian Silver Kangaroo',metal:'silver',terms:['kangaroo','australia','fine silver'],mint:'Perth Mint',purity:'.9999 fine silver'},
-  {product:'Australian Platinum Kangaroo',metal:'platinum',terms:['kangaroo','australia','platinum'],mint:'Perth Mint',purity:'.9995 platinum'},
-  {product:'Australian Silver Kookaburra',metal:'silver',terms:['kookaburra','australia'],mint:'Perth Mint',purity:'.9999 fine silver'},
-  {product:'Australian Silver Koala',metal:'silver',terms:['koala','australia'],mint:'Perth Mint',purity:'.9999 fine silver'},
-  {product:'Australian Gold Lunar',metal:'gold',terms:['lunar','australia','fine gold'],mint:'Perth Mint',purity:'.9999 fine gold'},
-  {product:'Australian Silver Lunar',metal:'silver',terms:['lunar','australia','fine silver'],mint:'Perth Mint',purity:'.9999 fine silver'},
-  {product:'Chinese Gold Panda',metal:'gold',terms:['panda','yuan','fine gold'],mint:'China Gold Coin',purity:'.999 fine gold'},
-  {product:'Chinese Silver Panda',metal:'silver',terms:['panda','yuan','silver'],mint:'China Gold Coin',purity:'.999 fine silver'},
-  {product:'Chinese Palladium Panda',metal:'palladium',terms:['panda','palladium'],mint:'China Gold Coin',purity:'.999 palladium'},
-  {product:'Mexican Gold Libertad',metal:'gold',terms:['libertad','ley .999','onza'],mint:'Casa de Moneda de México',purity:'.999 fine gold'},
-  {product:'Mexican Silver Libertad',metal:'silver',terms:['libertad','ley .999','onza'],mint:'Casa de Moneda de México',purity:'.999 fine silver'},
-  {product:'Mexican 50 Peso Gold',metal:'gold',terms:['50 pesos','37.5 gr oro puro'],mint:'Casa de Moneda de México',purity:'.900 gold'},
-  {product:'Mexican 20 Peso Gold',metal:'gold',terms:['20 pesos','oro puro'],mint:'Casa de Moneda de México',purity:'.900 gold'},
-  {product:'Mexican 10 Peso Gold',metal:'gold',terms:['10 pesos','oro puro'],mint:'Casa de Moneda de México',purity:'.900 gold'},
-  {product:'Mexican 5 Peso Gold',metal:'gold',terms:['5 pesos','oro puro'],mint:'Casa de Moneda de México',purity:'.900 gold'},
-  {product:'Mexican 2.5 Peso Gold',metal:'gold',terms:['2 1/2 pesos','2.5 pesos','oro puro'],mint:'Casa de Moneda de México',purity:'.900 gold'},
-  {product:'British Gold Sovereign',metal:'gold',terms:['sovereign','dei gra rex fid def'],mint:'The Royal Mint',purity:'22K gold'},
-  {product:'Morgan Silver Dollar',metal:'silver',terms:['e pluribus unum','one dollar','in god we trust'],mint:'United States Mint',purity:'.900 silver'},
-  {product:'Peace Silver Dollar',metal:'silver',terms:['peace','one dollar','in god we trust'],mint:'United States Mint',purity:'.900 silver'},
-  {product:'Walking Liberty Half Dollar',metal:'silver',terms:['walking liberty','half dollar'],mint:'United States Mint',purity:'.900 silver'},
-  {product:'Franklin Half Dollar',metal:'silver',terms:['half dollar','franklin'],mint:'United States Mint',purity:'.900 silver'},
-  {product:'1964 Kennedy Half Dollar',metal:'silver',terms:['half dollar','kennedy'],mint:'United States Mint',purity:'.900 silver'},
-  {product:'Mercury Dime',metal:'silver',terms:['one dime','liberty'],mint:'United States Mint',purity:'.900 silver'},
-  {product:'Gold Bar',metal:'gold',terms:['fine gold','gold bar'],purity:'.9999 fine gold'},
-  {product:'Silver Bar',metal:'silver',terms:['fine silver','silver bar'],purity:'.999 fine silver'},
-  {product:'Platinum Bar',metal:'platinum',terms:['fine platinum','platinum bar'],purity:'.9995 platinum'},
-  {product:'Palladium Bar',metal:'palladium',terms:['fine palladium','palladium bar'],purity:'.9995 palladium'}
+  {product:'American Silver Eagle',metal:'silver',strong:['american eagle','silver eagle','1 oz fine silver'],support:['walking liberty','one dollar','united states of america'],mint:'United States Mint',purity:'.999 fine silver',weight:1,yearMin:1986},
+  {product:'American Gold Eagle',metal:'gold',strong:['american eagle','gold eagle','1 oz fine gold'],support:['50 dollars','united states of america'],mint:'United States Mint',purity:'22K gold',weight:1,yearMin:1986},
+  {product:'American Gold Buffalo',metal:'gold',strong:['american buffalo','gold buffalo','.9999 fine gold'],support:['50 dollars','1 oz .9999'],mint:'United States Mint',purity:'.9999 fine gold',weight:1,yearMin:2006},
+  {product:'American Platinum Eagle',metal:'platinum',strong:['platinum eagle'],support:['platinum','100 dollars','1 oz'],mint:'United States Mint',purity:'.9995 platinum',weight:1,yearMin:1997},
+  {product:'American Palladium Eagle',metal:'palladium',strong:['palladium eagle'],support:['palladium','25 dollars','1 oz'],mint:'United States Mint',purity:'.9995 palladium',weight:1,yearMin:2017},
+  {product:'Canadian Gold Maple Leaf',metal:'gold',strong:['maple leaf'],support:['canada','fine gold','9999'],mint:'Royal Canadian Mint',purity:'.9999 fine gold',yearMin:1979},
+  {product:'Canadian Silver Maple Leaf',metal:'silver',strong:['maple leaf'],support:['canada','fine silver','9999'],mint:'Royal Canadian Mint',purity:'.9999 fine silver',yearMin:1988},
+  {product:'Canadian Platinum Maple Leaf',metal:'platinum',strong:['maple leaf'],support:['canada','platinum'],mint:'Royal Canadian Mint',purity:'.9995 platinum'},
+  {product:'Canadian Palladium Maple Leaf',metal:'palladium',strong:['maple leaf'],support:['canada','palladium'],mint:'Royal Canadian Mint',purity:'.9995 palladium'},
+  {product:'British Gold Britannia',metal:'gold',strong:['britannia'],support:['fine gold','great britain'],mint:'The Royal Mint',purity:'.9999 fine gold'},
+  {product:'British Silver Britannia',metal:'silver',strong:['britannia'],support:['fine silver','great britain'],mint:'The Royal Mint',purity:'.999 fine silver'},
+  {product:'British Platinum Britannia',metal:'platinum',strong:['britannia'],support:['platinum','great britain'],mint:'The Royal Mint',purity:'.9995 platinum'},
+  {product:'British Silver Queen’s Beasts',metal:'silver',strong:["queen's beasts",'queens beasts'],support:['fine silver'],mint:'The Royal Mint',purity:'.9999 fine silver'},
+  {product:'South African Gold Krugerrand',metal:'gold',strong:['krugerrand'],support:['suid afrika','south africa'],mint:'South African Mint',purity:'22K gold'},
+  {product:'South African Silver Krugerrand',metal:'silver',strong:['krugerrand'],support:['fine silver','south africa'],mint:'South African Mint',purity:'.999 fine silver'},
+  {product:'Austrian Gold Philharmonic',metal:'gold',strong:['philharmoniker','wiener philharmoniker'],support:['republik osterreich','fine gold'],mint:'Austrian Mint',purity:'.9999 fine gold'},
+  {product:'Austrian Silver Philharmonic',metal:'silver',strong:['philharmoniker','wiener philharmoniker'],support:['republik osterreich','silver'],mint:'Austrian Mint',purity:'.999 fine silver'},
+  {product:'Austrian Platinum Philharmonic',metal:'platinum',strong:['philharmoniker','wiener philharmoniker'],support:['platinum'],mint:'Austrian Mint',purity:'.9995 platinum'},
+  {product:'Australian Gold Kangaroo',metal:'gold',strong:['kangaroo'],support:['australia','fine gold'],mint:'Perth Mint',purity:'.9999 fine gold'},
+  {product:'Australian Silver Kangaroo',metal:'silver',strong:['kangaroo'],support:['australia','fine silver'],mint:'Perth Mint',purity:'.9999 fine silver'},
+  {product:'Australian Platinum Kangaroo',metal:'platinum',strong:['kangaroo'],support:['australia','platinum'],mint:'Perth Mint',purity:'.9995 platinum'},
+  {product:'Australian Silver Kookaburra',metal:'silver',strong:['kookaburra'],support:['australia','fine silver'],mint:'Perth Mint',purity:'.9999 fine silver'},
+  {product:'Australian Silver Koala',metal:'silver',strong:['koala'],support:['australia','fine silver'],mint:'Perth Mint',purity:'.9999 fine silver'},
+  {product:'Australian Gold Lunar',metal:'gold',strong:['lunar'],support:['australia','fine gold'],mint:'Perth Mint',purity:'.9999 fine gold'},
+  {product:'Australian Silver Lunar',metal:'silver',strong:['lunar'],support:['australia','fine silver'],mint:'Perth Mint',purity:'.9999 fine silver'},
+  {product:'Chinese Gold Panda',metal:'gold',strong:['panda'],support:['yuan','fine gold'],mint:'China Gold Coin',purity:'.999 fine gold'},
+  {product:'Chinese Silver Panda',metal:'silver',strong:['panda'],support:['yuan','silver'],mint:'China Gold Coin',purity:'.999 fine silver'},
+  {product:'Chinese Palladium Panda',metal:'palladium',strong:['panda'],support:['palladium'],mint:'China Gold Coin',purity:'.999 palladium'},
+  {product:'Mexican Gold Libertad',metal:'gold',strong:['libertad'],support:['ley .999','onza','oro puro'],mint:'Casa de Moneda de México',purity:'.999 fine gold'},
+  {product:'Mexican Silver Libertad',metal:'silver',strong:['libertad'],support:['ley .999','onza','plata pura'],mint:'Casa de Moneda de México',purity:'.999 fine silver'},
+  {product:'Mexican 50 Peso Gold',metal:'gold',strong:['50 pesos'],support:['37.5 gr oro puro','oro puro'],mint:'Casa de Moneda de México',purity:'.900 gold'},
+  {product:'Mexican 20 Peso Gold',metal:'gold',strong:['20 pesos'],support:['oro puro'],mint:'Casa de Moneda de México',purity:'.900 gold'},
+  {product:'Mexican 10 Peso Gold',metal:'gold',strong:['10 pesos'],support:['oro puro'],mint:'Casa de Moneda de México',purity:'.900 gold'},
+  {product:'Mexican 5 Peso Gold',metal:'gold',strong:['5 pesos'],support:['oro puro'],mint:'Casa de Moneda de México',purity:'.900 gold'},
+  {product:'Mexican 2.5 Peso Gold',metal:'gold',strong:['2 1/2 pesos','2.5 pesos'],support:['oro puro'],mint:'Casa de Moneda de México',purity:'.900 gold'},
+  {product:'British Gold Sovereign',metal:'gold',strong:['sovereign'],support:['dei gra rex fid def'],mint:'The Royal Mint',purity:'22K gold'},
+  {product:'Morgan Silver Dollar',metal:'silver',strong:['morgan'],support:['e pluribus unum','one dollar','in god we trust'],mint:'United States Mint',purity:'.900 silver',yearMin:1878,yearMax:1921},
+  {product:'Peace Silver Dollar',metal:'silver',strong:['peace dollar','peace'],support:['one dollar','in god we trust'],mint:'United States Mint',purity:'.900 silver',yearMin:1921,yearMax:1935},
+  {product:'Walking Liberty Half Dollar',metal:'silver',strong:['half dollar'],support:['walking liberty'],mint:'United States Mint',purity:'.900 silver',yearMin:1916,yearMax:1947},
+  {product:'Franklin Half Dollar',metal:'silver',strong:['franklin'],support:['half dollar'],mint:'United States Mint',purity:'.900 silver',yearMin:1948,yearMax:1963},
+  {product:'1964 Kennedy Half Dollar',metal:'silver',strong:['kennedy'],support:['half dollar'],mint:'United States Mint',purity:'.900 silver',yearMin:1964,yearMax:1964},
+  {product:'Mercury Dime',metal:'silver',strong:['mercury dime'],support:['one dime','liberty'],mint:'United States Mint',purity:'.900 silver',yearMin:1916,yearMax:1945},
+  {product:'Gold Bar',metal:'gold',strong:['gold bar'],support:['fine gold','9999 gold','999.9 gold'],purity:'.9999 fine gold'},
+  {product:'Silver Bar',metal:'silver',strong:['silver bar'],support:['fine silver','999 silver','9999 silver'],purity:'.999 fine silver'},
+  {product:'Platinum Bar',metal:'platinum',strong:['platinum bar'],support:['fine platinum'],purity:'.9995 platinum'},
+  {product:'Palladium Bar',metal:'palladium',strong:['palladium bar'],support:['fine palladium'],purity:'.9995 palladium'}
 ];
 function normalizeSmartCameraText(value){
   return String(value||'').toLowerCase()
@@ -6695,27 +6695,33 @@ function smartCameraMetalGuess(text){
     palladium:(text.match(/\bpalladium\b|\bpd\b|fine palladium/g)||[]).length,
     copper:(text.match(/\bcopper\b|\bcu\b/g)||[]).length
   };
-  SMART_CAMERA_CATALOG.forEach(item=>{
-    const hits=item.terms.filter(t=>text.includes(t)).length;
-    if(hits>=2)scored[item.metal]+=hits;
-  });
   const sorted=Object.entries(scored).sort((a,b)=>b[1]-a[1]);
   return sorted[0]?.[1]>0?sorted[0][0]:'';
 }
+function smartCameraYearCandidates(text){
+  return [...new Set([...text.matchAll(/\b(18\d{2}|19\d{2}|20\d{2})\b/g)]
+    .map(m=>Number(m[1]))
+    .filter(y=>y>=1800&&y<=new Date().getFullYear()+1))];
+}
 function smartCameraCatalogMatch(text,metal){
-  const allowed=new Set(PRODUCT_MAP[metal]||[]);
+  const allowed=metal?new Set(PRODUCT_MAP[metal]||[]):null;
+  const years=smartCameraYearCandidates(text);
   const ranked=SMART_CAMERA_CATALOG
-    .filter(item=>item.metal===metal && allowed.has(item.product))
+    .filter(item=>(!metal||item.metal===metal) && (!allowed||allowed.has(item.product)))
     .map(item=>{
-      const hits=item.terms.filter(term=>text.includes(term));
-      const exactBonus=hits.some(h=>h.length>=10)?1:0;
-      return {item,hits,score:hits.length*2+exactBonus};
+      const strongHits=(item.strong||[]).filter(term=>text.includes(term));
+      const supportHits=(item.support||[]).filter(term=>text.includes(term));
+      const plausibleYears=years.filter(y=>(!item.yearMin||y>=item.yearMin)&&(!item.yearMax||y<=item.yearMax));
+      let score=strongHits.length*7 + supportHits.length*1.5;
+      if(plausibleYears.length===1)score+=2;
+      if(item.yearMin&&years.length&&plausibleYears.length===0)score-=8;
+      return {item,strongHits,supportHits,plausibleYears,score};
     })
-    .filter(x=>x.hits.length)
+    .filter(x=>x.strongHits.length>0 || (x.supportHits.length>=2 && x.plausibleYears.length===1))
     .sort((a,b)=>b.score-a.score);
   if(!ranked.length)return null;
-  if(ranked[0].score<3 && ranked[0].hits.length<2)return null;
-  return ranked[0];
+  if(ranked.length>1 && Math.abs(ranked[0].score-ranked[1].score)<2 && ranked[0].item.metal!==ranked[1].item.metal)return null;
+  return ranked[0].score>=6?ranked[0]:null;
 }
 function smartCameraProductGuess(text,metal){
   const match=smartCameraCatalogMatch(text,metal);
@@ -6811,31 +6817,40 @@ function smartCameraDenominationGuess(text){
 function interpretSmartCameraScan(result){
   const raw=Array.isArray(result?.lines)?result.lines.join(' '):(result?.text||'');
   const text=normalizeSmartCameraText(raw);
-  const metal=smartCameraMetalGuess(text);
-  const catalogMatch=metal?smartCameraCatalogMatch(text,metal):null;
+  let metal=smartCameraMetalGuess(text);
+  let catalogMatch=smartCameraCatalogMatch(text,metal||'');
+  if(!metal && catalogMatch)metal=catalogMatch.item.metal;
+  if(metal && (!catalogMatch || catalogMatch.item.metal!==metal))catalogMatch=smartCameraCatalogMatch(text,metal);
   const product=catalogMatch?.item?.product || (metal?smartCameraProductGuess(text,metal):'');
   let weight=metal?smartCameraWeightGuess(text,metal):0;
   if(!weight && catalogMatch?.item?.weight)weight=catalogMatch.item.weight;
-  const years=[...text.matchAll(/\b(18\d{2}|19\d{2}|20\d{2})\b/g)].map(m=>Number(m[1])).filter(y=>y>=1800&&y<=new Date().getFullYear()+1);
-  const year=years.length?Math.max(...years):null;
+  const years=smartCameraYearCandidates(text);
+  const plausibleYears=catalogMatch
+    ? years.filter(y=>(!catalogMatch.item.yearMin||y>=catalogMatch.item.yearMin)&&(!catalogMatch.item.yearMax||y<=catalogMatch.item.yearMax))
+    : years;
+  const year=plausibleYears.length===1?plausibleYears[0]:null;
   const mint=smartCameraMintGuess(text)||catalogMatch?.item?.mint||'';
   const serial=smartCameraSerialGuess(text);
   const purity=smartCameraPurityGuess(text,metal,product);
   const denomination=smartCameraDenominationGuess(text);
   const ocrConfidence=Math.max(0,Math.min(1,Number(result?.confidence)||0));
-  let evidence=0;
-  if(metal)evidence++;
-  if(product)evidence+=2;
-  if(weight>0)evidence++;
-  if(year)evidence++;
-  if(mint)evidence++;
-  if(purity)evidence++;
-  const confidence=Math.min(0.98,ocrConfidence*.55 + Math.min(1,evidence/7)*.45);
-  return {metal,product,weight,year,mint,serial,purity,denomination,text,raw,confidence,matchedTerms:catalogMatch?.hits||[]};
+  const matchStrength=catalogMatch
+    ? Math.min(1,(catalogMatch.strongHits.length*0.65)+(catalogMatch.supportHits.length*0.12))
+    : 0;
+  let confidence=(ocrConfidence*.38)+(matchStrength*.47)+(metal?.length?0.08:0)+(weight>0?0.07:0);
+  if(!product)confidence=Math.min(confidence,.62);
+  if(product && catalogMatch?.strongHits.length===0)confidence=Math.min(confidence,.68);
+  if(years.length>1 && !year)confidence=Math.min(confidence,.84);
+  confidence=Math.max(.18,Math.min(.96,confidence));
+  return {
+    metal,product,weight,year,mint,serial,purity,denomination,text,raw,confidence,
+    matchedTerms:[...(catalogMatch?.strongHits||[]),...(catalogMatch?.supportHits||[])],
+    usable:!!metal
+  };
 }
 function smartCameraConfidenceLabel(value){
-  if(value>=.78)return ['High confidence','high'];
-  if(value>=.52)return ['Medium confidence','medium'];
+  if(value>=.80)return ['High confidence','high'];
+  if(value>=.55)return ['Medium confidence','medium'];
   return ['Needs review','low'];
 }
 function smartCameraMoney(value){
@@ -6845,14 +6860,19 @@ function renderSmartCameraAnalysis(suggestion){
   pendingSmartCameraSuggestion=suggestion;
   const panel=document.getElementById('smartCameraAnalysis');
   if(!panel)return;
+  const useButton=document.getElementById('smartAnalysisUseButton');
+  if(useButton){
+    useButton.disabled=!suggestion.usable;
+    useButton.textContent=suggestion.usable?'Use Suggested Details':'Scan Again to Identify Metal';
+  }
   const confidence=smartCameraConfidenceLabel(suggestion.confidence);
   const confidenceEl=document.getElementById('smartAnalysisConfidence');
   confidenceEl.className='smartAnalysisConfidence '+confidence[1];
   confidenceEl.querySelector('span').textContent=confidence[0]+' · '+Math.round(suggestion.confidence*100)+'%';
   document.getElementById('smartAnalysisTitle').textContent=suggestion.product || (suggestion.metal?METAL_NAMES[suggestion.metal]+' bullion':'Bullion scan');
   document.getElementById('smartAnalysisSub').textContent=suggestion.product
-    ? 'Benza matched the visible markings to a known bullion profile. Confirm the details below.'
-    : 'Benza read the visible markings but could not confidently match a specific product. You can still use the detected details.';
+    ? 'Benza Bullion matched the visible markings to a known bullion profile. Confirm the details below.'
+    : 'Benza Bullion read the visible markings but could not confidently match a specific product. You can still use the detected details.';
   const checks=[
     ['Metal',suggestion.metal?METAL_NAMES[suggestion.metal]:'Not detected',!!suggestion.metal],
     ['Product',suggestion.product||'Needs review',!!suggestion.product],
@@ -6878,7 +6898,7 @@ function renderSmartCameraAnalysis(suggestion){
   ].map(([label,value])=>'<div class="smartAnalysisMetric"><span>'+label+'</span><strong>'+value+'</strong></div>').join('');
   const evidence=(suggestion.matchedTerms||[]).slice(0,4);
   document.getElementById('smartAnalysisNotes').innerHTML=
-    '<strong>What Benza used:</strong> '+(evidence.length?escapeBullionHtml(evidence.join(' · ')):'visible text and bullion markings')+
+    '<strong>What Benza Bullion used:</strong> '+(evidence.length?escapeBullionHtml(evidence.join(' · ')):'visible text and bullion markings')+
     (suggestion.raw?'<br><strong>Recognized text:</strong> '+escapeBullionHtml(String(suggestion.raw).replace(/\s+/g,' ').slice(0,180)):'');
   panel.classList.add('show');
   panel.scrollIntoView({behavior:'smooth',block:'start'});
@@ -6915,7 +6935,11 @@ function applySmartCameraSuggestion(suggestion){
   return true;
 }
 function useSmartCameraAnalysis(){
-  if(!pendingSmartCameraSuggestion)return;
+  if(!pendingSmartCameraSuggestion?.usable){
+    const status=document.getElementById('smartCameraStatus');
+    if(status)status.textContent='Benza Bullion needs a metal identification before it can fill the holding form. Try another scan with the metal or purity markings clearly visible.';
+    return;
+  }
   applySmartCameraSuggestion(pendingSmartCameraSuggestion);
 }
 async function runSmartCameraScan(){
@@ -6945,7 +6969,7 @@ async function runSmartCameraScan(){
       return;
     }
     if(button)button.textContent='Matching Bullion…';
-    if(status)status.textContent='Reading markings and comparing them with Benza bullion profiles…';
+    if(status)status.textContent='Reading markings and comparing them with Benza Bullion profiles…';
     const suggestion=interpretSmartCameraScan(result);
     renderSmartCameraAnalysis(suggestion);
     if(status)status.textContent=suggestion.product
@@ -10084,7 +10108,7 @@ function whyItMatters(title=''){
   if(t.includes('silver'))return 'Silver can respond to both monetary demand and industrial demand, which can make its moves more volatile than gold.';
   return 'This story may affect bullion through investor demand, currencies, economic expectations, or physical supply and demand.';
 }
-function fallbackNewsCards(){return [{title:'Live bullion headlines are temporarily unavailable',source:'Benza Bullion',date:'',tag:'Market update',url:'',why:'Your portfolio prices and saved history continue to work. Tap Refresh later to try the live news feed again.'},{title:'Watch rates, the dollar, inflation and physical demand together',source:'Benza Bullion',date:'',tag:'What to watch',url:'',why:'Bullion rarely moves for only one reason. Benza Market Insights is designed to surface the major forces affecting your stack.'}]}
+function fallbackNewsCards(){return [{title:'Live bullion headlines are temporarily unavailable',source:'Benza Bullion',date:'',tag:'Market update',url:'',why:'Your portfolio prices and saved history continue to work. Tap Refresh later to try the live news feed again.'},{title:'Watch rates, the dollar, inflation and physical demand together',source:'Benza Bullion',date:'',tag:'What to watch',url:'',why:'Bullion rarely moves for only one reason. Benza Bullion Market Insights is designed to surface the major forces affecting your stack.'}]}
 function syncMarketRailArrows(sliderId,prevId,nextId){
   const slider=document.getElementById(sliderId),prev=document.getElementById(prevId),next=document.getElementById(nextId);if(!slider||!prev||!next)return;
   const max=Math.max(0,slider.scrollWidth-slider.clientWidth);
