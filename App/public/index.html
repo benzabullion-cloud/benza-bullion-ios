@@ -10376,10 +10376,22 @@ async function sendBenzaTestNotification(){
         },
         body:JSON.stringify({action:'test-native'})
       });
-      const data=await response.json().catch(()=>({}));
-      if(!response.ok||data?.success===false)throw new Error(data?.error||`Push test failed (${response.status}).`);
+      const raw=await response.text();
+      let data={};
+      try{data=raw?JSON.parse(raw):{}}catch(_){data={raw}}
+      if(!response.ok||data?.success===false){
+        const failureDetail=Array.isArray(data?.failures)&&data.failures.length
+          ? data.failures.map(x=>x?.error||x?.reason||JSON.stringify(x)).filter(Boolean).join(' | ')
+          : '';
+        const backendMessage=data?.error||failureDetail||raw||`Push test failed (${response.status}).`;
+        throw new Error(backendMessage);
+      }
       await updateNotificationUI('Test push sent through Apple. It should appear in a moment.');
-    }catch(e){await updateNotificationUI('Could not send the test notification: '+(e?.message||'Unknown error'))}
+    }catch(e){
+      const message=e?.message||String(e)||'Unknown error';
+      console.warn('Native push test failed:',message);
+      await updateNotificationUI('Push test error: '+message);
+    }
     return;
   }
   if(Notification.permission!=='granted')return updateNotificationUI('Enable notifications first.');
