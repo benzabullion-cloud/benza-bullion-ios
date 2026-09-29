@@ -72,7 +72,7 @@ export default async function handler(req, res) {
 
     let appAppleId;
     if (environment === Environment.PRODUCTION) {
-      const configured = Number(process.env.APPLE_APP_ID || '');
+      const configured = Number(process.env.APPLE_APP_ID || '6811639929');
       if (!Number.isFinite(configured) || configured <= 0) {
         throw new Error('Production App Store verification is not configured');
       }
