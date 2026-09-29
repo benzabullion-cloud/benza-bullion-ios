@@ -3,6 +3,7 @@ import Capacitor
 import StoreKit
 import UserNotifications
 import Vision
+import CoreImage
 
 @objc(BenzaNotificationsPlugin)
 final class BenzaNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -201,19 +202,39 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
                     ? 0
                     : Double(candidates.reduce(Float(0)) { $0 + $1.1 }) / Double(candidates.count)
 
+                var payload: [String: Any] = [
+                    "cancelled": false,
+                    "lines": lines,
+                    "text": lines.joined(separator: "\n"),
+                    "confidence": avgConfidence
+                ]
+                if #available(iOS 15.0, *) {
+                    payload["visualLabels"] = self.classifyImage(cgImage)
+                }
+                if let visualColor = self.averageCenterColor(cgImage) {
+                    payload["visualColor"] = visualColor
+                }
                 DispatchQueue.main.async {
-                    call?.resolve([
-                        "cancelled": false,
-                        "lines": lines,
-                        "text": lines.joined(separator: "\n"),
-                        "confidence": avgConfidence
-                    ])
+                    call?.resolve(payload)
                 }
             }
 
             request.recognitionLevel = .accurate
             request.usesLanguageCorrection = true
             request.recognitionLanguages = ["en-US"]
+            request.customWords = [
+                "bullion","fine gold","fine silver","fine platinum","fine palladium",
+                "American Eagle","Silver Eagle","Gold Eagle","American Buffalo",
+                "Maple Leaf","Britannia","Krugerrand","Philharmonic","Kangaroo",
+                "Kookaburra","Koala","Panda","Libertad","Sovereign","Morgan",
+                "Peace Dollar","Walking Liberty","PAMP Suisse","Valcambi",
+                "Scottsdale","Johnson Matthey","Engelhard","Perth Mint",
+                "Royal Canadian Mint","United States Mint","1 oz","1/2 oz",
+                "1/4 oz","1/10 oz",".999",".9999","999","9999"
+            ]
+            if #available(iOS 13.0, *) {
+                request.minimumTextHeight = 0.008
+            }
 
             do {
                 try VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([request])
@@ -221,6 +242,60 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
                 DispatchQueue.main.async { call?.reject(error.localizedDescription) }
             }
         }
+    }
+
+    @available(iOS 15.0, *)
+    private func classifyImage(_ cgImage: CGImage) -> [[String: Any]] {
+        let request = VNClassifyImageRequest()
+        do {
+            try VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([request])
+        } catch {
+            return []
+        }
+        return (request.results ?? []).prefix(8).compactMap { item in
+            guard item.confidence >= 0.035 else { return nil }
+            return ["identifier": item.identifier, "confidence": Double(item.confidence)]
+        }
+    }
+
+    private func averageCenterColor(_ cgImage: CGImage) -> [String: Any]? {
+        let input = CIImage(cgImage: cgImage)
+        let extent = input.extent
+        let sample = extent.insetBy(dx: extent.width * 0.20, dy: extent.height * 0.20)
+        guard !sample.isEmpty, let filter = CIFilter(name: "CIAreaAverage") else { return nil }
+
+        filter.setValue(input.cropped(to: sample), forKey: kCIInputImageKey)
+        filter.setValue(CIVector(cgRect: sample), forKey: kCIInputExtentKey)
+        guard let output = filter.outputImage else { return nil }
+
+        var rgba = [UInt8](repeating: 0, count: 4)
+        let context = CIContext(options: nil)
+        context.render(output, toBitmap: &rgba, rowBytes: 4,
+                       bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
+                       format: .RGBA8, colorSpace: CGColorSpaceCreateDeviceRGB())
+
+        let r = CGFloat(rgba[0]) / 255.0
+        let g = CGFloat(rgba[1]) / 255.0
+        let b = CGFloat(rgba[2]) / 255.0
+        var h: CGFloat = 0, s: CGFloat = 0, v: CGFloat = 0, a: CGFloat = 0
+        UIColor(red: r, green: g, blue: b, alpha: 1).getHue(&h, saturation: &s, brightness: &v, alpha: &a)
+
+        let tone: String
+        if s < 0.13 && v > 0.30 {
+            tone = "silvery"
+        } else if h >= 0.075 && h <= 0.17 && s >= 0.24 && v >= 0.30 {
+            tone = "golden"
+        } else if (h <= 0.075 || h >= 0.97) && s >= 0.24 && v >= 0.22 {
+            tone = "copper"
+        } else {
+            tone = "neutral"
+        }
+
+        return [
+            "red": Double(r), "green": Double(g), "blue": Double(b),
+            "hue": Double(h), "saturation": Double(s), "brightness": Double(v),
+            "tone": tone
+        ]
     }
 
     private func normalizedCGImage(_ image: UIImage) -> CGImage? {
