@@ -6683,6 +6683,36 @@ function smartCameraWeightGuess(text,metal){
   if(lb && metal==='copper')return Number(lb[1])*16;
   return 0;
 }
+function smartCameraMintGuess(text){
+  const mints=[
+    ['United States Mint',['united states mint','u s mint','us mint']],
+    ['Royal Canadian Mint',['royal canadian mint','monnaie royale canadienne']],
+    ['The Royal Mint',['the royal mint','royal mint']],
+    ['Perth Mint',['perth mint']],
+    ['Austrian Mint',['austrian mint','münze österreich','munze osterreich']],
+    ['Casa de Moneda de México',['casa de moneda','moneda de mexico']],
+    ['South African Mint',['south african mint']],
+    ['PAMP Suisse',['pamp suisse','pamp']],
+    ['Valcambi Suisse',['valcambi']],
+    ['Argor-Heraeus',['argor heraeus','argor-heraeus']],
+    ['Royal Australian Mint',['royal australian mint']]
+  ];
+  for(const [name,terms] of mints){
+    if(terms.some(t=>text.includes(t)))return name;
+  }
+  return '';
+}
+function smartCameraSerialGuess(text){
+  const patterns=[
+    /\b(?:serial|serial no|serial number|s\/n|sn)\s*[:#-]?\s*([a-z0-9-]{4,24})\b/i,
+    /\bno\.?\s*[:#-]?\s*([a-z]{0,4}\d{4,20})\b/i
+  ];
+  for(const pattern of patterns){
+    const match=text.match(pattern);
+    if(match?.[1])return match[1].toUpperCase();
+  }
+  return '';
+}
 function interpretSmartCameraScan(result){
   const raw=Array.isArray(result?.lines)?result.lines.join(' '):(result?.text||'');
   const text=normalizeSmartCameraText(raw);
@@ -6691,7 +6721,9 @@ function interpretSmartCameraScan(result){
   const weight=metal?smartCameraWeightGuess(text,metal):0;
   const years=[...text.matchAll(/\b(18\d{2}|19\d{2}|20\d{2})\b/g)].map(m=>Number(m[1])).filter(y=>y>=1800&&y<=new Date().getFullYear()+1);
   const year=years.length?Math.max(...years):null;
-  return {metal,product,weight,year,text,confidence:Number(result?.confidence)||0};
+  const mint=smartCameraMintGuess(text);
+  const serial=smartCameraSerialGuess(text);
+  return {metal,product,weight,year,mint,serial,text,confidence:Number(result?.confidence)||0};
 }
 function applySmartCameraSuggestion(suggestion){
   if(!suggestion?.metal){
@@ -6712,12 +6744,24 @@ function applySmartCameraSuggestion(suggestion){
     document.getElementById('weight').value=Number(suggestion.weight.toFixed(4));
   }
   document.getElementById('cost').value='';
-  if(isProActive()&&suggestion.year){
+  if(isProActive()){
+    const serial=document.getElementById('holdingSerial');
+    if(serial&&suggestion.serial)serial.value=suggestion.serial;
     const notes=document.getElementById('holdingNotes');
-    if(notes)notes.value='Smart Camera detected year: '+suggestion.year;
+    const detected=[];
+    if(suggestion.year)detected.push('Year: '+suggestion.year);
+    if(suggestion.mint)detected.push('Mint: '+suggestion.mint);
+    if(notes&&detected.length)notes.value='Smart Camera detected — '+detected.join(' · ');
+    const details=document.getElementById('proInventoryFields');
+    if(details&&(suggestion.year||suggestion.mint||suggestion.serial))details.open=true;
   }
   update();
-  const found=[suggestion.product||suggestion.metal,suggestion.weight>0?Number(suggestion.weight.toFixed(4))+' oz':'',suggestion.year||''].filter(Boolean);
+  const found=[
+    suggestion.product||suggestion.metal,
+    suggestion.weight>0?Number(suggestion.weight.toFixed(4))+' oz':'',
+    suggestion.year||'',
+    suggestion.mint||''
+  ].filter(Boolean);
   alert('Smart Camera prepared '+found.join(' · ')+'. Review every detail and enter what you paid before adding it.');
   return true;
 }
