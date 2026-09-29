@@ -8324,7 +8324,11 @@ function sortStoreKitTransactionsForVerification(transactions){
 }
 async function refreshNativeProEntitlementSilently(){
   const plugin=nativeStoreKitPlugin();
-  if(!isBenzaNativeRuntime()||!plugin||!currentUser)return;
+  // A Free account must stay Free until the user buys or explicitly restores.
+  // Replaying a previous Apple/sandbox purchase at sign-in would undo an
+  // administrative reset and bring back the Founding Member badge.
+  if(!isBenzaNativeRuntime()||!plugin||!currentUser||benzaEntitlement?.tier!=='pro')return;
+  const userId=currentUser.id;
   try{
     const result=await plugin.restorePurchases();
     const transactions=sortStoreKitTransactionsForVerification(
@@ -8332,13 +8336,14 @@ async function refreshNativeProEntitlementSilently(){
     );
     if(!transactions.length)return;
     for(const transaction of transactions){
+      if(currentUser?.id!==userId||benzaEntitlement?.tier!=='pro')return;
       try{
         await verifyNativeStoreTransaction(transaction);
       }catch(error){
         console.warn('Silent StoreKit entitlement refresh failed for a transaction:',error);
       }
     }
-    await loadBenzaEntitlement();
+    if(currentUser?.id===userId)await loadBenzaEntitlement();
   }catch(error){
     console.warn('Silent StoreKit entitlement refresh unavailable:',error);
   }
@@ -8530,13 +8535,18 @@ function isProActive(){
 }
 
 async function loadBenzaEntitlement(){
+  const userId=currentUser?.id;
   benzaEntitlement={tier:'free',status:'inactive',expires_at:null,trial_ends_at:null};
+  updateProIntegratedUI();
+  renderProAnalytics();
   if(!supabaseClient||!currentUser)return;
   const {data,error}=await supabaseClient
     .from('user_entitlements')
     .select('tier,status,product_id,expires_at,trial_ends_at,last_verified_at')
-    .eq('user_id',currentUser.id)
+    .eq('user_id',userId)
     .maybeSingle();
+  // Do not apply a response belonging to a previous signed-in account.
+  if(currentUser?.id!==userId)return;
   if(error){
     if(isAuthSessionError(error)){await handleExpiredSession();return}
     console.warn('Pro entitlement unavailable:',error.message);
