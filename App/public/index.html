@@ -10253,15 +10253,28 @@ async function getSavedNativeBenzaSubscription(token){
 }
 async function saveNativeBenzaSubscription(token){
   if(!supabaseClient||!currentUser||!token)throw new Error('Notification device token is missing.');
-  const {error}=await supabaseClient.from('notification_subscriptions').upsert({
-    user_id:currentUser.id,
-    endpoint:nativeBenzaEndpoint(token),
-    p256dh:'native-apns',
-    auth:'native-apns',
-    enabled:true,
-    updated_at:new Date().toISOString()
-  },{onConflict:'endpoint'});
-  if(error)throw error;
+  const {data:{session},error:sessionError}=await supabaseClient.auth.getSession();
+  if(sessionError||!session?.access_token)throw new Error('Your Benza Bullion session has expired. Please sign in again.');
+
+  const response=await fetch(`${SUPABASE_URL}/functions/v1/benza-price-alerts`,{
+    method:'POST',
+    headers:{
+      apikey:SUPABASE_PUBLISHABLE_KEY,
+      Authorization:`Bearer ${session.access_token}`,
+      'Content-Type':'application/json'
+    },
+    body:JSON.stringify({
+      action:'register-native-subscription',
+      endpoint:nativeBenzaEndpoint(token)
+    })
+  });
+
+  const raw=await response.text();
+  let data={};
+  try{data=raw?JSON.parse(raw):{}}catch(_){data={raw}}
+  if(!response.ok||data?.success===false){
+    throw new Error(data?.error||raw||`Could not save notification device (${response.status}).`);
+  }
 }
 async function removeNativeBenzaSubscriptions(){
   if(!supabaseClient||!currentUser)return;
