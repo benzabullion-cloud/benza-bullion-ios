@@ -2,6 +2,7 @@ import UIKit
 import Capacitor
 import StoreKit
 import UserNotifications
+import Vision
 
 @objc(BenzaNotificationsPlugin)
 final class BenzaNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -108,6 +109,129 @@ final class BenzaNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve()
             }
         }
+    }
+}
+
+@objc(BenzaSmartCameraPlugin)
+final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+    let identifier = "BenzaSmartCameraPlugin"
+    let jsName = "BenzaSmartCamera"
+    let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "scan", returnType: CAPPluginReturnPromise)
+    ]
+
+    private var pendingCall: CAPPluginCall?
+
+    @objc func scan(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+                call.reject("Camera is not available on this device.")
+                return
+            }
+            guard self.pendingCall == nil else {
+                call.reject("A Smart Camera scan is already in progress.")
+                return
+            }
+            guard let presenter = self.bridge?.viewController else {
+                call.reject("Smart Camera could not open the camera.")
+                return
+            }
+
+            self.pendingCall = call
+            let picker = UIImagePickerController()
+            picker.sourceType = .camera
+            picker.cameraCaptureMode = .photo
+            picker.allowsEditing = false
+            picker.delegate = self
+            picker.modalPresentationStyle = .fullScreen
+            presenter.present(picker, animated: true)
+        }
+    }
+
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+        let call = pendingCall
+        pendingCall = nil
+        picker.dismiss(animated: true) {
+            call?.resolve(["cancelled": true, "lines": []])
+        }
+    }
+
+    func imagePickerController(_ picker: UIImagePickerController,
+                               didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+        guard let image = info[.originalImage] as? UIImage else {
+            let call = pendingCall
+            pendingCall = nil
+            picker.dismiss(animated: true) {
+                call?.reject("Smart Camera could not read the captured photo.")
+            }
+            return
+        }
+
+        let call = pendingCall
+        pendingCall = nil
+        picker.dismiss(animated: true) {
+            self.recognizeText(in: image, call: call)
+        }
+    }
+
+    private func recognizeText(in image: UIImage, call: CAPPluginCall?) {
+        guard let cgImage = normalizedCGImage(image) else {
+            call?.reject("Smart Camera could not prepare the captured photo.")
+            return
+        }
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            let request = VNRecognizeTextRequest { request, error in
+                if let error {
+                    DispatchQueue.main.async { call?.reject(error.localizedDescription) }
+                    return
+                }
+
+                let observations = request.results as? [VNRecognizedTextObservation] ?? []
+                let candidates = observations.compactMap { observation -> (String, Float)? in
+                    guard let top = observation.topCandidates(1).first else { return nil }
+                    let text = top.string.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !text.isEmpty else { return nil }
+                    return (text, top.confidence)
+                }
+                .sorted { $0.1 > $1.1 }
+
+                let lines = candidates.map { $0.0 }
+                let avgConfidence = candidates.isEmpty
+                    ? 0
+                    : Double(candidates.reduce(Float(0)) { $0 + $1.1 }) / Double(candidates.count)
+
+                DispatchQueue.main.async {
+                    call?.resolve([
+                        "cancelled": false,
+                        "lines": lines,
+                        "text": lines.joined(separator: "\n"),
+                        "confidence": avgConfidence
+                    ])
+                }
+            }
+
+            request.recognitionLevel = .accurate
+            request.usesLanguageCorrection = true
+            request.recognitionLanguages = ["en-US"]
+
+            do {
+                try VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([request])
+            } catch {
+                DispatchQueue.main.async { call?.reject(error.localizedDescription) }
+            }
+        }
+    }
+
+    private func normalizedCGImage(_ image: UIImage) -> CGImage? {
+        if image.imageOrientation == .up, let cg = image.cgImage {
+            return cg
+        }
+        UIGraphicsBeginImageContextWithOptions(image.size, false, 1)
+        image.draw(in: CGRect(origin: .zero, size: image.size))
+        let normalized = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        return normalized?.cgImage
     }
 }
 
@@ -238,6 +362,7 @@ final class BenzaBridgeViewController: CAPBridgeViewController {
         super.capacitorDidLoad()
         bridge?.registerPluginInstance(BenzaStoreKitPlugin())
         bridge?.registerPluginInstance(BenzaNotificationsPlugin())
+        bridge?.registerPluginInstance(BenzaSmartCameraPlugin())
     }
 }
 
