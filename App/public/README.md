@@ -289,8 +289,14 @@ The scheduled Edge Function should run repeatedly (recommended: every minute) so
 
 ## Private Smart Camera simplification
 - Scan photos are processed in memory by the native Apple Vision plugin. The scanner returns recognized text to the app; it has no image upload or photo persistence path. Optional portfolio attachments are a separate, user-selected feature.
-- Pro users go straight to capture. A usable result goes to the holding review; incomplete results ask for one reverse photo. No intermediate evidence dashboard or manual reset controls.
+- Pro users go straight to capture. A compact result card shows product, metal, and weight. Review holding is available only for a usable catalog product with a positive weight and no conflicting evidence. Incomplete results ask for one reverse photo, then stay on the result screen with retry/manual options.
 - Photo attempts are counted separately from recognized evidence. Two unreadable photos offer a fresh attempt instead of an endless reverse loop.
 - Fresh attempts clear all prior evidence, cancellation never mixes items, and failed or superseded resets cannot open a camera.
 - Recognition is based on markings and verified product rules. Artwork-only recognition is not implemented, and scanning does not authenticate bullion.
 - Run scanner checks from the repository root with `node tests/smart-camera.test.cjs`, `node tests/smart-camera-flow.test.cjs`, and `node tests/smart-camera-simple-flow.test.cjs`. Physical iPhone testing is still required for photo/OCR accuracy.
+
+## Smart Camera review regression fix
+- A metal-only two-photo result cannot open an empty holding. Product, metal, weight, and conflict validation apply both to the review control and the handoff function.
+- Complete scans remain on a compact result card until Review holding is selected. Nothing is auto-added.
+- Hidden Inventory & records sections now explicitly honor their hidden attributes, preventing both the Pro form and upgrade teaser from rendering together.
+- Review regression tests exercise the actual openAdd, selectMetal, and product option setup instead of stubbing the handoff.
