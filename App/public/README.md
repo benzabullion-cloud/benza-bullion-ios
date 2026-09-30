@@ -285,3 +285,12 @@ The scheduled Edge Function should run repeatedly (recommended: every minute) so
 - Fixed Add Bullion globally across all tabs by portaling Add to Portfolio, manual Add Holding, and Scan Coin directly under document.body.
 - Removed reliance on the Popover API for this flow to avoid iOS/PWA stacking inconsistencies.
 - Raised add-flow surfaces above Analytics, News, Markets, Settings, and future overlays.
+
+
+## Private Smart Camera simplification
+- Scan photos are processed in memory by the native Apple Vision plugin. The scanner returns recognized text to the app; it has no image upload or photo persistence path. Optional portfolio attachments are a separate, user-selected feature.
+- Pro users go straight to capture. A usable result goes to the holding review; incomplete results ask for one reverse photo. No intermediate evidence dashboard or manual reset controls.
+- Photo attempts are counted separately from recognized evidence. Two unreadable photos offer a fresh attempt instead of an endless reverse loop.
+- Fresh attempts clear all prior evidence, cancellation never mixes items, and failed or superseded resets cannot open a camera.
+- Recognition is based on markings and verified product rules. Artwork-only recognition is not implemented, and scanning does not authenticate bullion.
+- Run scanner checks from the repository root with `node tests/smart-camera.test.cjs`, `node tests/smart-camera-flow.test.cjs`, and `node tests/smart-camera-simple-flow.test.cjs`. Physical iPhone testing is still required for photo/OCR accuracy.
