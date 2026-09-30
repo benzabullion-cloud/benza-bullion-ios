@@ -5,7 +5,8 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import tarfile
-import urllib.request
+import shutil
+import subprocess
 
 ROOT = Path(__file__).resolve().parent
 
@@ -28,9 +29,19 @@ def acquire(spec, directory):
     temp = target.with_suffix(target.suffix + '.partial')
     print('Downloading fixed asset:', spec['name'], flush=True)
     try:
-        with urllib.request.urlopen(spec['source_url'], timeout=45) as source, temp.open('wb') as out:
-            while chunk := source.read(4 * 1024 * 1024):
-                out.write(chunk)
+        # Use the platform TLS/certificate setup on Apple's build hosts. A
+        # Python installation's certificate bundle must not block cloud setup.
+        # HTTPS verification stays enabled; a failed transfer aborts the build.
+        curl = shutil.which('curl')
+        if not curl:
+            raise RuntimeError('System curl is required for explicit asset setup')
+        subprocess.run([
+            curl, '--fail', '--location', '--show-error', '--silent',
+            '--proto', '=https', '--proto-redir', '=https',
+            '--connect-timeout', '30', '--max-time', '1200',
+            '--retry', '3', '--retry-delay', '2', '--retry-max-time', '180',
+            '--output', str(temp), spec['source_url']
+        ], check=True)
         if not verify(temp, spec):
             raise RuntimeError('Asset size or checksum mismatch: ' + spec['name'])
         temp.replace(target)
