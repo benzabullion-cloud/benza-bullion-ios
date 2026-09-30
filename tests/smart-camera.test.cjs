@@ -34,4 +34,55 @@ test('Split four-digit date is recovered without guessing',()=>assert.equal(scan
 test('Conflicting purity blocks use',()=>assert.equal(scan('Fine silver .999 .900 1 oz').usable,false));
 test('Fixed product fineness contradiction blocks use',()=>assert.equal(scan('American Silver Eagle .925').usable,false));
 test('Unrelated serial digits cannot create purity',()=>assert.equal(scan('Fine gold Serial: AB9999123').purity,''));
+
+const pass=(text,confidence=.95)=>({observations:text.split('\n').map(text=>({text,confidence})),confidence});
+const evidence=passes=>context.selectSmartCameraPhotoEvidence({passes,text:'Legacy union must be ignored',lines:['Fine gold 10 oz'],engineVersion:3,appBuild:'44'});
+const interpreted=passes=>context.interpretSmartCameraScan(evidence(passes));
+test('A weak alternate crop cannot poison a coherent Maple reading',()=>{
+ const passes=[pass('CANADA 9999 FINE SILVER 1 OZ ARGENT PUR'),pass('10 OZ',.4)];
+ assert.equal(scan(passes.flatMap(p=>p.observations.map(o=>o.text)).join(' ')).weight,0);
+ const selected=evidence(passes);const r=context.interpretSmartCameraScan(selected);
+ assert.equal(r.product,'Canadian Silver Maple Leaf');assert.equal(r.weight,1);assert.equal(r.warnings.length,0);
+ assert.equal(selected.rejectedPasses,1);
+});
+test('Compatible crop can recover a date without stacking a different year',()=>{
+ const r=interpreted([pass('UNITED STATES OF AMERICA ONE DOLLAR 1 OZ FINE SILVER'),pass('LIBERTY 2011'),pass('2012',.35)]);
+ assert.equal(r.product,'American Silver Eagle');assert.equal(r.year,2011);assert.equal(r.weight,1);
+});
+test('Equally complete conflicting metals remain blocked',()=>{
+ const r=interpreted([pass('Maple Leaf CANADA 9999 FINE SILVER 1 OZ'),pass('Maple Leaf CANADA 9999 FINE GOLD 1 OZ')]);
+ assert.equal(r.usable,false);assert.ok(r.warnings.length);
+});
+test('Equally complete conflicting weights remain blocked',()=>{
+ const r=interpreted([pass('CANADA 9999 FINE SILVER 1 OZ ARGENT PUR'),pass('CANADA 9999 FINE SILVER 10 OZ ARGENT PUR')]);
+ assert.equal(r.usable,false);assert.equal(r.weight,0);
+});
+test('Replica markings survive rejection of a weaker crop',()=>{
+ const r=interpreted([pass('American Silver Eagle 1 OZ FINE SILVER'),pass('REPLICA FINE GOLD',.4)]);
+ assert.equal(r.usable,false);assert.match(r.warnings.join(' '),/replica/i);
+});
+test('Warnings within a single pass cannot be discarded',()=>{
+ assert.equal(interpreted([pass('FINE GOLD FINE SILVER 1 OZ')]).usable,false);
+});
+test('Subthreshold observations cannot introduce conflicting weights',()=>{
+ const p=pass('CANADA 9999 FINE SILVER 1 OZ ARGENT PUR');p.observations.push({text:'10 OZ',confidence:.1});
+ assert.equal(interpreted([p]).weight,1);
+});
+test('Blank passes ignore the legacy flattened text',()=>{
+ const r=interpreted([pass(''),{observations:[],confidence:0}]);assert.equal(r.usable,false);assert.equal(r.raw,'');
+});
+test('Older native engine retains its original result contract',()=>{
+ const input={lines:['FINE SILVER 1 OZ'],engineVersion:2};assert.equal(context.selectSmartCameraPhotoEvidence(input),input);
+ assert.equal(context.selectSmartCameraPhotoEvidence({cancelled:true}).cancelled,true);
+});
+test('Malformed pass observations cannot crash a scan',()=>{
+ assert.equal(interpreted([null,{observations:[null,{}, {text:42,confidence:1}]}]).usable,false);
+});
+test('Missing data has a specific failure reason',()=>{
+ assert.match(context.smartCameraFailureReason(scan('')),/No readable markings/);
+ assert.match(context.smartCameraFailureReason(scan('LIBERTY 2011')),/metal could not/);
+ assert.match(context.smartCameraFailureReason(scan('Fine silver')),/weight could not/);
+ assert.match(context.smartCameraFailureReason(scan('Fine silver 1 OZ')),/product could not/);
+ assert.match(context.smartCameraFailureReason(scan('Fine silver replica 1 OZ')),/replica/i);
+});
 console.log(count+' scanner regression checks passed');

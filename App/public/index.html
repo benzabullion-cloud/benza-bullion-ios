@@ -812,7 +812,7 @@ html[data-theme="dark"] .marketCard{background:linear-gradient(145deg,#1a1b20,#1
 .smartScanSummary>div{display:flex;justify-content:space-between;gap:16px;align-items:baseline}
 .smartScanSummary span{font-size:10px;color:var(--muted)}
 .smartScanSummary strong{font-size:12px;text-align:right;max-width:70%;overflow-wrap:anywhere}
-#smartAnalysisUseButton[hidden],#proInventoryFields[hidden],#proInventoryTeaser[hidden]{display:none!important}
+#smartCameraDiagnostics[hidden],#smartAnalysisUseButton[hidden],#proInventoryFields[hidden],#proInventoryTeaser[hidden]{display:none!important}
 .smartAnalysisTop{padding:16px;border-bottom:1px solid rgba(214,165,58,.18);background:radial-gradient(circle at 100% 0%,rgba(240,212,126,.14),transparent 44%)}
 .smartAnalysisEyebrow{font-size:8px;font-weight:950;letter-spacing:1px;text-transform:uppercase;color:#d6a53a;margin-bottom:6px}
 .smartAnalysisTitle{font-size:20px;font-weight:900;line-height:1.18;margin:0 0 7px}
@@ -5798,6 +5798,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
         <button class="smartCameraSecondary" type="button" onclick="closeSmartCamera();openManualAdd();">Enter manually</button>
       </div>
       <div id="smartCameraStatus" class="smartCameraFine" role="status"></div>
+      <details id="smartCameraDiagnostics" class="smartCameraFine" hidden><summary>Scanner check · stays on this phone</summary><p id="smartCameraDiagnosticText"></p></details>
       <div class="smartCameraFine">Scan photos stay on your iPhone. Scanning does not verify authenticity.</div>
     </div>
   </section>
@@ -6621,6 +6622,7 @@ function smartCameraPlugin(){
 let pendingSmartCameraSuggestion=null;
 let smartCameraScans=[];
 let smartCameraPhotoCount=0;
+let smartCameraLastDiagnostic=null;
 let smartCameraScanning=false;
 let smartCameraSession=0;
 let smartCameraRunId=0;
@@ -6868,6 +6870,69 @@ function interpretSmartCameraScan(result){
     matchedTerms,inferredWeight,inferredMint:!!mint&&!detectedMint,inferredPurity:!!purity&&!observedPurity,
     sides:result?.sides||1,usable:!!metal&&!plated&&metals.length<=1&&confidence>=.42};
 }
+// OCR passes are alternative readings of ONE photo, not additional inscriptions.
+function selectSmartCameraPhotoEvidence(result){
+  if(!Array.isArray(result?.passes))return result;
+  const candidates=result.passes.map(pass=>{
+    const observations=Array.isArray(pass?.observations)?pass.observations:[];
+    const lines=observations.filter(o=>typeof o?.text==='string'&&Number(o.confidence)>=.25).map(o=>o.text);
+    const photo={lines,confidence:Number(pass?.confidence)||0};
+    const reading=interpretSmartCameraScan(photo);
+    const score=(reading.usable?3:0)+(reading.metal?3:0)+(reading.product?4:0)+(reading.weight>0?3:0)+
+      (reading.purity?1:0)+(reading.year ? .25 : 0)+photo.confidence-reading.warnings.length*12;
+    return {photo,reading,score,id:pass?.id};
+  }).filter(c=>c.photo.lines.length).sort((a,b)=>b.score-a.score);
+  if(!candidates.length)return {...result,lines:[],text:'',confidence:0,selectedPasses:0,rejectedPasses:result.passes.length};
+  const primary=candidates[0];
+  const accepted=[primary];
+  const compatible=(a,b)=>!((a.metal&&b.metal&&a.metal!==b.metal)||
+    (a.product&&b.product&&a.product!==b.product)||
+    (a.weight>0&&b.weight>0&&Math.abs(a.weight-b.weight)>Math.max(a.weight,b.weight)*.002)||
+    (a.year&&b.year&&a.year!==b.year)||
+    (a.purity&&b.purity&&a.purity!==b.purity));
+  // Equally complete, confident alternatives are ambiguous, not permission to guess.
+  const fieldCount=r=>[r.metal,r.product,r.weight>0,r.purity].filter(Boolean).length;
+  const competing=candidates.filter(c=>c!==primary&&c.reading.usable&&
+    c.photo.confidence>=primary.photo.confidence*.9&&
+    fieldCount(c.reading)>=fieldCount(primary.reading)&&!compatible(primary.reading,c.reading));
+  if(competing.length){
+    const lines=[...new Set(candidates.flatMap(c=>c.photo.lines))];
+    return {...result,lines,text:lines.join('\n'),confidence:primary.photo.confidence,
+      selectedPasses:candidates.length,rejectedPasses:result.passes.length-candidates.length};
+  }
+  // Keep directly read replica/plating warnings even if a crop omits them.
+  const cautionLines=candidates.flatMap(c=>c.photo.lines).filter(line=>/\b(?:plated|clad|filled|replica|copy|tribute|layered)\b/i.test(line));
+  let reading=primary.reading;
+  for(const c of candidates.slice(1)){
+    if(!compatible(reading,c.reading))continue;
+    const merged={lines:accepted.flatMap(p=>p.photo.lines).concat(c.photo.lines),confidence:primary.photo.confidence};
+    const next=interpretSmartCameraScan(merged);
+    // Combining partial passes must not invent conflicting weights, years, or purity.
+    if(next.warnings.length>reading.warnings.length)continue;
+    accepted.push(c);reading=next;
+  }
+  const lines=[...new Set(accepted.flatMap(c=>c.photo.lines).concat(cautionLines))];
+  return {...result,lines,text:lines.join('\n'),confidence:primary.photo.confidence,
+    selectedPasses:accepted.length,rejectedPasses:result.passes.length-accepted.length};
+}
+function smartCameraFailureReason(suggestion){
+  if(suggestion.warnings?.length)return suggestion.warnings[0];
+  if(!suggestion.raw?.trim())return 'No readable markings were found. A design-only photo cannot identify the item yet.';
+  if(!suggestion.metal)return 'Text was read, but the metal could not be identified.';
+  if(!(suggestion.weight>0))return 'The weight could not be read. Photograph the weight marking in focus.';
+  if(!suggestion.product)return 'Metal and weight were read, but the product could not be matched. Artwork recognition is not available yet.';
+  return 'The product details need another clear photo before continuing.';
+}
+function renderSmartCameraDiagnostics(suggestion){
+  const panel=document.getElementById('smartCameraDiagnostics');
+  const text=document.getElementById('smartCameraDiagnosticText');
+  if(!panel||!text)return;
+  panel.hidden=canUseSmartCameraSuggestion(suggestion)||!smartCameraLastDiagnostic;
+  // Counts and field-presence flags only. Never include images, OCR text, or serials.
+  if(!panel.hidden)text.textContent=JSON.stringify({...smartCameraLastDiagnostic,
+    photoCount:smartCameraPhotoCount,metalRead:!!suggestion.metal,weightRead:suggestion.weight>0,
+    productMatched:!!suggestion.product,conflictCount:suggestion.warnings?.length||0});
+}
 function smartCameraConfidenceLabel(value){
   if(value>=.80)return ['Strong evidence','high'];
   if(value>=.55)return ['Partial evidence','medium'];
@@ -6893,7 +6958,7 @@ function renderSmartCameraAnalysis(suggestion){
     ? 'Review the details below, then continue to your holding.'
     : smartCameraAwaitingReverse
       ? 'Flip the same item over so I can read its markings.'
-      : 'I couldn’t read enough to fill a holding. Try again with the metal and weight markings in focus, or enter it manually.';
+      : smartCameraFailureReason(suggestion);
   document.getElementById('smartScanProduct').textContent=suggestion.product||'Not identified';
   document.getElementById('smartScanMetal').textContent=METAL_NAMES[suggestion.metal]||'Not identified';
   document.getElementById('smartScanWeight').textContent=suggestion.weight>0
@@ -6901,6 +6966,7 @@ function renderSmartCameraAnalysis(suggestion){
   const use=document.getElementById('smartAnalysisUseButton');
   if(use){use.hidden=!ready;use.disabled=!ready;}
   panel.classList.add('show');
+  renderSmartCameraDiagnostics(suggestion);
 }
 function applySmartCameraSuggestion(suggestion){
   if(!canUseSmartCameraSuggestion(suggestion)||!isProActive()){
@@ -6947,6 +7013,9 @@ function useSmartCameraAnalysis(){
 function clearSmartCameraEvidence(){
   smartCameraScans=[];
   smartCameraPhotoCount=0;
+  smartCameraLastDiagnostic=null;
+  const diagnostic=document.getElementById('smartCameraDiagnostics');
+  if(diagnostic){diagnostic.hidden=true;diagnostic.open=false;}
   pendingSmartCameraSuggestion=null;
   smartCameraAwaitingReverse=false;
   document.getElementById('smartCameraAnalysis')?.classList.remove('show');
@@ -7019,12 +7088,19 @@ async function runSmartCameraScan(append=false,source='camera'){
     if(!append&&typeof plugin.reset==='function')await plugin.reset();
     if(run!==smartCameraRunId||session!==smartCameraSession)return;
     if(status)status.textContent='Reading your bullion…';
-    const result=await plugin.scan({source});
+    const captured=await plugin.scan({source});
+    const result=selectSmartCameraPhotoEvidence(captured);
     if(run!==smartCameraRunId||session!==smartCameraSession)return;
     if(result?.cancelled){
       if(status)status.textContent=append?'Ready when you are. Photograph the other side.':'Ready when you are.';
       return;
     }
+    if(!result||typeof result!=='object')throw new Error('Invalid camera result');
+    smartCameraLastDiagnostic={engineVersion:Number(result.engineVersion)||0,
+      appBuild:typeof result.appBuild==='string'&&/^[0-9.]+$/.test(result.appBuild)?result.appBuild:'unknown',
+      ocrPasses:Number(result.ocrPasses)||0,selectedPasses:Number(result.selectedPasses)||0,
+      rejectedPasses:Number(result.rejectedPasses)||0,lineCount:Array.isArray(result.lines)?result.lines.length:0,
+      elapsedMs:Number(result.elapsedMs)||0};
     smartCameraPhotoCount++;
     const reading=interpretSmartCameraScan(result);
     // Count photos separately: blank OCR never stacks evidence or causes endless reverse prompts.
