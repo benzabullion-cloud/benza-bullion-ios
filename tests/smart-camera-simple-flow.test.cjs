@@ -50,4 +50,23 @@ test('Failed two-side scan stays on result with a fresh retry',()=>{context.rend
 test('Pro access is checked again at handoff',()=>{active=false;assert.equal(context.applySmartCameraSuggestion(complete),false);active=true});
 test('Free and Pro inventory sections are mutually exclusive',()=>{active=false;context.syncProInventoryVisibility();assert.equal(get('proInventoryFields').hidden,true);assert.equal(get('proInventoryTeaser').hidden,false);active=true;context.syncProInventoryVisibility();assert.equal(get('proInventoryTeaser').hidden,true);assert.match(html,/#smartAnalysisUseButton\[hidden\],#proInventoryFields\[hidden\],#proInventoryTeaser\[hidden\]\{display:none!important\}/)});
 test('Scanner has no photo transmission or persistence path',()=>{const scanner=html.slice(html.indexOf('function smartCameraPlugin('),html.indexOf('function clearAttachmentObjectUrls'));assert.doesNotMatch(scanner,/\bfetch\s*\(|XMLHttpRequest|sendBeacon|upload|localStorage|indexedDB|sessionStorage/);const native=fs.readFileSync('App/SceneDelegate.swift','utf8');const plugin=native.slice(native.indexOf('@objc(BenzaSmartCameraPlugin)'),native.indexOf('@objc(BenzaStoreKitPlugin)'));assert.doesNotMatch(plugin,/URLSession|URLRequest|base64EncodedString|write\(to:|UserDefaults/)});
+
+test('Failure diagnostics contain counts and flags, never recognized text',()=>{
+ vm.runInContext('smartCameraLastDiagnostic={engineVersion:3,appBuild:"44",ocrPasses:10,selectedPasses:2,rejectedPasses:8,lineCount:3,elapsedMs:1200};smartCameraPhotoCount=2',context);
+ context.renderSmartCameraAnalysis(scan('Valcambi Fine gold Serial: SECRET123'));
+ assert.equal(get('smartCameraDiagnostics').hidden,false);
+ const diagnostic=JSON.parse(get('smartCameraDiagnosticText').textContent);
+ assert.equal(diagnostic.appBuild,'44');assert.equal(diagnostic.photoCount,2);assert.equal(diagnostic.weightRead,false);
+ assert.doesNotMatch(JSON.stringify(diagnostic),/SECRET123|Valcambi|gold|raw|serial|observations/i);
+});
+test('Fresh retry clears diagnostic and recognized evidence',()=>{
+ get('smartCameraDiagnostics').open=true;context.clearSmartCameraEvidence();
+ assert.equal(get('smartCameraDiagnostics').hidden,true);assert.equal(get('smartCameraDiagnostics').open,false);
+ assert.equal(vm.runInContext('smartCameraLastDiagnostic',context),null);
+ assert.equal(vm.runInContext('smartCameraScans.length+smartCameraPhotoCount',context),0);
+});
+test('Successful result hides diagnostics',()=>{
+ vm.runInContext('smartCameraLastDiagnostic={engineVersion:3}',context);
+ context.renderSmartCameraAnalysis(complete);assert.equal(get('smartCameraDiagnostics').hidden,true);
+});
 console.log(count+' scanner review checks passed');

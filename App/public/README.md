@@ -300,3 +300,11 @@ The scheduled Edge Function should run repeatedly (recommended: every minute) so
 - Complete scans remain on a compact result card until Review holding is selected. Nothing is auto-added.
 - Hidden Inventory & records sections now explicitly honor their hidden attributes, preventing both the Pro form and upgrade teaser from rendering together.
 - Review regression tests exercise the actual openAdd, selectMetal, and product option setup instead of stubbing the handoff.
+
+
+## Smart Camera OCR evidence isolation (engine 3)
+- Native OCR returns each pass separately. Crops and rotations are alternative readings of the same photo, rather than ten independent inscriptions to concatenate.
+- The web layer selects coherent evidence, adds compatible partial readings, and retains plating/replica warnings. Equally complete and confident contradictory alternatives remain blocked.
+- The scanner keeps the existing native observation threshold; this change does not claim calibrated recognition confidence or implement artwork recognition.
+- Incomplete results explain whether text, metal, weight, product matching, or conflicting evidence prevented review. A collapsed local Scanner check shows only build, timing, counts, and field-presence flags. It never includes images, OCR text, or serials and is cleared on a fresh attempt.
+- Synthetic regressions reproduce alternate-pass weight contamination and exercise ambiguity, warning retention, old native payload compatibility, diagnostics privacy, and reset. Apple Vision performance and real photo accuracy require physical iPhone validation.

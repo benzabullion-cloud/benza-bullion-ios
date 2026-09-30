@@ -301,8 +301,10 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
             }
             var found: [String: (String, Float)] = [:]
             var completed = 0
+            var passReadings: [[String: Any]] = []
             var lastError: Error?
-            for (photo, orientation, correction) in passes {
+            for (passIndex, pass) in passes.enumerated() {
+                let (photo, orientation, correction) = pass
                 if !self.isCurrent(generation) || (completed > 0 && Date().timeIntervalSince(started) > 18) { break }
                 autoreleasepool {
                     let request = VNRecognizeTextRequest()
@@ -325,14 +327,22 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
                     do {
                         try VNImageRequestHandler(cgImage: photo, orientation: orientation, options: [:]).perform([request])
                         completed += 1
+                        var observations: [[String: Any]] = []
+                        var passConfidence: Float = 0
                         for observation in request.results ?? [] {
                             guard let top = observation.topCandidates(1).first, top.confidence >= 0.25 else { continue }
                             let line = top.string.trimmingCharacters(in: .whitespacesAndNewlines)
                             let key = line.lowercased()
+                            if !line.isEmpty {
+                                observations.append(["text": line, "confidence": Double(top.confidence)])
+                                passConfidence += top.confidence
+                            }
                             if !line.isEmpty && top.confidence > (found[key]?.1 ?? 0) {
                                 found[key] = (line, top.confidence)
                             }
                         }
+                        passReadings.append(["id": passIndex, "observations": observations,
+                                             "confidence": observations.isEmpty ? 0 : Double(passConfidence) / Double(observations.count)])
                     } catch { lastError = error }
                 }
             }
@@ -349,7 +359,9 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
                 } else {
                     call?.resolve(["cancelled": false, "lines": lines,
                                    "text": lines.joined(separator: "\n"), "confidence": confidence,
-                                   "ocrPasses": completed, "engineVersion": 2])
+                                   "ocrPasses": completed, "passes": passReadings, "engineVersion": 3,
+                                   "elapsedMs": Int(Date().timeIntervalSince(started) * 1000),
+                                   "appBuild": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"])
                 }
             }
         }
