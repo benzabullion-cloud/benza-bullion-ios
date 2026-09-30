@@ -23,4 +23,19 @@ jobs:
         run: swift test --package-path experiments/private-vision/NativeCore
       - name: Compile for iOS without signing
         working-directory: experiments/private-vision/NativeCore
-        run: xcodebuild -scheme BenzaPrivateVision -destination 'generic/platform=iOS' -derivedDataPath /tmp/benza-vision-ios CODE_SIGNING_ALLOWED=NO build
+        run: |
+          xcodebuild -list -json > /tmp/benza-vision-schemes.json
+          benza_scheme=$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('/tmp/benza-vision-schemes.json').read_text())
+          schemes = data.get('workspace', data.get('project', {})).get('schemes', [])
+          for name in ['BenzaPrivateVisionCore-Package', 'BenzaPrivateVisionCore', 'BenzaPrivateVision', 'CBenzaVision']:
+              if name in schemes:
+                  print(name)
+                  break
+          else:
+              raise SystemExit('Native package scheme missing: ' + repr(schemes))
+          PY
+          )
+          xcodebuild -scheme "$benza_scheme" -destination 'generic/platform=iOS' -derivedDataPath /tmp/benza-vision-ios CODE_SIGNING_ALLOWED=NO build

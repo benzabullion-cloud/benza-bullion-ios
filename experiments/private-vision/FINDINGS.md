@@ -118,3 +118,15 @@ This is a native Linux test, not an iPhone test. The package includes a strict
 Swift design-response boundary and Apple compile/test workflow; their successful
 execution must be confirmed separately. Model results still cannot create a
 holding, and the shipping app target is not connected to this experiment.
+
+A same-process sequence after cancellation returned Eagle, unknown for the
+unsupported round, then Eagle again. The three runs took 27.79, 19.03 and 21.60
+seconds. Process peak RSS stayed at 2,542,544 KiB throughout this sequence;
+the later runs did not raise the recorded memory peak. This is a short lifecycle
+check, not proof against leaks over unlimited scans.
+
+The first Apple workflow compiled the C++ core and Swift parser on arm64 macOS
+and passed all three Swift boundary/lifecycle tests. Its iOS step failed because
+the package's auto-generated scheme name differed from the product name. The
+workflow now discovers the available package scheme instead of assuming it.
+Physical iPhone inference and end-to-end camera/holding behavior remain untested.
