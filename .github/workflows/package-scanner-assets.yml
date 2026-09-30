@@ -1,0 +1,39 @@
+name: Package Apple-hosted scanner assets
+
+on:
+  pull_request:
+    paths:
+      - 'experiments/private-vision/apple-hosted-models.json'
+      - 'experiments/private-vision/package_apple_hosted_models.sh'
+      - 'experiments/private-vision/prepare_app_models.py'
+      - 'experiments/private-vision/assets.lock.json'
+      - '.github/workflows/package-scanner-assets.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Download pinned scanner models
+        run: python3 experiments/private-vision/prepare_app_models.py --download
+      - name: Package Apple-hosted asset pack
+        run: |
+          mkdir -p build/background-assets
+          xcrun ba-package experiments/private-vision/apple-hosted-models.json -o build/background-assets/BenzaPrivateVisionModels.aar
+          ls -lh build/background-assets/BenzaPrivateVisionModels.aar
+          du -sh build/background-assets/BenzaPrivateVisionModels.aar
+      - name: Upload packaged asset
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: BenzaPrivateVisionModels
+          path: build/background-assets/BenzaPrivateVisionModels.aar
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
