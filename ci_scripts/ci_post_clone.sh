@@ -7,8 +7,11 @@ if [ -n "${BENZA_APPLE_SDK_ARCHIVE:-}" ]; then
 else
     python3 experiments/private-vision/prepare_apple_sdk.py --download
 fi
-# Only explicitly selected beta builds contain the experimental 1.55 GB weights.
+# Explicit TestFlight validation marker enables main-branch cloud beta builds.
+# Remove the marker before preparing a public App Store release. Ordinary local
+# builds retain the disabled tracked manifest; recognition never downloads assets.
 benza_branch="${CI_PULL_REQUEST_SOURCE_BRANCH:-${CI_BRANCH:-}}"
-if [ "$benza_branch" = scanner-private-vision-benchmark ] || [ "${BENZA_BUNDLE_OFFLINE_VISION:-0}" = 1 ]; then
+benza_beta_marker=App/PrivateVisionModels/TESTFLIGHT_BETA
+if [ "$benza_branch" = scanner-private-vision-benchmark ] || [ "${BENZA_BUNDLE_OFFLINE_VISION:-0}" = 1 ] || { [ "$benza_branch" = main ] && [ -f "$benza_beta_marker" ]; }; then
     python3 experiments/private-vision/prepare_app_models.py --download
 fi
