@@ -1,8 +1,8 @@
-# Private vision experiment — not enabled in the app
+# Private vision integration — production inference disabled
 
 This tests actual image understanding as an alternative to the existing OCR and
-literal-name matching scanner. It does not change the camera, add holdings, or
-claim that recognition is launch ready.
+literal-name matching scanner. The native app integration returns a separate design suggestion beside OCR.
+It never adds holdings or claims that recognition is launch ready.
 
 ## Ownership and availability
 

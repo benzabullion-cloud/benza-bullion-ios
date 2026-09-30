@@ -4,7 +4,9 @@ on:
     paths:
       - 'experiments/private-vision/**'
       - 'App/**'
+      - 'debug.xcconfig'
       - 'App.xcodeproj/**'
+      - 'tests/**'
       - 'ci_scripts/**'
       - '.github/workflows/private-vision-native.yml'
   workflow_dispatch:
@@ -42,5 +44,11 @@ jobs:
           PY
           )
           xcodebuild -scheme "$benza_scheme" -destination 'generic/platform=iOS' -derivedDataPath /tmp/benza-vision-ios CODE_SIGNING_ALLOWED=NO build
-      - name: Compile integrated app without signing or experimental weights
-        run: xcodebuild -project App.xcodeproj -scheme App -destination 'generic/platform=iOS' -derivedDataPath /tmp/benza-app-ios CODE_SIGNING_ALLOWED=NO build
+      - name: Scanner regressions
+        run: |
+          node tests/smart-camera.test.cjs
+          node tests/smart-camera-flow.test.cjs
+          node tests/smart-camera-simple-flow.test.cjs
+          node tests/smart-camera-design.test.cjs
+      - name: Compile actual app integration without signing or model assets
+        run: xcodebuild -project App.xcodeproj -scheme App -destination 'generic/platform=iOS' -derivedDataPath /tmp/benza-camera-app CODE_SIGNING_ALLOWED=NO build

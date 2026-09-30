@@ -61,4 +61,23 @@ final class NativeBoundaryTests: XCTestCase {
         XCTAssertEqual(run(), 4)
         XCTAssertEqual(output[0], 0)
     }
+    func testCanceledWrapperDoesNotReadAssetsOrLoadModel() throws {
+        let engine = try BenzaOfflineDesignEngine(directory: URL(fileURLWithPath: "/missing-models"))
+        let scan = try BenzaOfflineScan()
+        scan.cancel()
+        let context = try XCTUnwrap(CGContext(data: nil, width: 1, height: 1,
+            bitsPerComponent: 8, bytesPerRow: 4, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue))
+        let image = try XCTUnwrap(context.makeImage())
+        XCTAssertThrowsError(try engine.identify(image: image, scan: scan)) { error in
+            guard case BenzaOfflineDesignEngine.Failure.canceled = error else {
+                return XCTFail("Canceled wrapper attempted asset loading")
+            }
+        }
+    }
+
+    func testRemoteAssetDirectoryIsRejected() {
+        XCTAssertThrowsError(try BenzaOfflineDesignEngine(directory: URL(string: "https://example.invalid/models")!))
+    }
+
 }

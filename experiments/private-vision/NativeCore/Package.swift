@@ -1,7 +1,7 @@
 // swift-tools-version: 5.9
 import PackageDescription
 
-// App integration remains gated by the explicit beta model manifest.
+// Linked for compile checks; inference remains behind an explicit device-test gate.
 // We retain the matching binary and runtime source independently of this URL.
 let package = Package(
     name: "BenzaPrivateVisionCore",

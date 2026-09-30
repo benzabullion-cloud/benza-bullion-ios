@@ -32,6 +32,7 @@ public final class BenzaOfflineDesignEngine {
     public enum Failure: Error { case unavailable, canceled, busy, invalidReply }
     private let directory: URL
     private var verified = false
+    private let workerLock = NSLock()
     private let files: [(String, Int64, String)] = [
         ("Qwen3VL-2B-Instruct-Q4_K_M.gguf", 1107409952,
          "089d75c52f4b7ffc56ba998ffc50aae89fcafc755f9e7208aacca281dca6c2ae"),
@@ -45,7 +46,6 @@ public final class BenzaOfflineDesignEngine {
     }
 
     private func verifyFiles(scan: BenzaOfflineScan) throws {
-        if scan.isCanceled { throw Failure.canceled }
         if verified { return }
         for (name, size, expected) in files {
             let url = directory.appendingPathComponent(name)
@@ -70,6 +70,9 @@ public final class BenzaOfflineDesignEngine {
     }
 
     public func identify(image: CGImage, scan: BenzaOfflineScan) throws -> BenzaDesignIdentity {
+        guard workerLock.try() else { throw Failure.busy }
+        defer { workerLock.unlock() }
+        if scan.isCanceled { throw Failure.canceled }
         try verifyFiles(scan: scan)
         if scan.isCanceled { throw Failure.canceled }
         guard let promptURL = Bundle.module.url(forResource: "catalogue-prompt", withExtension: "txt", subdirectory: "Resources") else {

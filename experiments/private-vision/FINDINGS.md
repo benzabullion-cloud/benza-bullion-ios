@@ -130,3 +130,14 @@ and passed all three Swift boundary/lifecycle tests. Its iOS step failed because
 the package's auto-generated scheme name differed from the product name. The
 workflow now discovers the available package scheme instead of assuming it.
 Physical iPhone inference and end-to-end camera/holding behavior remain untested.
+
+## App integration continuation
+
+Added the Swift image/asset wrapper, checksum verification of local files,
+app package/resource wiring, separate design reply channel and reset cleanup
+barrier. Fourteen additional JavaScript integration checks pass (110 total),
+including artwork-only front followed by inscription reverse, contradictory
+designs, fractional weight, model specification injection and fresh-item reset.
+Seven Python boundary checks pass. Apple checks for the new wrapper and actual
+app target are run separately. No iPhone recognition or performance evidence is
+claimed; production inference remains explicitly disabled.
