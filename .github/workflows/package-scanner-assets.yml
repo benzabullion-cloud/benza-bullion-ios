@@ -9,6 +9,11 @@ on:
       - 'experiments/private-vision/assets.lock.json'
       - '.github/workflows/package-scanner-assets.yml'
   workflow_dispatch:
+    inputs:
+      apple_app_id:
+        description: 'Numeric App Store Connect Apple ID for Benza Bullion'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -29,7 +34,7 @@ jobs:
           xcrun ba-package experiments/private-vision/apple-hosted-models.json -o build/background-assets/BenzaPrivateVisionModels.aar
           ls -lh build/background-assets/BenzaPrivateVisionModels.aar
           du -sh build/background-assets/BenzaPrivateVisionModels.aar
-      - name: Upload packaged asset
+      - name: Upload packaged asset artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: BenzaPrivateVisionModels
@@ -37,3 +42,18 @@ jobs:
           compression-level: 0
           retention-days: 7
           if-no-files-found: error
+      - name: Upload asset pack to App Store Connect
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          APPLE_ID_USERNAME: ${{ secrets.APPLE_ID_USERNAME }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_APP_ID: ${{ inputs.apple_app_id }}
+        run: |
+          test -n "$APPLE_ID_USERNAME"
+          test -n "$APPLE_APP_PASSWORD"
+          test -n "$APPLE_APP_ID"
+          xcrun altool \
+            --upload-asset-pack build/background-assets/BenzaPrivateVisionModels.aar \
+            --apple-id "$APPLE_APP_ID" \
+            -u "$APPLE_ID_USERNAME" \
+            -p "$APPLE_APP_PASSWORD"
