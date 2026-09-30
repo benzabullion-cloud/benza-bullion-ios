@@ -7,6 +7,7 @@ import CoreImage
 import ImageIO
 import BenzaPrivateVision
 import BackgroundAssets
+import System
 
 @objc(BenzaNotificationsPlugin)
 final class BenzaNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -141,21 +142,16 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
 
     private func ensureManagedModelsAvailable() async throws {
         let manager = AssetPackManager.shared
-        let manifest = try await manager.manifest
-        guard let pack = manifest.assetPack(withID: managedAssetPackID) else {
-            throw NSError(
-                domain: "BenzaSmartCamera",
-                code: 1001,
-                userInfo: [NSLocalizedDescriptionKey: "Apple-hosted scanner model pack was not found."]
-            )
-        }
 
-        try await manager.ensureLocalAvailability(of: pack, requireLatestVersion: true)
+        // Use the iOS 26 managed-asset APIs because Benza Bullion still supports
+        // iOS 26.0. The newer manifest API requires iOS 27.
+        let pack = try await manager.assetPack(withID: managedAssetPackID)
+        try await manager.ensureLocalAvailability(of: pack)
 
-        let requiredPaths = [
-            "App/PrivateVisionModels/Qwen3VL-2B-Instruct-Q4_K_M.gguf",
-            "App/PrivateVisionModels/mmproj-Qwen3VL-2B-Instruct-Q8_0.gguf",
-            "App/PrivateVisionModels/manifest.json"
+        let requiredPaths: [FilePath] = [
+            FilePath("App/PrivateVisionModels/Qwen3VL-2B-Instruct-Q4_K_M.gguf"),
+            FilePath("App/PrivateVisionModels/mmproj-Qwen3VL-2B-Instruct-Q8_0.gguf"),
+            FilePath("App/PrivateVisionModels/manifest.json")
         ]
         for path in requiredPaths {
             let url = try manager.url(for: path)
@@ -168,7 +164,9 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
             }
         }
 
-        let manifestURL = try manager.url(for: "App/PrivateVisionModels/manifest.json")
+        let manifestURL = try manager.url(
+            for: FilePath("App/PrivateVisionModels/manifest.json")
+        )
         let data = try Data(contentsOf: manifestURL)
         guard let configuration = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               configuration["enabled"] as? Bool == true else {
@@ -182,7 +180,7 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
 
     private func managedModelDirectory() throws -> URL {
         let modelURL = try AssetPackManager.shared.url(
-            for: "App/PrivateVisionModels/Qwen3VL-2B-Instruct-Q4_K_M.gguf"
+            for: FilePath("App/PrivateVisionModels/Qwen3VL-2B-Instruct-Q4_K_M.gguf")
         )
         return modelURL.deletingLastPathComponent()
     }
