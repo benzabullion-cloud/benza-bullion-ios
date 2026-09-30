@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "status": "experimental-not-shipped",
-  "evaluation": "rejected-for-production-unsupported-weight",
+  "evaluation": "free-form-rejected-catalogue-suggestions-experimental",
   "model": {
     "repository": "Qwen/Qwen3-VL-2B-Instruct-GGUF",
     "revision": "52d6c8ffea26cc873ac5ad116f8631268d7eb503",

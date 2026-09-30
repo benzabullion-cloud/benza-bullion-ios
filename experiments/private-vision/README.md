@@ -33,6 +33,9 @@ gcc -shared -fPIC experiments/private-vision/offline_guard.c -ldl \
   -o experiments/private-vision/assets/offline_guard.so
 python experiments/private-vision/prepare_assets.py --verify-only
 python experiments/private-vision/benchmark.py /absolute/path/to/private-photo.jpeg
+python experiments/private-vision/benchmark.py /absolute/path/to/private-photo.jpeg \
+  --prompt experiments/private-vision/catalogue-prompt.txt --case eagle
+python -m unittest discover -s experiments/private-vision -p 'test_*.py' -v
 ```
 
 Setup downloads only public software and model assets. It does not accept or
@@ -47,6 +50,11 @@ photos, raw model replies, paths revealing customers, or serial numbers.
 Delete this directory after reviewing a run. A production app must not retain
 these debug outputs. The timeout kills and waits for the worker; no recognition
 context carries over into the next run.
+
+The catalogue prompt limits the worker to design suggestions. `identity_gate.py`
+enforces this response schema and never produces holding specifications. A
+caller must apply the gate to model output, keep independent OCR/catalogue data
+separate, and prevent stale or mixed-item evidence from entering a scan.
 
 ## Release gates
 

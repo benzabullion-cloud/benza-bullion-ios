@@ -1,6 +1,7 @@
 # Candidate evaluation — 2026-09-30
 
-**Decision: reject this candidate for production scanner use.**
+**Decision: reject free-form specification generation. Catalogue-only design
+suggestions remain experimental, with production integration disabled.**
 
 Tested the pinned Qwen3-VL-2B-Instruct Q4_K_M model with llama.cpp b11146,
 CPU execution, four threads, temperature zero and 1,024 maximum image tokens.
@@ -42,3 +43,33 @@ front/back markings and catalogue data. Arbitrary model-generated weights must
 never populate holdings. A dedicated catalogue image matcher/classifier may
 offer a smaller local solution, but requires licensed reference images and a
 representative test set; its accuracy is not established by this experiment.
+
+## Catalogue-only follow-up
+
+Tested the same fixed model with `catalogue-prompt.txt`, which asks for only one
+supported design ID or `unknown`. It does not ask the model to transcribe text or
+generate metal, weight, year, or confidence.
+
+| Input case | Design response | Assessment |
+| --- | --- | --- |
+| Eagle obverse | `american_eagle` | Correct design suggestion |
+| Maple Leaf reverse | `canadian_maple_leaf` | Correct design suggestion |
+| Unmarked generic round | `unknown` | Correct rejection of unsupported design |
+| App screenshot, no physical coin | `unknown` | Correct rejection of a non-coin image |
+
+The Eagle run took 80.24 seconds. The Maple and round runs took 90.89 and 86.09
+seconds while run concurrently on the same Linux CPU. Peak resident memory
+remained about 3.01 GiB per worker. These timings are not directly comparable to
+one another or to iPhone GPU execution. The non-coin test took 68.10 seconds.
+
+`identity_gate.py` permits exactly one known design ID, rejects extra fields,
+duplicate keys, malformed responses and unsupported IDs, and blocks conflicting
+front/back identities. Every accepted result explicitly has
+`can_create_holding: false`; specifications require an independent data source.
+Seven regression tests pass, including rejection of the original wrong-weight
+response shape. These protocol tests do not validate image-recognition accuracy.
+
+This small sample is promising for bounded suggestions, but does not establish
+general accuracy. Confusable bullion, replicas, gold commemoratives sharing
+artwork, blurred images and supported-device performance still require testing.
+No holding data or app camera behavior changed.

@@ -14,8 +14,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('image', type=Path)
     parser.add_argument('--timeout', type=int, default=360)
+    parser.add_argument('--prompt', type=Path, default=ROOT / 'prompt.txt')
+    parser.add_argument('--case', choices=['single', 'eagle', 'maple', 'round'], default='single')
     args = parser.parse_args()
     image = args.image.resolve(strict=True)
+    prompt = args.prompt.resolve(strict=True)
     lock = json.loads((ROOT / 'assets.lock.json').read_text())
     assets = ROOT / 'assets'
     specs = lock['model']['files'] + [lock['runtime']['linux_archive']]
@@ -27,7 +30,7 @@ def main():
     runtime = assets / 'runtime' / ('llama-' + lock['runtime']['release'])
     command = [str(runtime / 'llama-mtmd-cli'), '-m', str(assets / specs[0]['name']),
                '--mmproj', str(assets / specs[1]['name']), '--image', str(image),
-               '-f', str(ROOT / 'prompt.txt'), '-n', '220', '-c', '4096',
+               '-f', str(prompt), '-n', '220', '-c', '4096',
                '-t', '4', '--temp', '0', '--no-mmproj-offload',
                '--image-min-tokens', '1024', '--image-max-tokens', '1024']
     env = dict(os.environ, LD_PRELOAD=str(guard))
@@ -37,7 +40,9 @@ def main():
         env=env, capture_output=True)
     if check.returncode == 0 or b'Operation not permitted' not in check.stderr:
         raise SystemExit('Network isolation check failed.')
-    result_dir = ROOT / 'private-results'
+    private_root = ROOT / 'private-results'
+    private_root.mkdir(mode=0o700, exist_ok=True)
+    result_dir = private_root / args.case
     result_dir.mkdir(mode=0o700, exist_ok=True)
     started = time.monotonic()
     try:
