@@ -18,8 +18,7 @@ let package = Package(
             linkerSettings: [.linkedFramework("Accelerate"), .linkedFramework("Metal"),
                              .linkedFramework("Foundation"), .linkedLibrary("c++")]
         ),
-        .target(name: "BenzaPrivateVision", dependencies: ["CBenzaVision"],
-                resources: [.copy("Resources")]),
+        .target(name: "BenzaPrivateVision", dependencies: ["CBenzaVision"]),
         .testTarget(name: "BenzaPrivateVisionTests", dependencies: ["BenzaPrivateVision", "CBenzaVision"])
     ],
     cxxLanguageStandard: .cxx17
