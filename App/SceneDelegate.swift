@@ -137,10 +137,50 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
     private var offlineDesignEngine: BenzaOfflineDesignEngine?
     private var analysisInFlight = false
 
+    private let managedAssetPackID = "BenzaPrivateVisionModels"
+
+    private func ensureManagedModelsAvailable() async throws {
+        let manager = AssetPackManager.shared
+        let manifest = try await manager.manifest
+        guard let pack = manifest.assetPack(withID: managedAssetPackID) else {
+            throw NSError(
+                domain: "BenzaSmartCamera",
+                code: 1001,
+                userInfo: [NSLocalizedDescriptionKey: "Apple-hosted scanner model pack was not found."]
+            )
+        }
+
+        try await manager.ensureLocalAvailability(of: pack, requireLatestVersion: true)
+
+        let requiredPaths = [
+            "App/PrivateVisionModels/Qwen3VL-2B-Instruct-Q4_K_M.gguf",
+            "App/PrivateVisionModels/mmproj-Qwen3VL-2B-Instruct-Q8_0.gguf",
+            "App/PrivateVisionModels/manifest.json"
+        ]
+        for path in requiredPaths {
+            let url = try manager.url(for: path)
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                throw NSError(
+                    domain: "BenzaSmartCamera",
+                    code: 1002,
+                    userInfo: [NSLocalizedDescriptionKey: "Scanner model download finished, but a required model file is missing."]
+                )
+            }
+        }
+
+        let manifestURL = try manager.url(for: "App/PrivateVisionModels/manifest.json")
+        let data = try Data(contentsOf: manifestURL)
+        guard let configuration = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              configuration["enabled"] as? Bool == true else {
+            throw NSError(
+                domain: "BenzaSmartCamera",
+                code: 1003,
+                userInfo: [NSLocalizedDescriptionKey: "Scanner model pack is present but is not enabled."]
+            )
+        }
+    }
+
     private func managedModelDirectory() throws -> URL {
-        // Apple-hosted packs share a logical local namespace. url(for:) is nonisolated
-        // and synchronous; downstream file verification determines whether delivery
-        // has completed without requiring the iOS 26.4-only availability convenience API.
         let modelURL = try AssetPackManager.shared.url(
             for: "App/PrivateVisionModels/Qwen3VL-2B-Instruct-Q4_K_M.gguf"
         )
@@ -245,16 +285,38 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
                 call.reject("Close the other screen before opening Smart Camera.")
                 return
             }
-            _ = self.advanceGeneration()
+
+            let generation = self.advanceGeneration()
             self.pendingCall = call
-            let picker = UIImagePickerController()
-            picker.sourceType = source
-            if source == .camera { picker.cameraCaptureMode = .photo }
-            picker.allowsEditing = false
-            picker.delegate = self
-            self.activePicker = picker
-            picker.modalPresentationStyle = .fullScreen
-            presenter.present(picker, animated: true)
+
+            Task { @MainActor in
+                if ProcessInfo.processInfo.physicalMemory >= 7 * 1024 * 1024 * 1024 {
+                    do {
+                        try await self.ensureManagedModelsAvailable()
+                    } catch {
+                        guard self.isCurrent(generation) else { return }
+                        self.pendingCall = nil
+                        call.reject("Smart Camera visual model is not ready: \(error.localizedDescription)")
+                        return
+                    }
+                }
+
+                guard self.isCurrent(generation), self.pendingCall != nil else { return }
+                guard presenter.presentedViewController == nil else {
+                    self.pendingCall = nil
+                    call.reject("Close the other screen before opening Smart Camera.")
+                    return
+                }
+
+                let picker = UIImagePickerController()
+                picker.sourceType = source
+                if source == .camera { picker.cameraCaptureMode = .photo }
+                picker.allowsEditing = false
+                picker.delegate = self
+                self.activePicker = picker
+                picker.modalPresentationStyle = .fullScreen
+                presenter.present(picker, animated: true)
+            }
         }
     }
 
