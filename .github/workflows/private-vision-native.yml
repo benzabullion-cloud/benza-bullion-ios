@@ -16,7 +16,7 @@ jobs:
   compile:
     # Only standard public-repository runners; no billed larger/private runner.
     if: github.event.repository.private == false
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
