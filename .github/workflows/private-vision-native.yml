@@ -1,0 +1,55 @@
+name: Private vision native prototype
+on:
+  pull_request:
+    paths:
+      - 'experiments/private-vision/**'
+      - 'App/**'
+      - 'debug.xcconfig'
+      - 'App.xcodeproj/**'
+      - 'tests/**'
+      - 'ci_scripts/**'
+      - '.github/workflows/private-vision-native.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile:
+    # Only standard public-repository runners; no billed larger/private runner.
+    if: github.event.repository.private == false
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Prepare fixed SDK only
+        run: python3 experiments/private-vision/prepare_apple_sdk.py --download
+      - name: Compile and test native boundary on macOS
+        run: swift test --package-path experiments/private-vision/NativeCore
+      - name: Compile for iOS without signing
+        working-directory: experiments/private-vision/NativeCore
+        run: |
+          xcodebuild -list -json > /tmp/benza-vision-schemes.json
+          benza_scheme=$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('/tmp/benza-vision-schemes.json').read_text())
+          schemes = data.get('workspace', data.get('project', {})).get('schemes', [])
+          for name in ['BenzaPrivateVisionCore-Package', 'BenzaPrivateVisionCore', 'BenzaPrivateVision', 'CBenzaVision']:
+              if name in schemes:
+                  print(name)
+                  break
+          else:
+              raise SystemExit('Native package scheme missing: ' + repr(schemes))
+          PY
+          )
+          xcodebuild -scheme "$benza_scheme" -destination 'generic/platform=iOS' -derivedDataPath /tmp/benza-vision-ios CODE_SIGNING_ALLOWED=NO build
+      - name: Scanner regressions
+        run: |
+          node tests/smart-camera.test.cjs
+          node tests/smart-camera-flow.test.cjs
+          node tests/smart-camera-simple-flow.test.cjs
+          node tests/smart-camera-design.test.cjs
+          python3 -m unittest discover -s experiments/private-vision -p 'test_*.py'
+      - name: Compile actual app integration without signing or model assets
+        run: xcodebuild -project App.xcodeproj -scheme App -destination 'generic/platform=iOS' -derivedDataPath /tmp/benza-camera-app CODE_SIGNING_ALLOWED=NO build

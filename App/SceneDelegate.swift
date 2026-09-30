@@ -5,6 +5,7 @@ import UserNotifications
 import Vision
 import CoreImage
 import ImageIO
+import BenzaPrivateVision
 
 @objc(BenzaNotificationsPlugin)
 final class BenzaNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -131,6 +132,9 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
     private let stateLock = NSLock()
     private var generation = 0
     private var activeRequest: VNRecognizeTextRequest?
+    private var activeDesignScan: BenzaOfflineScan?
+    private var offlineDesignEngine: BenzaOfflineDesignEngine?
+    private var analysisInFlight = false
 
     // Advancing the generation invalidates every callback from an older attempt.
     private func advanceGeneration() -> Int {
@@ -138,9 +142,12 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
         generation += 1
         let value = generation
         let request = activeRequest
+        let designScan = activeDesignScan
         activeRequest = nil
+        activeDesignScan = nil
         stateLock.unlock()
         request?.cancel()
+        designScan?.cancel()
         return value
     }
 
@@ -168,7 +175,14 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
         if activeRequest === request { activeRequest = nil }
     }
 
+    private func isAnalyzing() -> Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return analysisInFlight
+    }
+
     private func finishResetWaiters() {
+        guard !isAnalyzing() && !pickerDismissalInProgress else { return }
         let waiters = resetWaiters
         resetWaiters.removeAll()
         waiters.forEach { $0.resolve() }
@@ -207,7 +221,7 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
                 call.reject("Camera is not available on this device.")
                 return
             }
-            guard self.pendingCall == nil && !self.pickerDismissalInProgress else {
+            guard self.pendingCall == nil && !self.pickerDismissalInProgress && !self.isAnalyzing() else {
                 call.reject("A Smart Camera scan is already in progress.")
                 return
             }
@@ -273,7 +287,28 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
             call?.reject("Smart Camera could not prepare the captured photo.")
             return
         }
+        stateLock.lock()
+        guard self.generation == generation && !analysisInFlight else {
+            stateLock.unlock()
+            return
+        }
+        analysisInFlight = true
+        stateLock.unlock()
         analysisQueue.async {
+            var completion: (() -> Void)?
+            // Reset resolves only after the worker's model/OCR allocations unwind.
+            defer {
+                let completedCallback = completion
+                self.analysisQueue.async {
+                    DispatchQueue.main.async {
+                        self.stateLock.lock()
+                        self.analysisInFlight = false
+                        self.stateLock.unlock()
+                        completedCallback?()
+                        self.finishResetWaiters()
+                    }
+                }
+            }
             guard self.isCurrent(generation) else { return }
             let started = Date()
             let context = CIContext(options: nil)
@@ -348,20 +383,65 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
             }
             context.clearCaches()
             guard self.isCurrent(generation) else { return }
+            var designID: String?
+            var designStatus = "not-bundled"
+            if let resources = Bundle.main.resourceURL {
+                let directory = resources.appendingPathComponent("PrivateVisionModels")
+                let manifest = directory.appendingPathComponent("manifest.json")
+                var enabled = false
+                if let data = try? Data(contentsOf: manifest),
+                   let configuration = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
+                    enabled = configuration["enabled"] as? Bool == true
+                }
+                if enabled && ProcessInfo.processInfo.physicalMemory >= 7 * 1024 * 1024 * 1024 {
+                    do {
+                        let scan = try BenzaOfflineScan()
+                        self.stateLock.lock()
+                        let current = self.generation == generation
+                        if current { self.activeDesignScan = scan }
+                        self.stateLock.unlock()
+                        guard current else { scan.cancel(); return }
+                        defer {
+                            self.stateLock.lock()
+                            if self.activeDesignScan === scan { self.activeDesignScan = nil }
+                            self.stateLock.unlock()
+                        }
+                        if self.offlineDesignEngine == nil {
+                            self.offlineDesignEngine = try BenzaOfflineDesignEngine(directory: directory)
+                        }
+                        guard let engine = self.offlineDesignEngine else { throw BenzaOfflineDesignEngine.Failure.unavailable }
+                        let identity = try autoreleasepool {
+                            try engine.identify(image: cgImage, scan: scan)
+                        }
+                        designStatus = "local-catalogue-v1"
+                        if identity.design != .unknown { designID = identity.design.rawValue }
+                    } catch {
+                        designStatus = "unavailable"
+                    }
+                } else if enabled {
+                    designStatus = "device-limited"
+                }
+            }
+            guard self.isCurrent(generation) else { return }
             let readings = found.values.sorted { $0.1 > $1.1 }
             let lines = readings.map { $0.0 }
             let confidence = readings.isEmpty ? 0 : Double(readings.reduce(Float(0)) { $0 + $1.1 }) / Double(readings.count)
-            DispatchQueue.main.async {
+            completion = {
                 guard self.isCurrent(generation) else { return }
                 self.pendingCall = nil
-                if completed == 0 {
+                if completed == 0 && designID == nil {
                     call?.reject(lastError?.localizedDescription ?? "Could not read this photo. Please try again.")
                 } else {
-                    call?.resolve(["cancelled": false, "lines": lines,
+                    var response: [String: Any] = ["cancelled": false, "lines": lines,
                                    "text": lines.joined(separator: "\n"), "confidence": confidence,
-                                   "ocrPasses": completed, "passes": passReadings, "engineVersion": 3,
+                                   "ocrPasses": completed, "passes": passReadings, "engineVersion": 4,
+                                   "designStatus": designStatus,
                                    "elapsedMs": Int(Date().timeIntervalSince(started) * 1000),
-                                   "appBuild": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"])
+                                   "appBuild": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"]
+                    if let designID {
+                        response["designSuggestion"] = ["id": designID, "source": "local-catalogue-v1"]
+                    }
+                    call?.resolve(response)
                 }
             }
         }

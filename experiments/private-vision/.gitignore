@@ -1,0 +1,6 @@
+assets/
+private-results/
+__pycache__/
+NativeCore/Vendor/
+NativeCore/.build/
+NativeCore/.swiftpm/

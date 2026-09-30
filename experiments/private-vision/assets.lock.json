@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "status": "experimental-not-shipped",
+  "evaluation": "free-form-rejected-catalogue-suggestions-experimental",
+  "model": {
+    "repository": "Qwen/Qwen3-VL-2B-Instruct-GGUF",
+    "revision": "52d6c8ffea26cc873ac5ad116f8631268d7eb503",
+    "license": "Apache-2.0",
+    "files": [
+      {
+        "name": "Qwen3VL-2B-Instruct-Q4_K_M.gguf",
+        "bytes": 1107409952,
+        "sha256": "089d75c52f4b7ffc56ba998ffc50aae89fcafc755f9e7208aacca281dca6c2ae",
+        "source_url": "https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct-GGUF/resolve/52d6c8ffea26cc873ac5ad116f8631268d7eb503/Qwen3VL-2B-Instruct-Q4_K_M.gguf"
+      },
+      {
+        "name": "mmproj-Qwen3VL-2B-Instruct-Q8_0.gguf",
+        "bytes": 445053216,
+        "sha256": "f9a68fabba69c3b81e153367b2c7521030b0fa8bb0de400c9599c8e6725f9c82",
+        "source_url": "https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct-GGUF/resolve/52d6c8ffea26cc873ac5ad116f8631268d7eb503/mmproj-Qwen3VL-2B-Instruct-Q8_0.gguf"
+      }
+    ]
+  },
+  "runtime": {
+    "repository": "ggml-org/llama.cpp",
+    "release": "b11146",
+    "license": "MIT",
+    "commit": "7fe450e19305b828c199d602c23a8337aaa1f03b",
+    "linux_archive": {
+      "name": "llama-b11146-bin-ubuntu-x64.tar.gz",
+      "bytes": 16998357,
+      "sha256": "c150306eb16b5ab696f76a8bdf810c35fd98a24e82158742e6fa28f420ff8410",
+      "source_url": "https://github.com/ggml-org/llama.cpp/releases/download/b11146/llama-b11146-bin-ubuntu-x64.tar.gz"
+    }
+  },
+  "policy": {
+    "network_during_recognition": false,
+    "automatic_model_updates": false,
+    "hosted_api_fallback": false,
+    "photo_logging": false,
+    "production_enabled": false
+  }
+}

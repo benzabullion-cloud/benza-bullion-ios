@@ -1,0 +1,27 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const html=fs.readFileSync('App/public/index.html','utf8');
+const nodes=new Map();const get=id=>{if(!nodes.has(id))nodes.set(id,{disabled:false,textContent:'',classList:{add(){},remove(){},contains(){return true}},setAttribute(){}});return nodes.get(id)};
+const queued=[];const plugin={reset:async()=>{},scan:async()=>queued.shift()};
+const context=vm.createContext({Date,console,document:{getElementById:get,querySelectorAll:()=>[]},isProActive:()=>true,isBenzaNativeRuntime:()=>true,smartCameraPlugin:()=>plugin});
+vm.runInContext(html.slice(html.indexOf('const GOLD_PRODUCTS='),html.indexOf('const METAL_SYMBOLS='))+html.slice(html.indexOf('let pendingSmartCameraSuggestion='),html.indexOf('function clearAttachmentObjectUrls')),context);
+vm.runInContext('renderSmartCameraAnalysis=s=>{pendingSmartCameraSuggestion=s;globalThis.last=s;}',context);
+const design=id=>({id,source:'local-catalogue-v1'});
+const read=(text,id,extra={})=>context.interpretSmartCameraScan({text,confidence:.95,designSuggestion:design(id),...extra});
+let count=0;async function test(name,fn){await fn();count++;console.log('PASS',name)}
+(async()=>{
+await test('Artwork alone cannot provide holding fields',()=>{const r=read('','american_eagle');assert.equal(r.designID,'american_eagle');assert.equal(r.metal,'');assert.equal(r.product,'');assert.equal(r.weight,0);assert.equal(context.canUseSmartCameraSuggestion(r),false)});
+await test('Model extra specification fields invalidate design payload',()=>{const r=read('','american_eagle',{designSuggestion:{...design('american_eagle'),metal:'silver',weight_oz:20}});assert.equal(r.designID,'');assert.equal(r.weight,0)});
+await test('Unsupported and inherited IDs are ignored',()=>{for(const id of ['unknown','arbitrary','__proto__','constructor'])assert.equal(read('',id).designID,'')});
+await test('Maple artwork needs independent metal weight and country',()=>{assert.equal(read('Fine gold 1/10 oz CANADA','canadian_maple_leaf').product,'Canadian Gold Maple Leaf');assert.equal(read('Fine gold CANADA','canadian_maple_leaf').weight,0);assert.equal(read('Fine gold 1 oz','canadian_maple_leaf').product,'')});
+await test('Half dollar does not gain invented silver weight',()=>{const r=read('Half Dollar 1942','walking_liberty_half_dollar');assert.equal(r.metal,'');assert.equal(r.weight,0);assert.equal(r.product,'')});
+await test('Artwork contradicting a supported inscription blocks review',()=>{const r=read('American Silver Eagle 1 oz fine silver','canadian_maple_leaf');assert.ok(r.warnings.length);assert.equal(context.canUseSmartCameraSuggestion(r),false)});
+await test('Replica markings block artwork-based review',()=>{for(const text of ['CANADA fine silver 1 oz REPLICA'])assert.equal(context.canUseSmartCameraSuggestion(read(text,'canadian_maple_leaf')),false)});
+await test('Conflicting front and reverse artwork blocks use',()=>{const r=read('American Silver Eagle fine silver 1 oz','unknown',{designSuggestions:[design('american_eagle'),design('canadian_maple_leaf')]});assert.equal(context.canUseSmartCameraSuggestion(r),false);assert.match(r.warnings.join(' '),/different designs/)});
+await test('Unavailable model preserves validated OCR',()=>{const r=read('American Silver Eagle 1 oz fine silver','unknown',{designSuggestion:undefined});assert.equal(context.canUseSmartCameraSuggestion(r),true)});
+await test('Unknown reverse does not erase known design',()=>{const r=read('Fine gold 1/10 oz CANADA','unknown',{designSuggestions:[design('canadian_maple_leaf'),design('unknown')]});assert.equal(r.designID,'canadian_maple_leaf');assert.equal(r.weight,.1)});
+await test('OCR pass selection preserves separate design channel',()=>{const selected=context.selectSmartCameraPhotoEvidence({passes:[],designSuggestion:design('american_eagle')});assert.equal(context.interpretSmartCameraScan(selected).designID,'american_eagle')});
+await test('Actual two-photo flow retains artwork with no front text',async()=>{queued.push({lines:[],designSuggestion:design('canadian_maple_leaf')},{text:'CANADA fine gold 1/10 oz',confidence:.95,designSuggestion:design('unknown')});await context.runSmartCameraScan();assert.equal(context.last.designID,'canadian_maple_leaf');assert.equal(context.last.weight,0);await context.runSmartCameraScan(true);assert.equal(context.last.product,'Canadian Gold Maple Leaf');assert.equal(context.last.weight,.1);assert.equal(context.last.sides,2);assert.equal(context.canUseSmartCameraSuggestion(context.last),true)});
+await test('Fresh scan never inherits artwork from prior item',async()=>{queued.push({text:'fine silver 1 oz',confidence:.95});await context.runSmartCameraScan();assert.equal(context.last.designID,'');assert.equal(context.last.product,'');assert.equal(context.last.sides,1)});
+await test('Actual conflicting photo flow retains failure state',async()=>{queued.push({lines:[],designSuggestion:design('american_eagle')},{text:'CANADA fine gold 1 oz',confidence:.95,designSuggestion:design('canadian_maple_leaf')});await context.runSmartCameraScan();await context.runSmartCameraScan(true);assert.equal(context.canUseSmartCameraSuggestion(context.last),false);assert.match(context.last.warnings.join(' '),/different designs/)});
+console.log(count+' design integration checks passed');
+})().catch(e=>{console.error(e);process.exitCode=1});

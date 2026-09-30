@@ -308,3 +308,9 @@ The scheduled Edge Function should run repeatedly (recommended: every minute) so
 - The scanner keeps the existing native observation threshold; this change does not claim calibrated recognition confidence or implement artwork recognition.
 - Incomplete results explain whether text, metal, weight, product matching, or conflicting evidence prevented review. A collapsed local Scanner check shows only build, timing, counts, and field-presence flags. It never includes images, OCR text, or serials and is cleared on a fresh attempt.
 - Synthetic regressions reproduce alternate-pass weight contamination and exercise ambiguity, warning retention, old native payload compatibility, diagnostics privacy, and reset. Apple Vision performance and real photo accuracy require physical iPhone validation.
+
+## Offline design integration (engine 4, device-test gate)
+- Native design suggestions use a fixed local model and remain separate from OCR. Ordinary release inference is disabled by default; an explicitly selected beta branch can bundle the fixed assets for iPhone validation. No hosted API or subscription is involved.
+- Artwork-only front evidence survives for a reverse photo. Conflicting designs, markings and unsupported replies block review; model specifications cannot populate holdings.
+- Reset waits for native inference cleanup, preventing a canceled scan from stacking another model in memory. Unavailable test assets preserve OCR results.
+- See `experiments/private-vision/README.md` for retained-asset test-build setup and outstanding physical-device gates.
