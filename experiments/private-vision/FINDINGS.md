@@ -25,7 +25,7 @@ markings, unknown values to be null, and unsupported facts not to be invented.
 The wrong weight therefore demonstrates why prompt instructions and a model's
 uncertainty output cannot be trusted as validation.
 
-No app scanner implementation was changed by this experiment. It is not a
+The initial benchmark did not change the app scanner. It is not a
 replacement for an actual iPhone camera, front/back lifecycle, or holding-form
 handoff test. No native build or launch-readiness claim is made.
 
@@ -117,7 +117,7 @@ The fresh Eagle run took 23.95 seconds and peaked at 2,541,104 KiB process RSS.
 This is a native Linux test, not an iPhone test. The package includes a strict
 Swift design-response boundary and Apple compile/test workflow; their successful
 execution must be confirmed separately. Model results still cannot create a
-holding, and the shipping app target is not connected to this experiment.
+holding; the app integration was added afterward as a gated beta.
 
 A same-process sequence after cancellation returned Eagle, unknown for the
 unsupported round, then Eagle again. The three runs took 27.79, 19.03 and 21.60
@@ -141,3 +141,11 @@ designs, fractional weight, model specification injection and fresh-item reset.
 Seven Python boundary checks pass. Apple checks for the new wrapper and actual
 app target are run separately. No iPhone recognition or performance evidence is
 claimed; production inference remains explicitly disabled.
+
+The combined app integration subsequently passed Apple CI: six Swift tests,
+generic iOS package compilation, all 110 JavaScript scanner checks and the full
+unsigned iOS App build. Seven Python identity checks also pass locally. These
+checks establish compilation and program boundaries, not phone inference
+accuracy or real-device memory and latency. Scanner diagnostics include only
+an allowlisted design-engine availability status; they exclude raw replies,
+recognized inscriptions and photos.

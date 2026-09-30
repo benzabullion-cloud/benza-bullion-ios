@@ -7142,6 +7142,7 @@ async function runSmartCameraScan(append=false,source='camera'){
     }
     if(!result||typeof result!=='object')throw new Error('Invalid camera result');
     smartCameraLastDiagnostic={engineVersion:Number(result.engineVersion)||0,
+      designStatus:['local-catalogue-v1','not-bundled','device-limited','unavailable'].includes(result.designStatus)?result.designStatus:'unknown',
       appBuild:typeof result.appBuild==='string'&&/^[0-9.]+$/.test(result.appBuild)?result.appBuild:'unknown',
       ocrPasses:Number(result.ocrPasses)||0,selectedPasses:Number(result.selectedPasses)||0,
       rejectedPasses:Number(result.rejectedPasses)||0,lineCount:Array.isArray(result.lines)?result.lines.length:0,
