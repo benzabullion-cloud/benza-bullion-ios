@@ -818,7 +818,7 @@ html[data-theme="dark"] .marketCard{background:linear-gradient(145deg,#1a1b20,#1
 .smartAnalysisChecks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:12px 14px 4px}
 .smartAnalysisCheck{border:1px solid var(--border);border-radius:12px;padding:9px;background:var(--surface)}
 .smartAnalysisCheck span{display:block;color:var(--muted);font-size:8px;margin-bottom:3px}
-.smartAnalysisCheck strong{display:block;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.smartAnalysisCheck strong{display:block;font-size:10px;white-space:normal;overflow-wrap:anywhere;line-height:1.4}
 .smartAnalysisCheck.detected{border-color:rgba(22,132,71,.28)}
 .smartAnalysisCheck.detected strong:before{content:'✓ ';color:#168447}
 .smartAnalysisGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px 14px}
@@ -5773,10 +5773,10 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
           <svg viewBox="0 0 24 24"><path d="M4 8.5h3l1.4-2h7.2l1.4 2h3v10H4Z"/><circle cx="12" cy="13.5" r="3.4"/><path d="m18.2 5.2.5 1.1 1.1.5-1.1.5-.5 1.1-.5-1.1-1.1-.5 1.1-.5Z"/></svg>
         </div>
         <h2 class="smartCameraTitle">Add bullion in a smarter way</h2>
-        <p class="smartCameraCopy">Photograph supported bullion and Smart Camera Beta combines on-device text recognition with visual cues to suggest the item details, then lets you confirm everything before it reaches your portfolio.</p>
+        <p class="smartCameraCopy">Photograph supported bullion and Smart Camera Beta reads markings from multiple angles and combines both sides with bullion profiles to suggest the item details, then lets you confirm everything before it reaches your portfolio.</p>
       </div>
       <div class="smartCameraGrid">
-        <div class="smartCameraFeature"><div class="smartCameraFeatureIcon">◎</div><div><strong>Recognize supported bullion</strong><span>Use visible markings plus visual cues such as color and object appearance to suggest the metal and product.</span></div></div>
+        <div class="smartCameraFeature"><div class="smartCameraFeatureIcon">◎</div><div><strong>Recognize supported bullion</strong><span>Read metal, purity, weight, and mint inscriptions. Scan the reverse when the design side has no markings.</span></div></div>
         <div class="smartCameraFeature"><div class="smartCameraFeatureIcon">✦</div><div><strong>Prefill key details</strong><span>Prepare supported product, metal, weight, year, mint/refiner, purity, and serial information when confidence is sufficient.</span></div></div>
         <div class="smartCameraFeature"><div class="smartCameraFeatureIcon">✓</div><div><strong>You stay in control</strong><span>Review and edit every suggestion before choosing to add the holding. Nothing saves automatically.</span></div></div>
       </div>
@@ -5786,6 +5786,8 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
       </div>
       <div class="smartCameraActions">
         <button id="smartCameraProButton" class="smartCameraPrimary" type="button" onclick="handleSmartCameraProAction()">Scan Bullion</button>
+        <button class="smartCameraSecondary" data-scan-control type="button" onclick="runSmartCameraScan(false,'library')">Choose Existing Photo</button>
+        <button id="smartCameraResetButton" class="smartCameraSecondary" type="button" onclick="resetSmartCameraScan()">Reset Scanner</button>
         <button class="smartCameraSecondary" type="button" onclick="closeSmartCamera();openManualAdd();">Add Manually — Free</button>
       </div>
       <div id="smartCameraStatus" class="smartCameraFine">For best results, fill the frame with one item and keep weight, metal, mint, or product markings clearly visible. You will review every suggestion before saving.</div>
@@ -5801,7 +5803,9 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
         <div id="smartAnalysisNotes" class="smartAnalysisNotes"></div>
         <div class="smartAnalysisActions">
           <button id="smartAnalysisUseButton" class="smartAnalysisUse" type="button" onclick="useSmartCameraAnalysis()">Use Suggested Details</button>
-          <button class="smartAnalysisAgain" type="button" onclick="runSmartCameraScan()">Scan Again</button>
+          <button class="smartAnalysisAgain" data-scan-control type="button" onclick="runSmartCameraScan(true)">Scan Reverse / Add Detail Photo</button>
+          <button class="smartAnalysisAgain" data-scan-control type="button" onclick="runSmartCameraScan(true,'library')">Add Reverse from Photos</button>
+          <button class="smartAnalysisAgain" data-scan-control type="button" onclick="runSmartCameraScan()">Start New Item</button>
         </div>
         <div class="smartAnalysisDisclosure">Smart Camera interprets visible markings and known bullion specifications. It does not authenticate, grade, or guarantee an item's identity or value.</div>
       </div>
@@ -6624,18 +6628,16 @@ function openManualAdd(){
 function smartCameraPlugin(){
   return isBenzaNativeRuntime()?window.Capacitor?.Plugins?.BenzaSmartCamera:null;
 }
-function normalizeSmartCameraText(value){
-  return String(value||'').toLowerCase()
-    .replace(/[’‘]/g,"'")
-    .replace(/[^a-z0-9.%/\-\s]/g,' ')
-    .replace(/\s+/g,' ')
-    .trim();
-}
 let pendingSmartCameraSuggestion=null;
+let smartCameraScans=[];
+let smartCameraScanning=false;
+let smartCameraSession=0;
+let smartCameraRunId=0;
+const SMART_CAMERA_MAX_VIEWS=4;
 const SMART_CAMERA_CATALOG=[
-  {product:'American Silver Eagle',metal:'silver',strong:['american eagle','silver eagle','1 oz fine silver'],support:['walking liberty','one dollar','united states of america'],mint:'United States Mint',purity:'.999 fine silver',weight:1,yearMin:1986},
-  {product:'American Gold Eagle',metal:'gold',strong:['american eagle','gold eagle','1 oz fine gold'],support:['50 dollars','united states of america'],mint:'United States Mint',purity:'22K gold',weight:1,yearMin:1986},
-  {product:'American Gold Buffalo',metal:'gold',strong:['american buffalo','gold buffalo','.9999 fine gold'],support:['50 dollars','1 oz .9999'],mint:'United States Mint',purity:'.9999 fine gold',weight:1,yearMin:2006},
+  {product:'American Silver Eagle',metal:'silver',strong:['american silver eagle','silver eagle'],support:['walking liberty','one dollar','united states of america'],mint:'United States Mint',purity:'.999 fine silver',weight:1,yearMin:1986},
+  {product:'American Gold Eagle',metal:'gold',strong:['american gold eagle','gold eagle'],support:['50 dollars','united states of america'],mint:'United States Mint',purity:'22K gold',weight:1,yearMin:1986},
+  {product:'American Gold Buffalo',metal:'gold',strong:['american gold buffalo','gold buffalo'],support:['50 dollars','1 oz .9999'],mint:'United States Mint',purity:'.9999 fine gold',weight:1,yearMin:2006},
   {product:'American Platinum Eagle',metal:'platinum',strong:['platinum eagle'],support:['platinum','100 dollars','1 oz'],mint:'United States Mint',purity:'.9995 platinum',weight:1,yearMin:1997},
   {product:'American Palladium Eagle',metal:'palladium',strong:['palladium eagle'],support:['palladium','25 dollars','1 oz'],mint:'United States Mint',purity:'.9995 palladium',weight:1,yearMin:2017},
   {product:'Canadian Gold Maple Leaf',metal:'gold',strong:['maple leaf'],support:['canada','fine gold','9999'],mint:'Royal Canadian Mint',purity:'.9999 fine gold',yearMin:1979},
@@ -6681,82 +6683,80 @@ const SMART_CAMERA_CATALOG=[
   {product:'Palladium Bar',metal:'palladium',strong:['palladium bar'],support:['fine palladium'],purity:'.9995 palladium'}
 ];
 function normalizeSmartCameraText(value){
-  return String(value||'').toLowerCase()
-    .replace(/[’‘]/g,"'")
-    .replace(/[^a-z0-9.$%/\-\s]/g,' ')
-    .replace(/\s+/g,' ')
-    .trim();
+  let text=String(value||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
+    .replace(/[’‘]/g,"'").replace(/[½¼]/g,c=>c==='½'?'1/2':'1/4')
+    .replace(/⁄/g,'/').replace(/[^a-z0-9.$%/#:\-\s]/g,' ').replace(/\s+/g,' ').trim();
+  // Rim lettering is often split into individual characters by OCR.
+  for(const word of ['canada','silver','gold','liberty','platinum','palladium']){
+    text=text.replace(new RegExp('\\b'+word.split('').join('\\s*')+'\\b','g'),word);
+  }
+  return text.replace(/\b(?:silv|silvr|stlver|stlvern|silvern|s1lver)\b/g,'silver')
+    .replace(/\b(?:sine|f1ne)\s+(silver|gold)\b/g,'fine $1')
+    .replace(/\bo\s*z\b|\b(?:o[z2]|0z)\b/g,'oz')
+    .replace(/\b([12])\s+(\d)\s+(\d)\s+(\d)\b/g,'$1$2$3$4');
+}
+function smartCameraMetalEvidence(text){
+  const patterns={gold:/\bgold\b|\bau\b|\boro puro\b|\bor pur\b|\bfeingold\b|\b(?:22|24)\s*(?:k|karat|carat)\b/,
+    silver:/\bsilver\b|\bag\b|\bargent\b|\bsterling\b|\bplata\b|\bfeinsilber\b|\bsilber\b/,
+    platinum:/\bplatinum\b|\bplatine\b|\bplatino\b|\bplatin\b|\bpt\b/,
+    palladium:/\bpalladium\b|\bpaladio\b|\bpd\b/,copper:/\bcopper\b|\bcu\b|\bcobre\b|\bkupfer\b/};
+  return Object.entries(patterns).filter(([,rx])=>rx.test(text)).map(([metal])=>metal);
 }
 function smartCameraMetalGuess(text){
-  const scored={
-    gold:(text.match(/\bgold\b|\bau\b|fine gold|oro puro|karat|carat/g)||[]).length,
-    silver:(text.match(/\bsilver\b|\bag\b|fine silver|sterling|plata pura/g)||[]).length,
-    platinum:(text.match(/\bplatinum\b|\bpt\b|fine platinum/g)||[]).length,
-    palladium:(text.match(/\bpalladium\b|\bpd\b|fine palladium/g)||[]).length,
-    copper:(text.match(/\bcopper\b|\bcu\b/g)||[]).length
-  };
-  const sorted=Object.entries(scored).sort((a,b)=>b[1]-a[1]);
-  return sorted[0]?.[1]>0?sorted[0][0]:'';
+  const metals=smartCameraMetalEvidence(text);
+  return metals.length===1?metals[0]:'';
 }
 function smartCameraYearCandidates(text){
-  return [...new Set([...text.matchAll(/\b(18\d{2}|19\d{2}|20\d{2})\b/g)]
-    .map(m=>Number(m[1]))
+  // A truncated "11" is never expanded to 2011. Read the whole date or leave blank.
+  return [...new Set([...text.matchAll(/\b(18\d{2}|19\d{2}|20\d{2})\b/g)].map(m=>Number(m[1]))
     .filter(y=>y>=1800&&y<=new Date().getFullYear()+1))];
 }
 function smartCameraCatalogMatch(text,metal){
-  const allowed=metal?new Set(PRODUCT_MAP[metal]||[]):null;
   const years=smartCameraYearCandidates(text);
-  const ranked=SMART_CAMERA_CATALOG
-    .filter(item=>(!metal||item.metal===metal) && (!allowed||allowed.has(item.product)))
+  const ranked=SMART_CAMERA_CATALOG.filter(item=>(!metal||item.metal===metal)&&(PRODUCT_MAP[item.metal]||[]).includes(item.product))
     .map(item=>{
-      const strongHits=(item.strong||[]).filter(term=>text.includes(term));
+      // A generic weight/metal inscription cannot identify a sovereign coin.
+      const strongHits=(item.strong||[]).filter(term=>text.includes(term)&&!['1 oz fine silver','1 oz fine gold','.9999 fine gold','half dollar'].includes(term));
       const supportHits=(item.support||[]).filter(term=>text.includes(term));
       const plausibleYears=years.filter(y=>(!item.yearMin||y>=item.yearMin)&&(!item.yearMax||y<=item.yearMax));
-      let score=strongHits.length*7 + supportHits.length*1.5;
-      if(plausibleYears.length===1)score+=2;
-      if(item.yearMin&&years.length&&plausibleYears.length===0)score-=8;
+      let score=strongHits.length*7+supportHits.length;
+      if(item.product.includes('Maple Leaf') && metal===item.metal && /\b(?:canada|can)\b/.test(text) && /9999|999\.9/.test(text) && !/\bbar\b/.test(text)){
+        strongHits.push('Canadian metal + .9999 markings');score+=8;
+      }
+      if(item.product==='American Silver Eagle' && metal==='silver' && /\bunited states of america\b/.test(text) && /\b(?:one|1) dollar\b/.test(text) && /\b(?:one|1) (?:troy )?(?:oz|ounce)\b/.test(text)){
+        strongHits.push('United States + one dollar + one ounce silver');score+=8;
+      }
+      if(item.yearMin&&years.length&&!plausibleYears.length)score-=10;
       return {item,strongHits,supportHits,plausibleYears,score};
-    })
-    .filter(x=>x.strongHits.length>0 || (x.supportHits.length>=2 && x.plausibleYears.length===1))
-    .sort((a,b)=>b.score-a.score);
-  if(!ranked.length)return null;
-  if(ranked.length>1 && Math.abs(ranked[0].score-ranked[1].score)<2 && ranked[0].item.metal!==ranked[1].item.metal)return null;
-  return ranked[0].score>=6?ranked[0]:null;
+    }).filter(x=>x.strongHits.length&&x.score>=7).sort((a,b)=>b.score-a.score);
+  // Ambiguous families and variants need another side instead of first-match wins.
+  if(!ranked.length || (ranked[1]&&ranked[0].score-ranked[1].score<3))return null;
+  return ranked[0];
 }
 function smartCameraProductGuess(text,metal){
   const match=smartCameraCatalogMatch(text,metal);
   if(match)return match.item.product;
-  const allowed=new Set(PRODUCT_MAP[metal]||[]);
-  if(text.includes('bar')){
-    const generic={gold:'Gold Bar',silver:'Silver Bar',platinum:'Platinum Bar',palladium:'Palladium Bar',copper:'Copper Bullion Bar'}[metal];
-    if(generic&&allowed.has(generic))return generic;
+  const suffix=/\bbar\b/.test(text)?'Bar':/\bround\b/.test(text)?'Round':'';
+  const name=metal==='copper'?'Copper Bullion '+suffix:METAL_NAMES[metal]+' '+suffix;
+  return suffix&&(PRODUCT_MAP[metal]||[]).includes(name)?name:'';
+}
+function smartCameraWeightCandidates(text,metal){
+  const ozPerGram=metal==='copper'?28.349523125:31.1034768;
+  const words={one:1,two:2,five:5,ten:10,half:.5};
+  text=text.replace(/\b(one|two|five|ten|half)\s+(troy\s+)?(ounce|ounces|oz|onza|onzas)\b/g,(_,n,t,u)=>words[n]+' '+(t||'')+u);
+  const values=[];
+  for(const m of text.matchAll(/(?:^|\s)(\d+(?:\.\d+)?(?:\s*\/\s*\d+)?)\s*(?:troy\s*)?(oz|ounces?|onzas?|kg|kilograms?|g|grams?|gr|lbs?|pounds?)\b/g)){
+    const parts=m[1].split('/').map(Number);let n=parts.length===2?parts[0]/parts[1]:parts[0];
+    if(/^kg|kilogram/.test(m[2]))n=n*1000/ozPerGram;
+    else if(/^(g|gram|gr)$|^grams$/.test(m[2]))n=n/ozPerGram;
+    else if(/^(lb|lbs|pound|pounds)$/.test(m[2]))n=n*(metal==='copper'?16:453.59237/31.1034768);
+    if(n>0&&n<=10000&&Number.isFinite(n)&&!values.some(v=>Math.abs(v-n)<=Math.max(v,n)*.002))values.push(n);
   }
-  if(text.includes('round')){
-    const generic={gold:'Gold Round',silver:'Silver Round',platinum:'Platinum Round',palladium:'Palladium Round',copper:'Copper Bullion Round'}[metal];
-    if(generic&&allowed.has(generic))return generic;
-  }
-  return '';
+  return values;
 }
 function smartCameraWeightGuess(text,metal){
-  const fractions=[['1/20',0.05],['1/10',0.1],['1/4',0.25],['1/2',0.5]];
-  for(const [token,value] of fractions){
-    if(text.includes(token+' oz') || text.includes(token+' ounce') || text.includes(token+' troy oz'))return value;
-  }
-  const oz=text.match(/\b(\d+(?:\.\d+)?)\s*(?:troy\s*)?(?:oz|ounce|ounces)\b/);
-  if(oz)return Number(oz[1]);
-  const grams=text.match(/\b(\d+(?:\.\d+)?)\s*(?:g|gram|grams|gr)\b/);
-  if(grams){
-    const g=Number(grams[1]);
-    if(Number.isFinite(g)&&g>0)return metal==='copper'?g/28.349523125:g/31.1034768;
-  }
-  const kg=text.match(/\b(\d+(?:\.\d+)?)\s*(?:kg|kilogram|kilograms)\b/);
-  if(kg){
-    const g=Number(kg[1])*1000;
-    if(Number.isFinite(g)&&g>0)return metal==='copper'?g/28.349523125:g/31.1034768;
-  }
-  const lb=text.match(/\b(\d+(?:\.\d+)?)\s*(?:lb|lbs|pound|pounds)\b/);
-  if(lb && metal==='copper')return Number(lb[1])*16;
-  return 0;
+  const weights=smartCameraWeightCandidates(text,metal);
+  return weights.length===1?weights[0]:0;
 }
 function smartCameraMintGuess(text){
   const mints=[
@@ -6798,12 +6798,15 @@ function smartCameraSerialGuess(text){
 function smartCameraPurityGuess(text,metal,product){
   const catalog=SMART_CAMERA_CATALOG.find(x=>x.product===product && x.metal===metal);
   const patterns=[
-    [/\.9999|9999|999\.9/,' .9999'],
-    [/\.9995|9995/,' .9995'],
-    [/\.999|\b999\b/,' .999'],
-    [/\.925|\b925\b|sterling/,' .925'],
-    [/\.900|\b900\b/,' .900'],
-    [/22\s*k|22\s*karat/,'22K']
+    [/(?:^|\s)(?:\.?9999|999\.9)\b/,' .9999'],
+    [/(?:^|\s)\.?9995\b/,' .9995'],
+    [/(?:^|\s)\.?999\b/,' .999'],
+    [/(?:^|\s)\.?925\b|\bsterling\b/,' .925'],
+    [/(?:^|\s)\.?900\b/,' .900'],
+    [/\b22\s*(?:k|karat)\b/,'22K'],
+    [/\b24\s*(?:k|karat)\b/,'24K'],
+    [/(?:^|\s)\.?9167\b/,' .9167'],
+    [/(?:^|\s)\.?958\b/,' .958']
   ];
   for(const [rx,label] of patterns){
     if(rx.test(text))return label+(metal?' '+METAL_NAMES[metal].toLowerCase():'');
@@ -6811,75 +6814,70 @@ function smartCameraPurityGuess(text,metal,product){
   return catalog?.purity||'';
 }
 function smartCameraDenominationGuess(text){
+  text=text.replace(/\bone dollar\b/g,'1 dollar').replace(/\bfifty dollars\b/g,'50 dollars');
   const match=text.match(/\b(?:\$\s*)?(1|2|2\.5|5|10|20|25|50|100)\s*(?:dollar|dollars|peso|pesos|pound|pounds|euro|euros)\b/);
   return match?match[0].replace(/\s+/g,' ').toUpperCase():'';
 }
 function interpretSmartCameraScan(result){
   const raw=Array.isArray(result?.lines)?result.lines.join(' '):(result?.text||'');
   const text=normalizeSmartCameraText(raw);
-  const visualLabels=Array.isArray(result?.visualLabels)?result.visualLabels:[];
-  const visualColor=result?.visualColor||{};
-  const visualText=visualLabels.map(v=>String(v?.identifier||'').toLowerCase()).join(' ');
-  let metal=smartCameraMetalGuess(text);
-  if(!metal){
-    if(visualColor.tone==='golden')metal='gold';
-    else if(visualColor.tone==='copper')metal='copper';
-    else if(visualColor.tone==='silvery'){
-      if(/platinum/.test(visualText))metal='platinum';
-      else if(/palladium/.test(visualText))metal='palladium';
-      else metal='silver';
-    }
-  }
-  let catalogMatch=smartCameraCatalogMatch(text,metal||'');
-  if(!metal && catalogMatch)metal=catalogMatch.item.metal;
-  if(metal && (!catalogMatch || catalogMatch.item.metal!==metal))catalogMatch=smartCameraCatalogMatch(text,metal);
-  let product=catalogMatch?.item?.product || (metal?smartCameraProductGuess(text,metal):'');
-  if(!product && metal){
-    const visualProductHints=[
-      ['maple leaf','Canadian '+METAL_NAMES[metal]+' Maple Leaf'],
-      ['panda',METAL_NAMES[metal]==='Silver'?'Chinese Silver Panda':METAL_NAMES[metal]==='Gold'?'Chinese Gold Panda':''],
-      ['kangaroo',METAL_NAMES[metal]==='Silver'?'Australian Silver Kangaroo':METAL_NAMES[metal]==='Gold'?'Australian Gold Kangaroo':METAL_NAMES[metal]==='Platinum'?'Australian Platinum Kangaroo':''],
-      ['kookaburra','Australian Silver Kookaburra'],
-      ['koala','Australian Silver Koala'],
-      ['britannia','British '+METAL_NAMES[metal]+' Britannia'],
-      ['krugerrand',METAL_NAMES[metal]==='Silver'?'South African Silver Krugerrand':METAL_NAMES[metal]==='Gold'?'South African Gold Krugerrand':''],
-      ['eagle',METAL_NAMES[metal]==='Silver'?'American Silver Eagle':METAL_NAMES[metal]==='Gold'?'American Gold Eagle':METAL_NAMES[metal]==='Platinum'?'American Platinum Eagle':METAL_NAMES[metal]==='Palladium'?'American Palladium Eagle':'']
-    ];
-    for(const [hint,name] of visualProductHints){
-      if(name && visualText.includes(hint) && (PRODUCT_MAP[metal]||[]).includes(name)){product=name;break;}
-    }
-  }
-  let weight=metal?smartCameraWeightGuess(text,metal):0;
-  if(!weight && catalogMatch?.item?.weight)weight=catalogMatch.item.weight;
+  const warnings=[];
+  const metals=smartCameraMetalEvidence(text);
+  let metal=metals.length===1?metals[0]:'';
+  if(metals.length>1)warnings.push('Conflicting metal markings. Scan the other side and confirm the metal manually.');
+  const plated=/\b(?:plated|clad|filled|replica|copy|tribute|layered)\b/.test(text);
+  if(plated)warnings.push('Plated, replica, or layered marking detected. Fine-metal content needs manual verification.');
+  const catalogMatch=metals.length>1?null:smartCameraCatalogMatch(text,metal);
+  if(!metal&&catalogMatch)metal=catalogMatch.item.metal;
+  const product=catalogMatch?.item.product||(metal?smartCameraProductGuess(text,metal):'');
+  const weights=smartCameraWeightCandidates(text,metal);
+  let weight=weights.length===1?weights[0]:0;
+  if(weights.length>1)warnings.push('Different weights were read. Confirm the weight manually.');
+  // Only non-fractional, fixed fine-weight products have safe profile defaults.
+  const fixedWeights={'American Silver Eagle':1,'American Palladium Eagle':1};
+  const expected=fixedWeights[product];
+  if(expected&&weight&&Math.abs(weight-expected)>.003){warnings.push('Weight disagrees with the matched product. Confirm product and weight.');weight=0;}
+  let inferredWeight=false;
+  if(expected&&!weight&&weights.length===0&&!plated){weight=expected;inferredWeight=true;}
   const years=smartCameraYearCandidates(text);
-  const plausibleYears=catalogMatch
-    ? years.filter(y=>(!catalogMatch.item.yearMin||y>=catalogMatch.item.yearMin)&&(!catalogMatch.item.yearMax||y<=catalogMatch.item.yearMax))
-    : years;
-  const year=plausibleYears.length===1?plausibleYears[0]:null;
-  const mint=smartCameraMintGuess(text)||catalogMatch?.item?.mint||'';
+  const year=years.length===1?years[0]:null;
+  if(years.length>1)warnings.push('More than one possible year was read. Confirm the year.');
+  if(catalogMatch&&year&&((catalogMatch.item.yearMin&&year<catalogMatch.item.yearMin)||(catalogMatch.item.yearMax&&year>catalogMatch.item.yearMax)))warnings.push('Year disagrees with the product profile.');
+  const detectedMint=smartCameraMintGuess(text);
+  const mint=detectedMint||catalogMatch?.item.mint||'';
+  if(detectedMint&&catalogMatch?.item.mint&&detectedMint!==catalogMatch.item.mint)warnings.push('Mint disagrees with the matched product.');
   const serial=smartCameraSerialGuess(text);
-  const purity=smartCameraPurityGuess(text,metal,product);
+  const observedPurity=smartCameraPurityGuess(text,metal,'');
+  // Historical/fractional variants are not assigned modern fineness by default.
+  const safePurity=['American Silver Eagle','American Gold Eagle','American Gold Buffalo','American Platinum Eagle','American Palladium Eagle','Austrian Gold Philharmonic','Austrian Silver Philharmonic','Austrian Platinum Philharmonic'];
+  const purity=observedPurity||(safePurity.includes(product)?catalogMatch?.item.purity||'':'');
+  const fineness=value=>{const m=String(value).match(/\.(\d{3,4})/);return m?Number('0.'+m[1]):/22K/.test(value)?22/24:/24K/.test(value)?1:0;};
+  const purityReadings=[...text.matchAll(/(?:^|\s)\.?(9999|9995|999|925|900|9167|958)\b/g)].map(m=>Number('0.'+m[1]));
+  if(purityReadings.some(n=>Math.abs(n-purityReadings[0])>.002))warnings.push('Conflicting purity markings. Confirm the fine-metal content.');
+  const observed=fineness(observedPurity);
+  const standard=safePurity.includes(product)?fineness(catalogMatch?.item.purity):0;
+  if(observed&&standard&&Math.abs(observed-standard)>.002)warnings.push('Purity disagrees with the product profile. Confirm the product and metal content.');
   const denomination=smartCameraDenominationGuess(text);
   const ocrConfidence=Math.max(0,Math.min(1,Number(result?.confidence)||0));
-  const matchStrength=catalogMatch
-    ? Math.min(1,(catalogMatch.strongHits.length*0.65)+(catalogMatch.supportHits.length*0.12))
-    : 0;
-  const visualConfidence=Math.max(0,...visualLabels.map(v=>Number(v?.confidence)||0));
-  let confidence=(ocrConfidence*.30)+(matchStrength*.45)+(visualConfidence*.10)+(metal?.length?0.08:0)+(weight>0?0.07:0);
-  if(!product)confidence=Math.min(confidence,.62);
-  if(product && catalogMatch?.strongHits.length===0)confidence=Math.min(confidence,.68);
-  if(years.length>1 && !year)confidence=Math.min(confidence,.84);
-  confidence=Math.max(.18,Math.min(.96,confidence));
-  return {
-    metal,product,weight,year,mint,serial,purity,denomination,text,raw,confidence,
-    matchedTerms:[...(catalogMatch?.strongHits||[]),...(catalogMatch?.supportHits||[])],
-    visualLabels,visualColor,
-    usable:!!metal
-  };
+  // This is an evidence rating, not a claimed probability of correct identity.
+  let confidence=metal ? .42 : 0;
+  if(weight>0)confidence+=.10;
+  if(observedPurity)confidence+=.08;
+  if(catalogMatch)confidence+=.20;
+  confidence+=ocrConfidence*.12;
+  if(year)confidence+=.04;
+  confidence=Math.min(.96,confidence);
+  if(warnings.length)confidence=Math.min(confidence,.40);
+  const matchedTerms=[...(catalogMatch?.strongHits||[]),...(catalogMatch?.supportHits||[])];
+  if(metals.length===1)matchedTerms.unshift('metal inscription: '+METAL_NAMES[metal]);
+  if(inferredWeight)matchedTerms.push('weight from standard product specification — confirm');
+  return {metal,product,weight,year,mint,serial,purity,denomination,text,raw,confidence,warnings,
+    matchedTerms,inferredWeight,inferredMint:!!mint&&!detectedMint,inferredPurity:!!purity&&!observedPurity,
+    sides:result?.sides||1,usable:!!metal&&!plated&&metals.length<=1&&confidence>=.42};
 }
 function smartCameraConfidenceLabel(value){
-  if(value>=.80)return ['High confidence','high'];
-  if(value>=.55)return ['Medium confidence','medium'];
+  if(value>=.80)return ['Strong evidence','high'];
+  if(value>=.55)return ['Partial evidence','medium'];
   return ['Needs review','low'];
 }
 function smartCameraMoney(value){
@@ -6892,23 +6890,23 @@ function renderSmartCameraAnalysis(suggestion){
   const useButton=document.getElementById('smartAnalysisUseButton');
   if(useButton){
     useButton.disabled=!suggestion.usable;
-    useButton.textContent=suggestion.usable?'Use Suggested Details':'Scan Again to Identify Metal';
+    useButton.textContent=suggestion.usable?'Use Suggested Details':'Scan Reverse or Enter Manually';
   }
   const confidence=smartCameraConfidenceLabel(suggestion.confidence);
   const confidenceEl=document.getElementById('smartAnalysisConfidence');
   confidenceEl.className='smartAnalysisConfidence '+confidence[1];
-  confidenceEl.querySelector('span').textContent=confidence[0]+' · '+Math.round(suggestion.confidence*100)+'%';
+  confidenceEl.querySelector('span').textContent=confidence[0]+' · '+suggestion.sides+' photo'+(suggestion.sides===1?'':'s');
   document.getElementById('smartAnalysisTitle').textContent=suggestion.product || (suggestion.metal?METAL_NAMES[suggestion.metal]+' bullion':'Bullion scan');
   document.getElementById('smartAnalysisSub').textContent=suggestion.product
-    ? 'Benza Bullion matched the visible markings to a known bullion profile. Confirm the details below.'
-    : 'Benza Bullion read the visible markings but could not confidently match a specific product. You can still use the detected details.';
+    ? 'Benza bullion matched the markings to a product profile. Fields labeled Standard spec are inferred; confirm them.'
+    : 'Exact product needs review. Scan the reverse for metal and weight markings, or enter details manually.';
   const checks=[
     ['Metal',suggestion.metal?METAL_NAMES[suggestion.metal]:'Not detected',!!suggestion.metal],
     ['Product',suggestion.product||'Needs review',!!suggestion.product],
-    ['Weight',suggestion.weight>0?Number(suggestion.weight.toFixed(4))+' oz':'Needs review',suggestion.weight>0],
+    ['Weight',suggestion.weight>0?Number(suggestion.weight.toFixed(4))+' oz'+(suggestion.inferredWeight?' · Standard spec':''):'Needs review',suggestion.weight>0],
     ['Year',suggestion.year||'Not visible',!!suggestion.year],
-    ['Mint / Refiner',suggestion.mint||'Not detected',!!suggestion.mint],
-    ['Purity',suggestion.purity||'Not detected',!!suggestion.purity],
+    ['Mint / Refiner',suggestion.mint?suggestion.mint+(suggestion.inferredMint?' · Standard spec':''):'Not detected',!!suggestion.mint],
+    ['Purity',suggestion.purity?suggestion.purity+(suggestion.inferredPurity?' · Standard spec':''):'Not detected',!!suggestion.purity],
     ['Serial',suggestion.serial||'Not visible',!!suggestion.serial],
     ['Denomination',suggestion.denomination||'Not detected',!!suggestion.denomination]
   ];
@@ -6916,7 +6914,8 @@ function renderSmartCameraAnalysis(suggestion){
     '<div class="smartAnalysisCheck '+(detected?'detected':'')+'"><span>'+label+'</span><strong>'+escapeBullionHtml(String(value))+'</strong></div>'
   ).join('');
   const spot=suggestion.metal?Number(livePrices[suggestion.metal]||0):0;
-  const melt=suggestion.weight>0&&spot>0?suggestion.weight*spot:NaN;
+  const fineContentKnown=suggestion.purity&&(/999|24K/.test(suggestion.purity)||suggestion.inferredWeight);
+  const melt=suggestion.usable&&fineContentKnown&&suggestion.weight>0&&spot>0?suggestion.weight*spot:NaN;
   const currentOz=suggestion.metal?holdings.filter(h=>h.metal===suggestion.metal).reduce((sum,h)=>sum+(Number(h.oz)||0),0):0;
   const sameProduct=suggestion.product?holdings.filter(h=>h.product===suggestion.product).length:0;
   document.getElementById('smartAnalysisGrid').innerHTML=[
@@ -6925,19 +6924,17 @@ function renderSmartCameraAnalysis(suggestion){
     ['Metal after add',suggestion.metal&&suggestion.weight>0?(currentOz+suggestion.weight).toLocaleString(undefined,{maximumFractionDigits:4})+' oz':'—'],
     ['Already tracked',suggestion.product?sameProduct+' '+(sameProduct===1?'holding':'holdings'):'—']
   ].map(([label,value])=>'<div class="smartAnalysisMetric"><span>'+label+'</span><strong>'+value+'</strong></div>').join('');
-  const evidence=(suggestion.matchedTerms||[]).slice(0,4);
-  const visualEvidence=[];
-  if(suggestion.visualColor?.tone && suggestion.visualColor.tone!=='neutral')visualEvidence.push('visual tone: '+suggestion.visualColor.tone);
-  (suggestion.visualLabels||[]).slice(0,2).forEach(v=>{if(v?.identifier)visualEvidence.push('visual: '+String(v.identifier));});
-  const combinedEvidence=[...evidence,...visualEvidence].slice(0,5);
+  const evidence=suggestion.matchedTerms||[];
   document.getElementById('smartAnalysisNotes').innerHTML=
-    '<strong>What Benza Bullion used:</strong> '+(combinedEvidence.length?escapeBullionHtml(combinedEvidence.join(' · ')):'visible text, color, and object cues')+
-    (suggestion.raw?'<br><strong>Recognized text:</strong> '+escapeBullionHtml(String(suggestion.raw).replace(/\s+/g,' ').slice(0,180)):'');
+    '<strong>Evidence:</strong> '+(evidence.length?escapeBullionHtml(evidence.join(' · ')):'No reliable bullion markings. Metal is never determined from color.')+
+    (suggestion.warnings?.length?'<br><strong>Review:</strong> '+escapeBullionHtml(suggestion.warnings.join(' ')):'')+
+    (suggestion.raw?'<br><strong>Recognized text:</strong> '+escapeBullionHtml(String(suggestion.raw).replace(/\s+/g,' ').slice(0,600)):'')+
+    '<br>For clearer readings: one item, plain background, diffuse light, no flash glare. Fill the frame without cutting off the rim. Photograph the metal/weight side and use a close-up for small dates.';
   panel.classList.add('show');
   panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function applySmartCameraSuggestion(suggestion){
-  if(!suggestion?.metal){
+  if(!suggestion?.usable||!isProActive()){
     const status=document.getElementById('smartCameraStatus');
     if(status)status.textContent='Smart Camera could not confidently identify the metal. Try another photo with weight, metal, mint, or purity markings in focus.';
     return false;
@@ -6949,7 +6946,8 @@ function applySmartCameraSuggestion(suggestion){
     document.getElementById('product').value=suggestion.product;
   }
   document.getElementById('qty').value=1;
-  if(suggestion.weight>0)document.getElementById('weight').value=Number(suggestion.weight.toFixed(4));
+  document.getElementById('weight').value=suggestion.weight>0?Number(suggestion.weight.toFixed(4)):'';
+  if(!suggestion.product)document.getElementById('product').selectedIndex=-1;
   document.getElementById('cost').value='';
   if(isProActive()){
     const serial=document.getElementById('holdingSerial');
@@ -6958,7 +6956,9 @@ function applySmartCameraSuggestion(suggestion){
     const detected=[];
     if(suggestion.year)detected.push('Year: '+suggestion.year);
     if(suggestion.mint)detected.push('Mint/Refiner: '+suggestion.mint);
-    if(suggestion.purity)detected.push('Purity: '+suggestion.purity);
+    if(suggestion.purity)detected.push('Purity: '+suggestion.purity+(suggestion.inferredPurity?' (standard spec; confirm)':''));
+    if(suggestion.inferredWeight)detected.push('Weight from standard spec; confirm');
+    if(suggestion.warnings?.length)detected.push(suggestion.warnings.join(' '));
     if(suggestion.denomination)detected.push('Denomination: '+suggestion.denomination);
     if(notes&&detected.length)notes.value='Smart Camera — '+detected.join(' · ');
     const details=document.getElementById('proInventoryFields');
@@ -6975,44 +6975,105 @@ function useSmartCameraAnalysis(){
   }
   applySmartCameraSuggestion(pendingSmartCameraSuggestion);
 }
-async function runSmartCameraScan(){
+function clearSmartCameraEvidence(){
+  smartCameraScans=[];
+  pendingSmartCameraSuggestion=null;
+  document.getElementById('smartCameraAnalysis')?.classList.remove('show');
+  for(const id of ['smartAnalysisChecks','smartAnalysisGrid','smartAnalysisNotes']){
+    const el=document.getElementById(id);
+    if(el)el.innerHTML='';
+  }
+  const useButton=document.getElementById('smartAnalysisUseButton');
+  if(useButton)useButton.disabled=true;
+}
+function setSmartCameraBusy(busy){
+  smartCameraScanning=busy;
+  document.querySelectorAll('[data-scan-control]').forEach(el=>el.disabled=busy);
+  const button=document.getElementById('smartCameraProButton');
+  if(button){button.disabled=busy;button.textContent=busy?'Scanning / Reading Markings…':isProActive()?'Scan Bullion':'Unlock Smart Camera with Pro';}
+  const useButton=document.getElementById('smartAnalysisUseButton');
+  if(useButton)useButton.disabled=busy||!pendingSmartCameraSuggestion?.usable;
+}
+async function resetSmartCameraScan(silent=false){
+  const run=++smartCameraRunId;
+  smartCameraSession++;
+  clearSmartCameraEvidence();
+  setSmartCameraBusy(true);
+  const resetButton=document.getElementById('smartCameraResetButton');
+  if(resetButton)resetButton.disabled=true;
+  const status=document.getElementById('smartCameraStatus');
+  if(status&&!silent)status.textContent='Resetting scanner…';
+  try{
+    const plugin=smartCameraPlugin();
+    if(typeof plugin?.reset==='function')await plugin.reset();
+    if(run===smartCameraRunId&&status&&!silent)status.textContent='Scanner reset. Capture a new item; previous photos and suggestions have been cleared.';
+  }catch(error){
+    if(run===smartCameraRunId&&status&&!silent)status.textContent='Could not reset the camera: '+(error?.message||'Please close and reopen this screen.');
+  }finally{
+    if(run===smartCameraRunId){
+      setSmartCameraBusy(false);
+      if(resetButton)resetButton.disabled=false;
+    }
+  }
+}
+async function runSmartCameraScan(append=false,source='camera'){
+  if(smartCameraScanning)return;
+  // Clear BEFORE opening the picker, even when it fails or is cancelled.
+  if(!append){smartCameraSession++;clearSmartCameraEvidence();}
+  const session=smartCameraSession;
+  const run=++smartCameraRunId;
+  const status=document.getElementById('smartCameraStatus');
   if(!isProActive()){
     closeSmartCamera();
     openProUpgrade('smart-camera');
     return;
   }
   if(!isBenzaNativeRuntime()){
-    const status=document.getElementById('smartCameraStatus');
-    if(status)status.textContent='Smart Camera scanning is available in the native Benza Bullion iPhone app.';
+    if(status)status.textContent='Smart Camera scanning is available in the native Benza bullion iPhone app.';
     return;
   }
   const plugin=smartCameraPlugin();
-  const status=document.getElementById('smartCameraStatus');
-  const button=document.getElementById('smartCameraProButton');
   if(!plugin){
     if(status)status.textContent='Smart Camera is still loading. Close and reopen this screen, then try again.';
     return;
   }
+  if(append&&smartCameraScans.length>=SMART_CAMERA_MAX_VIEWS){
+    if(status)status.textContent='Four views are already included. Start New Item or Reset Scanner for a fresh attempt.';
+    return;
+  }
+  setSmartCameraBusy(true);
   try{
-    if(button){button.disabled=true;button.textContent='Opening Camera…';}
-    if(status)status.textContent='Fill the frame with one bullion item and keep its markings readable.';
-    const result=await plugin.scan();
+    if(!append&&typeof plugin.reset==='function')await plugin.reset();
+    if(run!==smartCameraRunId||session!==smartCameraSession)return;
+    if(status)status.textContent='Capture one item with readable markings. Reading multiple angles may take several seconds. Reset Scanner clears this attempt.';
+    const result=await plugin.scan({source});
+    if(run!==smartCameraRunId||session!==smartCameraSession)return;
     if(result?.cancelled){
-      if(status)status.textContent='Scan cancelled. Nothing was changed.';
+      if(status)status.textContent=append?'Reverse scan cancelled. Previously captured views are unchanged.':'Scan cancelled. The scanner is clear and ready for a new item.';
       return;
     }
-    if(button)button.textContent='Matching Bullion…';
-    if(status)status.textContent='Reading markings and comparing them with Benza Bullion profiles…';
-    const suggestion=interpretSmartCameraScan(result);
+    const reading=interpretSmartCameraScan(result);
+    // Blank/noise-only attempts are never added to the multi-view evidence.
+    const hasEvidence=!!(reading.metal||reading.product||reading.weight||reading.year||reading.mint||reading.purity||reading.serial||reading.denomination||reading.warnings.length);
+    if(!hasEvidence){
+      if(status)status.textContent=append?'No readable bullion markings in this photo. Previous views are unchanged; try the reverse or a close-up.':'No readable bullion markings. This attempt was cleared; try the metal/weight side or a close-up.';
+      return;
+    }
+    smartCameraScans.push(result);
+    const combined={lines:smartCameraScans.flatMap(scan=>Array.isArray(scan.lines)?scan.lines:[scan.text||'']),
+      confidence:Math.max(...smartCameraScans.map(scan=>Number(scan.confidence)||0)),sides:smartCameraScans.length};
+    const suggestion=interpretSmartCameraScan(combined);
     renderSmartCameraAnalysis(suggestion);
-    if(status)status.textContent=suggestion.product
-      ? 'Smart Analysis is ready. Review the match, live value, and detected details below.'
-      : 'Smart Analysis is ready. Some fields need your review before adding this holding.';
+    if(status)status.textContent=suggestion.warnings.length?suggestion.warnings.join(' '):suggestion.usable
+      ? 'Analysis ready. Confirm the suggested details before adding.'
+      : 'Scan the reverse of the same item for metal and weight markings, or enter details manually.';
   }catch(error){
     console.error('Smart Camera failed:',error);
-    if(status)status.textContent='Smart Camera error: '+(error?.message||'Could not scan this item.');
+    if(run!==smartCameraRunId||session!==smartCameraSession)return;
+    if(status)status.textContent=append?'This photo could not be read. Previous views are unchanged. Try again or Reset Scanner.':'This scan failed and its details were cleared. Try again or Reset Scanner.';
   }finally{
-    if(button){button.disabled=false;button.textContent='Scan Bullion';}
+    // An abandoned operation must not unlock controls belonging to a newer scan.
+    if(run===smartCameraRunId){setSmartCameraBusy(false);}
   }
 }
 function openSmartCamera(){
@@ -7026,7 +7087,7 @@ function openSmartCamera(){
   const founder=isFounderPro();
   if(button){
     button.textContent=active?'Scan Bullion':'Unlock Smart Camera with Pro';
-    button.disabled=false;
+    button.disabled=smartCameraScanning;
   }
   if(promise){
     promise.innerHTML=founder
@@ -7035,8 +7096,8 @@ function openSmartCamera(){
         ? '<strong>Included with your Pro plan</strong>Smart Camera is active on this account and runs on-device using Apple Vision.'
         : '<strong>Smart Camera is a Pro feature</strong>Upgrade to Benza Bullion Pro to scan supported bullion and prefill holding details.';
   }
-  pendingSmartCameraSuggestion=null;
-  document.getElementById('smartCameraAnalysis')?.classList.remove('show');
+  smartCameraSession++;
+  clearSmartCameraEvidence();
   if(status)status.textContent=active
     ? 'For best results, fill the frame with one item and keep weight, metal, mint, purity, or product markings clearly visible.'
     : 'Upgrade to Pro to use Smart Camera. Add Manually remains free.';
@@ -7044,6 +7105,7 @@ function openSmartCamera(){
   screen.setAttribute('aria-hidden','false');
 }
 function closeSmartCamera(){
+  void resetSmartCameraScan(true);
   const screen=document.getElementById('smartCameraScreen');
   screen.classList.remove('show');
   screen.setAttribute('aria-hidden','true');
