@@ -38,15 +38,16 @@ test('Unrelated serial digits cannot create purity',()=>assert.equal(scan('Fine 
 const design=(id,extra={})=>({designSuggestion:{id,source:'local-catalogue-v1',...extra}});
 test('Artwork alone supplies no product specifications',()=>{const r=scan('',design('american_eagle'));assert.equal(r.designID,'american_eagle');assert.equal(r.product,'');assert.equal(r.metal,'');assert.equal(r.weight,0);assert.equal(r.usable,false)});
 test('Eagle artwork plus independent silver uses confirmed catalogue standard',()=>{const r=scan('LIBERTY 2011 IN GOD WE TRUST FINE SILVER',design('american_eagle'));assert.equal(r.product,'American Silver Eagle');assert.equal(r.weight,1);assert.equal(r.inferredWeight,true);assert.equal(r.year,2011)});
+test('Similar silver artwork without identifying date cannot assume Eagle weight',()=>{const r=scan('FINE SILVER',design('american_eagle'));assert.equal(r.product,'');assert.equal(r.weight,0)});
 test('Gold Walking Liberty artwork cannot become silver Eagle',()=>{const r=scan('LIBERTY 2016 FINE GOLD 1/2 OZ',design('american_eagle'));assert.equal(r.product,'');assert.equal(r.metal,'gold');assert.equal(r.weight,.5)});
 test('Fractional Maple artwork never overwrites weight',()=>{const r=scan('CANADA FINE GOLD 1/10 OZ',design('canadian_maple_leaf'));assert.equal(r.product,'Canadian Gold Maple Leaf');assert.equal(r.weight,.1);assert.equal(r.inferredWeight,false)});
 test('Maple artwork never invents absent weight',()=>assert.equal(scan('CANADA FINE SILVER',design('canadian_maple_leaf')).weight,0));
 test('Extra model specification fields invalidate the suggestion',()=>{const r=scan('FINE SILVER',design('american_eagle',{weight_oz:20}));assert.equal(r.weight,0);assert.equal(r.product,'');assert.ok(r.warnings.length)});
 test('Conflicting side artwork blocks use',()=>{const r=scan('FINE SILVER',{designSuggestions:[design('american_eagle').designSuggestion,design('canadian_maple_leaf').designSuggestion]});assert.ok(r.warnings.length);assert.equal(r.designID,'')});
-test('Unknown reverse preserves known front design',()=>{const r=scan('FINE SILVER',{designSuggestions:[design('american_eagle').designSuggestion,design('unknown').designSuggestion]});assert.equal(r.product,'American Silver Eagle')});
+test('Unknown reverse preserves known front design',()=>{const r=scan('FINE SILVER 2011',{designSuggestions:[design('american_eagle').designSuggestion,design('unknown').designSuggestion]});assert.equal(r.product,'American Silver Eagle')});
 test('Text and artwork product disagreement blocks use',()=>assert.ok(scan('Maple Leaf CANADA FINE SILVER 1 OZ',design('american_eagle')).warnings.length));
 test('Historic half dollar artwork cannot inherit modern Eagle weight',()=>{const r=scan('LIBERTY 1942 HALF DOLLAR',design('walking_liberty_half_dollar'));assert.equal(r.weight,0);assert.equal(r.product,'')});
-test('OCR pass selection retains independent design metadata',()=>{const r=context.selectSmartCameraPhotoEvidence({passes:[{observations:[{text:'Fine silver',confidence:.95}],confidence:.95}],...design('american_eagle')});assert.equal(context.interpretSmartCameraScan(r).product,'American Silver Eagle')});
+test('OCR pass selection retains independent design metadata',()=>{const r=context.selectSmartCameraPhotoEvidence({passes:[{observations:[{text:'Fine silver 2011',confidence:.95}],confidence:.95}],...design('american_eagle')});assert.equal(context.interpretSmartCameraScan(r).product,'American Silver Eagle')});
 
 const pass=(text,confidence=.95)=>({observations:text.split('\n').map(text=>({text,confidence})),confidence});
 const evidence=passes=>context.selectSmartCameraPhotoEvidence({passes,text:'Legacy union must be ignored',lines:['Fine gold 10 oz'],engineVersion:3,appBuild:'44'});

@@ -298,12 +298,15 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
             var completion: (() -> Void)?
             // Reset resolves only after the worker's model/OCR allocations unwind.
             defer {
-                DispatchQueue.main.async {
-                    self.stateLock.lock()
-                    self.analysisInFlight = false
-                    self.stateLock.unlock()
-                    completion?()
-                    self.finishResetWaiters()
+                let completedCallback = completion
+                self.analysisQueue.async {
+                    DispatchQueue.main.async {
+                        self.stateLock.lock()
+                        self.analysisInFlight = false
+                        self.stateLock.unlock()
+                        completedCallback?()
+                        self.finishResetWaiters()
+                    }
                 }
             }
             guard self.isCurrent(generation) else { return }

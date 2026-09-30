@@ -84,9 +84,10 @@ Do not enable this in production until all of the following are demonstrated:
   uses Benza-controlled assets without relying on upstream availability.
 
 The llama.cpp release has an Apple XCFramework with multimodal headers, but this
-experiment has not validated a phone build. `NativeCore` supplies a portable C
-worker and strict Swift response parser; it is deliberately separate from the
-shipping app. Prepare its pinned SDK with:
+package has passed generic iOS compilation. The app now links `NativeCore`
+for a gated beta; production recognition remains disabled pending real-device
+validation. `NativeCore` supplies the C worker, strict Swift response parser and
+local asset verification. Prepare its pinned SDK with:
 
 ```sh
 python experiments/private-vision/prepare_apple_sdk.py --download
@@ -112,3 +113,27 @@ not physical-device recognition or memory limits.
 
 The quantized model is an unmodified upstream download. The prompt and benchmark
 are Benza experiment files. No customer image is included in this experiment.
+
+## Integrated beta build
+
+The tracked `App/PrivateVisionModels/manifest.json` is disabled. To make a beta
+from retained assets, run `prepare_app_models.py --assets /restored/assets` after
+preparing the SDK. `--download` is an explicit setup fallback; checksum-pinned
+files are never downloaded by the app. Keep the original backups so future
+builds can avoid upstream hosting entirely.
+
+Xcode Cloud's `ci_scripts/ci_post_clone.sh` prepares the fixed SDK and bundles
+weights only on `scanner-private-vision-benchmark` or when explicitly configured
+with `BENZA_BUNDLE_OFFLINE_VISION=1`. The beta adds 1.55 GB of bundled weights.
+Recognition is conservatively gated to devices reporting at least 7 GiB RAM
+(8 GB device class); this is a guard, not proof of safe iPhone memory use. Other
+devices retain OCR. The public Apple workflow compiles the integrated app without
+weights and uploads neither images nor build artifacts.
+
+A model suggestion never becomes OCR text. Eagle artwork additionally needs
+independent silver and a modern date or one-dollar inscription before the fixed
+catalogue weight can be offered for confirmation. Maple artwork needs an
+independent metal and Canada inscription; fractional weights remain directly
+read. Front/back conflicts block use. Blank OCR can retain an artwork suggestion
+for the reverse, but cannot create a holding. Reset cancels both engines and
+waits for the serial worker to unwind before another capture starts.

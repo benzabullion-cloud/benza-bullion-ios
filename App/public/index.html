@@ -6831,7 +6831,8 @@ function smartCameraDesignEvidence(result){
 function smartCameraDesignCatalogMatch(design,text,metal){
   if(!metal||/\b(?:bar|half dollar|plated|replica|copy|tribute)\b/.test(text))return null;
   let product='';
-  if(design==='american_eagle'&&metal==='silver')product='American Silver Eagle';
+  const modernYear=smartCameraYearCandidates(text).some(year=>year>=1986);
+  if(design==='american_eagle'&&metal==='silver'&&(modernYear||/\b(?:one|1) dollar\b/.test(text)))product='American Silver Eagle';
   if(design==='canadian_maple_leaf'&&/\b(?:canada|can)\b/.test(text)){
     product='Canadian '+METAL_NAMES[metal]+' Maple Leaf';
   }
@@ -6857,6 +6858,13 @@ function interpretSmartCameraScan(result){
     warnings.push('Artwork and inscriptions disagree. Confirm the product.');
   }else if(!catalogMatch&&artworkMatch){catalogMatch=artworkMatch;}
   if(design.id==='walking_liberty_half_dollar'&&catalogMatch?.item.product==='American Silver Eagle'){
+    warnings.push('Artwork and inscriptions disagree. Confirm the product.');
+  }
+  const familyFits=!catalogMatch||!design.id||
+    (design.id==='american_eagle'&&catalogMatch.item.product==='American Silver Eagle')||
+    (design.id==='canadian_maple_leaf'&&catalogMatch.item.product.includes('Maple Leaf'))||
+    (design.id==='walking_liberty_half_dollar'&&catalogMatch.item.product==='Walking Liberty Half Dollar');
+  if(!familyFits&&!warnings.includes('Artwork and inscriptions disagree. Confirm the product.')){
     warnings.push('Artwork and inscriptions disagree. Confirm the product.');
   }
   if(!metal&&catalogMatch)metal=catalogMatch.item.metal;
