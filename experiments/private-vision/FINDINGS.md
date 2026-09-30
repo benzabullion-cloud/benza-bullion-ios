@@ -73,3 +73,48 @@ This small sample is promising for bounded suggestions, but does not establish
 general accuracy. Confusable bullion, replicas, gold commemoratives sharing
 artwork, blurred images and supported-device performance still require testing.
 No holding data or app camera behavior changed.
+
+## Lower-detail catalogue follow-up
+
+Reduced image tokens from 1,024 to 256, context size from 4,096 to 1,024, and
+maximum generated tokens to 64. The catalogue-only task identifies broad artwork,
+not fine inscriptions; these settings must not be reused for specification OCR.
+Ran the four cases sequentially with independent workers and network blocked.
+
+| Case | Design response | Total seconds | Peak child RSS KiB |
+| --- | --- | ---: | ---: |
+| Eagle | `american_eagle` | 22.19 | 2,535,984 |
+| Maple | `canadian_maple_leaf` | 19.40 | 2,535,552 |
+| Unsupported round | `unknown` | 17.53 | 2,535,468 |
+| Non-coin screenshot | `unknown` | 19.26 | 2,531,164 |
+
+All four responses passed the strict identity gate. Correct outcomes on these
+four examples are encouraging, but are not an accuracy estimate for customer
+photos. Model files remain 1.55 GB and peak resident memory is still about
+2.42 GiB on Linux. No iPhone inference, native Metal timing, jetsam limit, or
+shipping integration has been validated.
+
+## Portable native core
+
+Implemented `NativeCore` around the pinned runtime's C APIs. It accepts decoded
+RGB pixels and verified local model paths, loads fresh model/vision/context state
+per worker, serializes inference with a try-lock, and uses single-use scan handles.
+All inference allocations have scoped destructors. Cancel and timeout checks run
+through loading and decoding and before publishing the reply. GPU work cannot be
+assumed immediately preemptible: a canceled worker must finish cleanup before a
+new worker can start. Busy calls are rejected instead of queued.
+
+Compiled the C++ core on Linux with warnings treated as errors. A real-image
+native benchmark, with networking blocked, confirmed:
+
+- An active worker rejects another inference request before loading more models.
+- A running handle cannot be destroyed.
+- Cancellation publishes no reply, and the handle can be cleaned up afterward.
+- A new worker after cancellation recognizes the Eagle correctly.
+- A completed handle cannot be reused for another image.
+
+The fresh Eagle run took 23.95 seconds and peaked at 2,541,104 KiB process RSS.
+This is a native Linux test, not an iPhone test. The package includes a strict
+Swift design-response boundary and Apple compile/test workflow; their successful
+execution must be confirmed separately. Model results still cannot create a
+holding, and the shipping app target is not connected to this experiment.

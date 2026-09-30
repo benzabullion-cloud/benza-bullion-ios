@@ -15,7 +15,11 @@ def main():
     parser.add_argument('image', type=Path)
     parser.add_argument('--timeout', type=int, default=360)
     parser.add_argument('--prompt', type=Path, default=ROOT / 'prompt.txt')
-    parser.add_argument('--case', choices=['single', 'eagle', 'maple', 'round'], default='single')
+    parser.add_argument('--case', choices=['single', 'eagle', 'maple', 'round',
+                                         'eagle-low', 'maple-low', 'round-low', 'screen-low'], default='single')
+    parser.add_argument('--image-tokens', choices=[256, 512, 1024], type=int, default=1024)
+    parser.add_argument('--context-size', choices=[1024, 4096], type=int, default=4096)
+    parser.add_argument('--output-tokens', choices=[64, 220], type=int, default=220)
     args = parser.parse_args()
     image = args.image.resolve(strict=True)
     prompt = args.prompt.resolve(strict=True)
@@ -30,9 +34,9 @@ def main():
     runtime = assets / 'runtime' / ('llama-' + lock['runtime']['release'])
     command = [str(runtime / 'llama-mtmd-cli'), '-m', str(assets / specs[0]['name']),
                '--mmproj', str(assets / specs[1]['name']), '--image', str(image),
-               '-f', str(prompt), '-n', '220', '-c', '4096',
+               '-f', str(prompt), '-n', str(args.output_tokens), '-c', str(args.context_size),
                '-t', '4', '--temp', '0', '--no-mmproj-offload',
-               '--image-min-tokens', '1024', '--image-max-tokens', '1024']
+               '--image-min-tokens', str(args.image_tokens), '--image-max-tokens', str(args.image_tokens)]
     env = dict(os.environ, LD_PRELOAD=str(guard))
     # Confirm the isolation hook is active before opening any customer photo.
     check = subprocess.run(['python', '-c',
@@ -55,6 +59,7 @@ def main():
     (result_dir / 'stderr.txt').write_bytes(result.stderr)
     metrics = {'exit_code': result.returncode, 'elapsed_seconds': round(elapsed, 2),
                'peak_child_rss_kib': resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss,
+               'image_tokens': args.image_tokens, 'context_size': args.context_size,
                'production_enabled': False, 'network_sockets_blocked': True}
     (result_dir / 'metrics.json').write_text(json.dumps(metrics, indent=2) + '\n')
     print(json.dumps(metrics))

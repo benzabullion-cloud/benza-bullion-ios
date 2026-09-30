@@ -35,6 +35,9 @@ python experiments/private-vision/prepare_assets.py --verify-only
 python experiments/private-vision/benchmark.py /absolute/path/to/private-photo.jpeg
 python experiments/private-vision/benchmark.py /absolute/path/to/private-photo.jpeg \
   --prompt experiments/private-vision/catalogue-prompt.txt --case eagle
+python experiments/private-vision/benchmark.py /absolute/path/to/private-photo.jpeg \
+  --prompt experiments/private-vision/catalogue-prompt.txt --case eagle-low \
+  --image-tokens 256 --context-size 1024 --output-tokens 64
 python -m unittest discover -s experiments/private-vision -p 'test_*.py' -v
 ```
 
@@ -55,6 +58,8 @@ The catalogue prompt limits the worker to design suggestions. `identity_gate.py`
 enforces this response schema and never produces holding specifications. A
 caller must apply the gate to model output, keep independent OCR/catalogue data
 separate, and prevent stale or mixed-item evidence from entering a scan.
+The lower-detail setting is for artwork suggestions only, never reading weight
+or fineness inscriptions. See `FINDINGS.md` for measured resource use and limits.
 
 ## Release gates
 
@@ -79,7 +84,24 @@ Do not enable this in production until all of the following are demonstrated:
   uses Benza-controlled assets without relying on upstream availability.
 
 The llama.cpp release has an Apple XCFramework with multimodal headers, but this
-experiment has not compiled a native iOS integration or validated a phone build.
+experiment has not validated a phone build. `NativeCore` supplies a portable C
+worker and strict Swift response parser; it is deliberately separate from the
+shipping app. Prepare its pinned SDK with:
+
+```sh
+python experiments/private-vision/prepare_apple_sdk.py --download
+swift test --package-path experiments/private-vision/NativeCore
+```
+
+For rebuilds using the retained SDK instead of its upstream URL, pass
+`--archive /absolute/path/llama-b11146-xcframework.zip` to the setup script.
+The script verifies the original archive checksum and preserves framework
+symlinks. Scanning itself never invokes this setup or fetches software.
+
+The Apple workflow builds on standard runners for this public repository only,
+does not publish artifacts or use caches, and does not download model weights
+or run customer photos. It checks compilation and protocol/lifecycle boundaries,
+not physical-device recognition or memory limits.
 
 ## Sources and notices
 
