@@ -5,7 +5,7 @@ import PackageDescription
 // We retain the matching binary and runtime source independently of this URL.
 let package = Package(
     name: "BenzaPrivateVisionCore",
-    platforms: [.iOS(.v26), .macOS(.v13)],
+    platforms: [.iOS("26.0"), .macOS(.v13)],
     products: [.library(name: "BenzaPrivateVision", type: .static, targets: ["BenzaPrivateVision"])],
     targets: [
         .binaryTarget(
