@@ -1,0 +1,17 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const html=fs.readFileSync('App/public/index.html','utf8');
+const nodes=new Map();const get=id=>{if(!nodes.has(id))nodes.set(id,{textContent:'',classList:{add(){},remove(){}}});return nodes.get(id)};
+const context=vm.createContext({document:{getElementById:get}});
+vm.runInContext('let pendingSmartCameraSuggestion=null;let smartCameraAwaitingReverse=false;'+html.slice(html.indexOf('function renderSmartCameraAnalysis('),html.indexOf('function applySmartCameraSuggestion(')),context);
+vm.runInContext('applySmartCameraSuggestion=(suggestion)=>{globalThis.review=suggestion;return true;}',context);
+let count=0;const test=(name,fn)=>{context.review=null;fn();count++;console.log('PASS',name)};
+const complete={metal:'silver',product:'American Silver Eagle',weight:1,usable:true,warnings:[],sides:1};
+test('Complete first scan goes straight to holding review',()=>{context.renderSmartCameraAnalysis(complete);assert.equal(context.review,complete)});
+test('Incomplete first side shows one reverse prompt',()=>{context.renderSmartCameraAnalysis({...complete,product:'',weight:0});assert.equal(context.review,null);assert.equal(get('smartAnalysisTitle').textContent,'One more photo');assert.equal(vm.runInContext('smartCameraAwaitingReverse',context),true)});
+test('Partial two-side result uses the normal holding form',()=>{const partial={...complete,product:'',sides:2};context.renderSmartCameraAnalysis(partial);assert.equal(context.review,partial)});
+test('Conflicting evidence never auto-fills a holding',()=>{context.renderSmartCameraAnalysis({...complete,warnings:['Conflicting metal markings'],usable:false,sides:2});assert.equal(context.review,null);assert.equal(vm.runInContext('smartCameraAwaitingReverse',context),false)});
+test('Unidentified two-side result offers fresh attempt',()=>{context.renderSmartCameraAnalysis({...complete,metal:'',product:'',weight:0,usable:false,sides:2});assert.equal(context.review,null);assert.equal(get('smartAnalysisTitle').textContent,'I couldn’t identify this confidently')});
+test('Scanner screen has no evidence, value or multi-control report',()=>{const screen=html.slice(html.indexOf('<section id="smartCameraScreen"'),html.indexOf('</section>',html.indexOf('<section id="smartCameraScreen"')));for(const removed of ['smartAnalysisChecks','smartAnalysisGrid','smartAnalysisNotes','Reset Scanner','Start New Item','Use Suggested Details'])assert.equal(screen.includes(removed),false)});
+test('Blank front produces a reverse prompt without a guessed holding',()=>{context.renderSmartCameraAnalysis({metal:'',product:'',weight:0,usable:false,warnings:[],sides:1});assert.equal(context.review,null);assert.equal(vm.runInContext('smartCameraAwaitingReverse',context),true)});
+test('Scanner has no photo transmission or persistence path',()=>{const scanner=html.slice(html.indexOf('function smartCameraPlugin('),html.indexOf('function clearAttachmentObjectUrls'));assert.doesNotMatch(scanner,/\bfetch\s*\(|XMLHttpRequest|sendBeacon|upload|localStorage|indexedDB|sessionStorage/);const native=fs.readFileSync('App/SceneDelegate.swift','utf8');const plugin=native.slice(native.indexOf('@objc(BenzaSmartCameraPlugin)'),native.indexOf('@objc(BenzaStoreKitPlugin)'));assert.doesNotMatch(plugin,/URLSession|URLRequest|base64EncodedString|write\(to:|UserDefaults/)});
+console.log(count+' simplified-flow checks passed');
