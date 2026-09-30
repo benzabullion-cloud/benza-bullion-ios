@@ -1,0 +1,19 @@
+{
+  "assetPackID": "BenzaPrivateVisionModels",
+  "downloadPolicy": {
+    "essential": {
+      "installationEventTypes": [
+        "firstInstallation",
+        "subsequentUpdate"
+      ]
+    }
+  },
+  "fileSelectors": [
+    {
+      "directory": "App/PrivateVisionModels"
+    }
+  ],
+  "platforms": [
+    "iOS"
+  ]
+}
