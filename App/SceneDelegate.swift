@@ -6,6 +6,7 @@ import Vision
 import CoreImage
 import ImageIO
 import BenzaPrivateVision
+import BackgroundAssets
 
 @objc(BenzaNotificationsPlugin)
 final class BenzaNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -135,6 +136,16 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
     private var activeDesignScan: BenzaOfflineScan?
     private var offlineDesignEngine: BenzaOfflineDesignEngine?
     private var analysisInFlight = false
+
+    private func managedModelDirectory() throws -> URL {
+        // Apple-hosted packs share a logical local namespace. url(for:) is nonisolated
+        // and synchronous; downstream file verification determines whether delivery
+        // has completed without requiring the iOS 26.4-only availability convenience API.
+        let modelURL = try AssetPackManager.shared.url(
+            for: "App/PrivateVisionModels/Qwen3VL-2B-Instruct-Q4_K_M.gguf"
+        )
+        return modelURL.deletingLastPathComponent()
+    }
 
     // Advancing the generation invalidates every callback from an older attempt.
     private func advanceGeneration() -> Int {
@@ -384,9 +395,9 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
             context.clearCaches()
             guard self.isCurrent(generation) else { return }
             var designID: String?
-            var designStatus = "not-bundled"
-            if let resources = Bundle.main.resourceURL {
-                let directory = resources.appendingPathComponent("PrivateVisionModels")
+            var designStatus = "asset-pack-unavailable"
+            do {
+                let directory = try self.managedModelDirectory()
                 let manifest = directory.appendingPathComponent("manifest.json")
                 var enabled = false
                 if let data = try? Data(contentsOf: manifest),
@@ -409,7 +420,9 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
                         if self.offlineDesignEngine == nil {
                             self.offlineDesignEngine = try BenzaOfflineDesignEngine(directory: directory)
                         }
-                        guard let engine = self.offlineDesignEngine else { throw BenzaOfflineDesignEngine.Failure.unavailable }
+                        guard let engine = self.offlineDesignEngine else {
+                            throw BenzaOfflineDesignEngine.Failure.unavailable
+                        }
                         let identity = try autoreleasepool {
                             try engine.identify(image: cgImage, scan: scan)
                         }
@@ -421,6 +434,9 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
                 } else if enabled {
                     designStatus = "device-limited"
                 }
+            } catch {
+                // OCR remains available if the essential pack is temporarily unavailable.
+                designStatus = "asset-pack-unavailable"
             }
             guard self.isCurrent(generation) else { return }
             let readings = found.values.sorted { $0.1 > $1.1 }

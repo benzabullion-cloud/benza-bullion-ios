@@ -30,6 +30,12 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>BAAppGroupID</key>
+	<string>group.com.benzabullion.app</string>
+	<key>BAHasManagedAssetPacks</key>
+	<true/>
+	<key>BAUsesAppleHosting</key>
+	<true/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
