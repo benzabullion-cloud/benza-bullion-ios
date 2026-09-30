@@ -22,6 +22,8 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose a bullion photo to identify its markings with Smart Camera.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Benza Bullion uses the camera to recognize supported bullion and prefill holding details for your review.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>

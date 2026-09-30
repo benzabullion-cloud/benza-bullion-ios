@@ -4,6 +4,7 @@ import StoreKit
 import UserNotifications
 import Vision
 import CoreImage
+import ImageIO
 
 @objc(BenzaNotificationsPlugin)
 final class BenzaNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -118,18 +119,95 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
     let identifier = "BenzaSmartCameraPlugin"
     let jsName = "BenzaSmartCamera"
     let pluginMethods: [CAPPluginMethod] = [
-        CAPPluginMethod(name: "scan", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "scan", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "reset", returnType: CAPPluginReturnPromise)
     ]
 
     private var pendingCall: CAPPluginCall?
+    private var activePicker: UIImagePickerController?
+    private var pickerDismissalInProgress = false
+    private var resetWaiters: [CAPPluginCall] = []
+    private let analysisQueue = DispatchQueue(label: "com.benzabullion.scanner", qos: .userInitiated)
+    private let stateLock = NSLock()
+    private var generation = 0
+    private var activeRequest: VNRecognizeTextRequest?
+
+    // Advancing the generation invalidates every callback from an older attempt.
+    private func advanceGeneration() -> Int {
+        stateLock.lock()
+        generation += 1
+        let value = generation
+        let request = activeRequest
+        activeRequest = nil
+        stateLock.unlock()
+        request?.cancel()
+        return value
+    }
+
+    private func currentGeneration() -> Int {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return generation
+    }
+
+    private func isCurrent(_ value: Int) -> Bool {
+        return currentGeneration() == value
+    }
+
+    private func activate(_ request: VNRecognizeTextRequest, generation value: Int) -> Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        guard generation == value else { return false }
+        activeRequest = request
+        return true
+    }
+
+    private func releaseRequest(_ request: VNRecognizeTextRequest) {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        if activeRequest === request { activeRequest = nil }
+    }
+
+    private func finishResetWaiters() {
+        let waiters = resetWaiters
+        resetWaiters.removeAll()
+        waiters.forEach { $0.resolve() }
+    }
+
+    private func dismissPicker(_ picker: UIImagePickerController, completion: @escaping () -> Void) {
+        pickerDismissalInProgress = true
+        picker.dismiss(animated: true) {
+            self.pickerDismissalInProgress = false
+            completion()
+            self.finishResetWaiters()
+        }
+    }
+
+    @objc func reset(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            _ = self.advanceGeneration()
+            let previousCall = self.pendingCall
+            self.pendingCall = nil
+            let picker = self.activePicker
+            self.activePicker = nil
+            previousCall?.resolve(["cancelled": true, "lines": []])
+            self.resetWaiters.append(call)
+            if let picker {
+                self.dismissPicker(picker) {}
+            } else if !self.pickerDismissalInProgress {
+                self.finishResetWaiters()
+            }
+        }
+    }
 
     @objc func scan(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            let source: UIImagePickerController.SourceType = call.getString("source") == "library" ? .photoLibrary : .camera
+            guard UIImagePickerController.isSourceTypeAvailable(source) else {
                 call.reject("Camera is not available on this device.")
                 return
             }
-            guard self.pendingCall == nil else {
+            guard self.pendingCall == nil && !self.pickerDismissalInProgress else {
                 call.reject("A Smart Camera scan is already in progress.")
                 return
             }
@@ -138,176 +216,157 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
                 return
             }
 
+            guard presenter.presentedViewController == nil else {
+                call.reject("Close the other screen before opening Smart Camera.")
+                return
+            }
+            _ = self.advanceGeneration()
             self.pendingCall = call
             let picker = UIImagePickerController()
-            picker.sourceType = .camera
-            picker.cameraCaptureMode = .photo
+            picker.sourceType = source
+            if source == .camera { picker.cameraCaptureMode = .photo }
             picker.allowsEditing = false
             picker.delegate = self
+            self.activePicker = picker
             picker.modalPresentationStyle = .fullScreen
             presenter.present(picker, animated: true)
         }
     }
 
     func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+        guard activePicker === picker else { return }
+        activePicker = nil
+        _ = advanceGeneration()
         let call = pendingCall
         pendingCall = nil
-        picker.dismiss(animated: true) {
+        dismissPicker(picker) {
             call?.resolve(["cancelled": true, "lines": []])
         }
     }
 
     func imagePickerController(_ picker: UIImagePickerController,
                                didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+        guard activePicker === picker else { return }
+        activePicker = nil
+        let generation = currentGeneration()
         guard let image = info[.originalImage] as? UIImage else {
             let call = pendingCall
             pendingCall = nil
-            picker.dismiss(animated: true) {
+            dismissPicker(picker) {
                 call?.reject("Smart Camera could not read the captured photo.")
             }
             return
         }
 
         let call = pendingCall
-        pendingCall = nil
-        picker.dismiss(animated: true) {
-            self.recognizeText(in: image, call: call)
+        dismissPicker(picker) {
+            self.recognizeText(in: image, call: call, generation: generation)
         }
     }
 
-    private func recognizeText(in image: UIImage, call: CAPPluginCall?) {
+    // Multiple bounded OCR passes recover rotated rim inscriptions and small dates.
+    // No generic image labels or color measurements are used as bullion evidence.
+    private func recognizeText(in image: UIImage, call: CAPPluginCall?, generation: Int) {
+        guard isCurrent(generation) else { return }
         guard let cgImage = normalizedCGImage(image) else {
+            pendingCall = nil
             call?.reject("Smart Camera could not prepare the captured photo.")
             return
         }
-
-        DispatchQueue.global(qos: .userInitiated).async {
-            let request = VNRecognizeTextRequest { request, error in
-                if let error {
-                    DispatchQueue.main.async { call?.reject(error.localizedDescription) }
-                    return
-                }
-
-                let observations = request.results as? [VNRecognizedTextObservation] ?? []
-                let candidates = observations.compactMap { observation -> (String, Float)? in
-                    guard let top = observation.topCandidates(1).first else { return nil }
-                    let text = top.string.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !text.isEmpty else { return nil }
-                    return (text, top.confidence)
-                }
-                .sorted { $0.1 > $1.1 }
-
-                let lines = candidates.map { $0.0 }
-                let avgConfidence = candidates.isEmpty
-                    ? 0
-                    : Double(candidates.reduce(Float(0)) { $0 + $1.1 }) / Double(candidates.count)
-
-                var payload: [String: Any] = [
-                    "cancelled": false,
-                    "lines": lines,
-                    "text": lines.joined(separator: "\n"),
-                    "confidence": avgConfidence
-                ]
-                if #available(iOS 15.0, *) {
-                    payload["visualLabels"] = self.classifyImage(cgImage)
-                }
-                if let visualColor = self.averageCenterColor(cgImage) {
-                    payload["visualColor"] = visualColor
-                }
-                DispatchQueue.main.async {
-                    call?.resolve(payload)
-                }
-            }
-
-            request.recognitionLevel = .accurate
-            request.usesLanguageCorrection = true
-            request.recognitionLanguages = ["en-US"]
-            request.customWords = [
-                "bullion","fine gold","fine silver","fine platinum","fine palladium",
-                "American Eagle","Silver Eagle","Gold Eagle","American Buffalo",
-                "Maple Leaf","Britannia","Krugerrand","Philharmonic","Kangaroo",
-                "Kookaburra","Koala","Panda","Libertad","Sovereign","Morgan",
-                "Peace Dollar","Walking Liberty","PAMP Suisse","Valcambi",
-                "Scottsdale","Johnson Matthey","Engelhard","Perth Mint",
-                "Royal Canadian Mint","United States Mint","1 oz","1/2 oz",
-                "1/4 oz","1/10 oz",".999",".9999","999","9999"
+        analysisQueue.async {
+            guard self.isCurrent(generation) else { return }
+            let started = Date()
+            let context = CIContext(options: nil)
+            let input = CIImage(cgImage: cgImage)
+            let extent = input.extent
+            let contrast = input.applyingFilter("CIColorControls", parameters: [
+                kCIInputSaturationKey: 0, kCIInputContrastKey: 1.35
+            ])
+            let center = extent.insetBy(dx: extent.width * 0.12, dy: extent.height * 0.12)
+            let bottom = CGRect(x: extent.minX, y: extent.minY,
+                                width: extent.width, height: extent.height * 0.42)
+            var passes: [(CGImage, CGImagePropertyOrientation, Bool)] = [
+                (cgImage, .up, true), (cgImage, .right, true),
+                (cgImage, .left, true), (cgImage, .down, true)
             ]
-            if #available(iOS 13.0, *) {
-                request.minimumTextHeight = 0.008
+            if let enhanced = context.createCGImage(contrast, from: extent) {
+                passes.append((enhanced, .up, false))
             }
-
-            do {
-                try VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([request])
-            } catch {
-                DispatchQueue.main.async { call?.reject(error.localizedDescription) }
+            if let crop = context.createCGImage(contrast, from: center) {
+                passes.append(contentsOf: [(crop, .up, true), (crop, .right, true),
+                                           (crop, .left, true), (crop, .down, true)])
+            }
+            if let dateCrop = context.createCGImage(contrast, from: bottom) {
+                passes.insert((dateCrop, .up, false), at: 1)
+            }
+            var found: [String: (String, Float)] = [:]
+            var completed = 0
+            var lastError: Error?
+            for (photo, orientation, correction) in passes {
+                if !self.isCurrent(generation) || (completed > 0 && Date().timeIntervalSince(started) > 18) { break }
+                autoreleasepool {
+                    let request = VNRecognizeTextRequest()
+                    request.recognitionLevel = .accurate
+                    request.usesLanguageCorrection = correction
+                    let supported = (try? request.supportedRecognitionLanguages()) ?? ["en-US"]
+                    request.recognitionLanguages = ["en-US", "fr-FR", "es-ES", "de-DE"].filter { supported.contains($0) }
+                    request.minimumTextHeight = 0.004
+                    request.customWords = [
+                        "FINE SILVER", "ARGENT PUR", "FINE GOLD", "OR PUR", "PLATA PURA",
+                        "ORO PURO", "FEINSILBER", "FEINGOLD", "PLATINUM", "PALLADIUM",
+                        "CANADA", "LIBERTY", "IN GOD WE TRUST", "ONE DOLLAR", "ONE OUNCE",
+                        "American Eagle", "Maple Leaf", "Britannia", "Krugerrand",
+                        "Philharmoniker", "Kangaroo", "Kookaburra", "Koala", "Panda",
+                        "Libertad", "PAMP", "Valcambi", "Engelhard", "Johnson Matthey",
+                        "1 OZ", "1 TROY OZ", "9999", "9995", "999", "999.9"
+                    ]
+                    guard self.activate(request, generation: generation) else { return }
+                    defer { self.releaseRequest(request) }
+                    do {
+                        try VNImageRequestHandler(cgImage: photo, orientation: orientation, options: [:]).perform([request])
+                        completed += 1
+                        for observation in request.results ?? [] {
+                            guard let top = observation.topCandidates(1).first, top.confidence >= 0.25 else { continue }
+                            let line = top.string.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let key = line.lowercased()
+                            if !line.isEmpty && top.confidence > (found[key]?.1 ?? 0) {
+                                found[key] = (line, top.confidence)
+                            }
+                        }
+                    } catch { lastError = error }
+                }
+            }
+            context.clearCaches()
+            guard self.isCurrent(generation) else { return }
+            let readings = found.values.sorted { $0.1 > $1.1 }
+            let lines = readings.map { $0.0 }
+            let confidence = readings.isEmpty ? 0 : Double(readings.reduce(Float(0)) { $0 + $1.1 }) / Double(readings.count)
+            DispatchQueue.main.async {
+                guard self.isCurrent(generation) else { return }
+                self.pendingCall = nil
+                if completed == 0 {
+                    call?.reject(lastError?.localizedDescription ?? "Could not read this photo. Please try again.")
+                } else {
+                    call?.resolve(["cancelled": false, "lines": lines,
+                                   "text": lines.joined(separator: "\n"), "confidence": confidence,
+                                   "ocrPasses": completed, "engineVersion": 2])
+                }
             }
         }
-    }
-
-    @available(iOS 15.0, *)
-    private func classifyImage(_ cgImage: CGImage) -> [[String: Any]] {
-        let request = VNClassifyImageRequest()
-        do {
-            try VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([request])
-        } catch {
-            return []
-        }
-        return (request.results ?? []).prefix(8).compactMap { item in
-            guard item.confidence >= 0.035 else { return nil }
-            return ["identifier": item.identifier, "confidence": Double(item.confidence)]
-        }
-    }
-
-    private func averageCenterColor(_ cgImage: CGImage) -> [String: Any]? {
-        let input = CIImage(cgImage: cgImage)
-        let extent = input.extent
-        let sample = extent.insetBy(dx: extent.width * 0.20, dy: extent.height * 0.20)
-        guard !sample.isEmpty, let filter = CIFilter(name: "CIAreaAverage") else { return nil }
-
-        filter.setValue(input.cropped(to: sample), forKey: kCIInputImageKey)
-        filter.setValue(CIVector(cgRect: sample), forKey: kCIInputExtentKey)
-        guard let output = filter.outputImage else { return nil }
-
-        var rgba = [UInt8](repeating: 0, count: 4)
-        let context = CIContext(options: nil)
-        context.render(output, toBitmap: &rgba, rowBytes: 4,
-                       bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
-                       format: .RGBA8, colorSpace: CGColorSpaceCreateDeviceRGB())
-
-        let r = CGFloat(rgba[0]) / 255.0
-        let g = CGFloat(rgba[1]) / 255.0
-        let b = CGFloat(rgba[2]) / 255.0
-        var h: CGFloat = 0, s: CGFloat = 0, v: CGFloat = 0, a: CGFloat = 0
-        UIColor(red: r, green: g, blue: b, alpha: 1).getHue(&h, saturation: &s, brightness: &v, alpha: &a)
-
-        let tone: String
-        if s < 0.13 && v > 0.30 {
-            tone = "silvery"
-        } else if h >= 0.075 && h <= 0.17 && s >= 0.24 && v >= 0.30 {
-            tone = "golden"
-        } else if (h <= 0.075 || h >= 0.97) && s >= 0.24 && v >= 0.22 {
-            tone = "copper"
-        } else {
-            tone = "neutral"
-        }
-
-        return [
-            "red": Double(r), "green": Double(g), "blue": Double(b),
-            "hue": Double(h), "saturation": Double(s), "brightness": Double(v),
-            "tone": tone
-        ]
     }
 
     private func normalizedCGImage(_ image: UIImage) -> CGImage? {
-        if image.imageOrientation == .up, let cg = image.cgImage {
-            return cg
-        }
-        UIGraphicsBeginImageContextWithOptions(image.size, false, 1)
-        image.draw(in: CGRect(origin: .zero, size: image.size))
-        let normalized = UIGraphicsGetImageFromCurrentImageContext()
-        UIGraphicsEndImageContext()
-        return normalized?.cgImage
+        // Bound memory and OCR latency; apply UIImage orientation before Vision.
+        let longest = max(image.size.width, image.size.height)
+        guard longest > 0 else { return nil }
+        let ratio = min(1, 2200 / longest)
+        let size = CGSize(width: image.size.width * ratio, height: image.size.height * ratio)
+        UIGraphicsBeginImageContextWithOptions(size, false, 1)
+        defer { UIGraphicsEndImageContext() }
+        image.draw(in: CGRect(origin: .zero, size: size))
+        return UIGraphicsGetImageFromCurrentImageContext()?.cgImage
     }
+
 }
 
 @objc(BenzaStoreKitPlugin)
