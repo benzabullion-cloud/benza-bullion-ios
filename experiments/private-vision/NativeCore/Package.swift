@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "BenzaPrivateVisionCore",
     platforms: [.iOS(.v15), .macOS(.v13)],
-    products: [.library(name: "BenzaPrivateVision", targets: ["BenzaPrivateVision"])],
+    products: [.library(name: "BenzaPrivateVision", type: .static, targets: ["BenzaPrivateVision"])],
     targets: [
         .binaryTarget(
             name: "llama",
