@@ -3,6 +3,9 @@ on:
   pull_request:
     paths:
       - 'experiments/private-vision/**'
+      - 'App/**'
+      - 'App.xcodeproj/**'
+      - 'ci_scripts/**'
       - '.github/workflows/private-vision-native.yml'
   workflow_dispatch:
 permissions:
@@ -39,3 +42,5 @@ jobs:
           PY
           )
           xcodebuild -scheme "$benza_scheme" -destination 'generic/platform=iOS' -derivedDataPath /tmp/benza-vision-ios CODE_SIGNING_ALLOWED=NO build
+      - name: Compile integrated app without signing or experimental weights
+        run: xcodebuild -project App.xcodeproj -scheme App -destination 'generic/platform=iOS' -derivedDataPath /tmp/benza-app-ios CODE_SIGNING_ALLOWED=NO build

@@ -6813,6 +6813,32 @@ function smartCameraDenominationGuess(text){
   const match=text.match(/\b(?:\$\s*)?(1|2|2\.5|5|10|20|25|50|100)\s*(?:dollar|dollars|peso|pesos|pound|pounds|euro|euros)\b/);
   return match?match[0].replace(/\s+/g,' ').toUpperCase():'';
 }
+// Artwork suggestions contain catalogue identity only. Specifications remain OCR/catalogue evidence.
+function smartCameraDesignEvidence(result){
+  const entries=Array.isArray(result?.designSuggestions)?result.designSuggestions:
+    result?.designSuggestion?[result.designSuggestion]:[];
+  const allowed=['american_eagle','walking_liberty_half_dollar','canadian_maple_leaf','unknown'];
+  let invalid=false;
+  const ids=[];
+  for(const entry of entries){
+    if(!entry||typeof entry!=='object'||Array.isArray(entry)||
+       Object.keys(entry).sort().join(',')!=='id,source'||
+       entry.source!=='local-catalogue-v1'||!allowed.includes(entry.id)){invalid=true;continue;}
+    if(entry.id!=='unknown'&&!ids.includes(entry.id))ids.push(entry.id);
+  }
+  return {id:ids.length===1?ids[0]:'',conflict:ids.length>1,invalid};
+}
+function smartCameraDesignCatalogMatch(design,text,metal){
+  if(!metal||/\b(?:bar|half dollar|plated|replica|copy|tribute)\b/.test(text))return null;
+  let product='';
+  if(design==='american_eagle'&&metal==='silver')product='American Silver Eagle';
+  if(design==='canadian_maple_leaf'&&/\b(?:canada|can)\b/.test(text)){
+    product='Canadian '+METAL_NAMES[metal]+' Maple Leaf';
+  }
+  const item=SMART_CAMERA_CATALOG.find(item=>item.product===product&&item.metal===metal);
+  if(!item)return null;
+  return {item,strongHits:['on-device artwork suggestion + metal inscription'],supportHits:[],score:7};
+}
 function interpretSmartCameraScan(result){
   const raw=Array.isArray(result?.lines)?result.lines.join(' '):(result?.text||'');
   const text=normalizeSmartCameraText(raw);
@@ -6822,7 +6848,17 @@ function interpretSmartCameraScan(result){
   if(metals.length>1)warnings.push('Conflicting metal markings. Scan the other side and confirm the metal manually.');
   const plated=/\b(?:plated|clad|filled|replica|copy|tribute|layered)\b/.test(text);
   if(plated)warnings.push('Plated, replica, or layered marking detected. Fine-metal content needs manual verification.');
-  const catalogMatch=metals.length>1?null:smartCameraCatalogMatch(text,metal);
+  const design=smartCameraDesignEvidence(result);
+  if(design.invalid)warnings.push('The artwork result was invalid. Scan again.');
+  if(design.conflict)warnings.push('The two photos suggest different designs. Scan this item again.');
+  let catalogMatch=metals.length>1?null:smartCameraCatalogMatch(text,metal);
+  const artworkMatch=!design.invalid&&!design.conflict?smartCameraDesignCatalogMatch(design.id,text,metal):null;
+  if(artworkMatch&&catalogMatch&&artworkMatch.item.product!==catalogMatch.item.product){
+    warnings.push('Artwork and inscriptions disagree. Confirm the product.');
+  }else if(!catalogMatch&&artworkMatch){catalogMatch=artworkMatch;}
+  if(design.id==='walking_liberty_half_dollar'&&catalogMatch?.item.product==='American Silver Eagle'){
+    warnings.push('Artwork and inscriptions disagree. Confirm the product.');
+  }
   if(!metal&&catalogMatch)metal=catalogMatch.item.metal;
   const product=catalogMatch?.item.product||(metal?smartCameraProductGuess(text,metal):'');
   const weights=smartCameraWeightCandidates(text,metal);
@@ -6867,7 +6903,7 @@ function interpretSmartCameraScan(result){
   if(metals.length===1)matchedTerms.unshift('metal inscription: '+METAL_NAMES[metal]);
   if(inferredWeight)matchedTerms.push('weight from standard product specification — confirm');
   return {metal,product,weight,year,mint,serial,purity,denomination,text,raw,confidence,warnings,
-    matchedTerms,inferredWeight,inferredMint:!!mint&&!detectedMint,inferredPurity:!!purity&&!observedPurity,
+    matchedTerms,designID:design.id,inferredWeight,inferredMint:!!mint&&!detectedMint,inferredPurity:!!purity&&!observedPurity,
     sides:result?.sides||1,usable:!!metal&&!plated&&metals.length<=1&&confidence>=.42};
 }
 // OCR passes are alternative readings of ONE photo, not additional inscriptions.
@@ -6876,7 +6912,7 @@ function selectSmartCameraPhotoEvidence(result){
   const candidates=result.passes.map(pass=>{
     const observations=Array.isArray(pass?.observations)?pass.observations:[];
     const lines=observations.filter(o=>typeof o?.text==='string'&&Number(o.confidence)>=.25).map(o=>o.text);
-    const photo={lines,confidence:Number(pass?.confidence)||0};
+    const photo={lines,confidence:Number(pass?.confidence)||0,designSuggestion:result.designSuggestion,designSuggestions:result.designSuggestions};
     const reading=interpretSmartCameraScan(photo);
     const score=(reading.usable?3:0)+(reading.metal?3:0)+(reading.product?4:0)+(reading.weight>0?3:0)+
       (reading.purity?1:0)+(reading.year ? .25 : 0)+photo.confidence-reading.warnings.length*12;
@@ -6905,7 +6941,7 @@ function selectSmartCameraPhotoEvidence(result){
   let reading=primary.reading;
   for(const c of candidates.slice(1)){
     if(!compatible(reading,c.reading))continue;
-    const merged={lines:accepted.flatMap(p=>p.photo.lines).concat(c.photo.lines),confidence:primary.photo.confidence};
+    const merged={...result,lines:accepted.flatMap(p=>p.photo.lines).concat(c.photo.lines),confidence:primary.photo.confidence};
     const next=interpretSmartCameraScan(merged);
     // Combining partial passes must not invent conflicting weights, years, or purity.
     if(next.warnings.length>reading.warnings.length)continue;
@@ -6917,10 +6953,11 @@ function selectSmartCameraPhotoEvidence(result){
 }
 function smartCameraFailureReason(suggestion){
   if(suggestion.warnings?.length)return suggestion.warnings[0];
-  if(!suggestion.raw?.trim())return 'No readable markings were found. A design-only photo cannot identify the item yet.';
+  if(suggestion.designID&&!suggestion.metal)return 'Design found. Photograph the side with metal and weight markings.';
+  if(!suggestion.raw?.trim())return 'No readable markings were found. Photograph the metal and weight markings in focus.';
   if(!suggestion.metal)return 'Text was read, but the metal could not be identified.';
   if(!(suggestion.weight>0))return 'The weight could not be read. Photograph the weight marking in focus.';
-  if(!suggestion.product)return 'Metal and weight were read, but the product could not be matched. Artwork recognition is not available yet.';
+  if(!suggestion.product)return 'Metal and weight were read, but the product could not be matched. Photograph the identifying design or name.';
   return 'The product details need another clear photo before continuing.';
 }
 function renderSmartCameraDiagnostics(suggestion){
@@ -7104,7 +7141,7 @@ async function runSmartCameraScan(append=false,source='camera'){
     smartCameraPhotoCount++;
     const reading=interpretSmartCameraScan(result);
     // Count photos separately: blank OCR never stacks evidence or causes endless reverse prompts.
-    const hasEvidence=!!(reading.metal||reading.product||reading.weight||reading.year||reading.mint||reading.purity||reading.serial||reading.denomination||reading.warnings.length);
+    const hasEvidence=!!(reading.designID||reading.metal||reading.product||reading.weight||reading.year||reading.mint||reading.purity||reading.serial||reading.denomination||reading.warnings.length);
     if(!hasEvidence){
       if(!append){
         renderSmartCameraAnalysis({...reading,sides:smartCameraPhotoCount});
@@ -7117,7 +7154,8 @@ async function runSmartCameraScan(append=false,source='camera'){
     }
     smartCameraScans.push(result);
     const combined={lines:smartCameraScans.flatMap(scan=>Array.isArray(scan.lines)?scan.lines:[scan.text||'']),
-      confidence:Math.max(...smartCameraScans.map(scan=>Number(scan.confidence)||0)),sides:smartCameraPhotoCount};
+      confidence:Math.max(...smartCameraScans.map(scan=>Number(scan.confidence)||0)),sides:smartCameraPhotoCount,
+      designSuggestions:smartCameraScans.flatMap(scan=>Array.isArray(scan.designSuggestions)?scan.designSuggestions:scan.designSuggestion?[scan.designSuggestion]:[])};
     const suggestion=interpretSmartCameraScan(combined);
     renderSmartCameraAnalysis(suggestion);
     if(status)status.textContent='';

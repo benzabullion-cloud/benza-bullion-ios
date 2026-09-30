@@ -1,7 +1,7 @@
 // swift-tools-version: 5.9
 import PackageDescription
 
-// Experimental package only; not connected to the shipping app target.
+// App integration remains gated by the explicit beta model manifest.
 // We retain the matching binary and runtime source independently of this URL.
 let package = Package(
     name: "BenzaPrivateVisionCore",
@@ -18,7 +18,8 @@ let package = Package(
             linkerSettings: [.linkedFramework("Accelerate"), .linkedFramework("Metal"),
                              .linkedFramework("Foundation"), .linkedLibrary("c++")]
         ),
-        .target(name: "BenzaPrivateVision", dependencies: ["CBenzaVision"]),
+        .target(name: "BenzaPrivateVision", dependencies: ["CBenzaVision"],
+                resources: [.copy("Resources")]),
         .testTarget(name: "BenzaPrivateVisionTests", dependencies: ["BenzaPrivateVision", "CBenzaVision"])
     ],
     cxxLanguageStandard: .cxx17

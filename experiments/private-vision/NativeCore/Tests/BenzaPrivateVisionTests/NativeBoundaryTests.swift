@@ -1,8 +1,24 @@
 import XCTest
 import CBenzaVision
+import CoreGraphics
 @testable import BenzaPrivateVision
 
 final class NativeBoundaryTests: XCTestCase {
+    func testCanceledAdapterSkipsAssetsAndImageWork() throws {
+        let scan = try BenzaOfflineScan()
+        scan.cancel()
+        let engine = try BenzaOfflineDesignEngine(directory: URL(fileURLWithPath: "/not-an-asset-directory"))
+        let context = try XCTUnwrap(CGContext(data: nil, width: 1, height: 1, bitsPerComponent: 8,
+                                             bytesPerRow: 4, space: CGColorSpaceCreateDeviceRGB(),
+                                             bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue))
+        let image = try XCTUnwrap(context.makeImage())
+        XCTAssertThrowsError(try engine.identify(image: image, scan: scan)) { error in
+            guard case BenzaOfflineDesignEngine.Failure.canceled = error else {
+                return XCTFail("Cancellation must precede file access")
+            }
+        }
+    }
+
     func testModelCannotSupplySpecifications() throws {
         let result = try BenzaDesignIdentity.parse(#"{"design_id":"american_eagle"}"#)
         XCTAssertEqual(result.design, .americanEagle)
