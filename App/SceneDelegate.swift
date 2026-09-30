@@ -138,35 +138,13 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
     private var analysisInFlight = false
 
     private func managedModelDirectory() throws -> URL {
-        // Managed Background Assets is actor-isolated. Scanner inference is intentionally
-        // synchronous on its private serial queue, so bridge the local URL lookup here.
-        let semaphore = DispatchSemaphore(value: 0)
-        let resultLock = NSLock()
-        var lookup: Result<URL, Error>?
-        Task {
-            do {
-                let manager = AssetPackManager.shared
-                guard manager.assetPackIsAvailableLocally(withID: "BenzaPrivateVisionModels") else {
-                    throw BenzaOfflineDesignEngine.Failure.unavailable
-                }
-                let modelURL = try await manager.url(
-                    for: "App/PrivateVisionModels/Qwen3VL-2B-Instruct-Q4_K_M.gguf"
-                )
-                resultLock.lock()
-                lookup = .success(modelURL.deletingLastPathComponent())
-                resultLock.unlock()
-            } catch {
-                resultLock.lock()
-                lookup = .failure(error)
-                resultLock.unlock()
-            }
-            semaphore.signal()
-        }
-        semaphore.wait()
-        resultLock.lock()
-        defer { resultLock.unlock() }
-        guard let lookup else { throw BenzaOfflineDesignEngine.Failure.unavailable }
-        return try lookup.get()
+        // Apple-hosted packs share a logical local namespace. url(for:) is nonisolated
+        // and synchronous; downstream file verification determines whether delivery
+        // has completed without requiring the iOS 26.4-only availability convenience API.
+        let modelURL = try AssetPackManager.shared.url(
+            for: "App/PrivateVisionModels/Qwen3VL-2B-Instruct-Q4_K_M.gguf"
+        )
+        return modelURL.deletingLastPathComponent()
     }
 
     // Advancing the generation invalidates every callback from an older attempt.
