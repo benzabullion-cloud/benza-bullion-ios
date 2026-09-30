@@ -1,17 +1,53 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const html=fs.readFileSync('App/public/index.html','utf8');
-const nodes=new Map();const get=id=>{if(!nodes.has(id))nodes.set(id,{textContent:'',classList:{add(){},remove(){}}});return nodes.get(id)};
-const context=vm.createContext({document:{getElementById:get}});
-vm.runInContext('let pendingSmartCameraSuggestion=null;let smartCameraAwaitingReverse=false;'+html.slice(html.indexOf('function renderSmartCameraAnalysis('),html.indexOf('function applySmartCameraSuggestion(')),context);
-vm.runInContext('applySmartCameraSuggestion=(suggestion)=>{globalThis.review=suggestion;return true;}',context);
-let count=0;const test=(name,fn)=>{context.review=null;fn();count++;console.log('PASS',name)};
-const complete={metal:'silver',product:'American Silver Eagle',weight:1,usable:true,warnings:[],sides:1};
-test('Complete first scan goes straight to holding review',()=>{context.renderSmartCameraAnalysis(complete);assert.equal(context.review,complete)});
-test('Incomplete first side shows one reverse prompt',()=>{context.renderSmartCameraAnalysis({...complete,product:'',weight:0});assert.equal(context.review,null);assert.equal(get('smartAnalysisTitle').textContent,'One more photo');assert.equal(vm.runInContext('smartCameraAwaitingReverse',context),true)});
-test('Partial two-side result uses the normal holding form',()=>{const partial={...complete,product:'',sides:2};context.renderSmartCameraAnalysis(partial);assert.equal(context.review,partial)});
-test('Conflicting evidence never auto-fills a holding',()=>{context.renderSmartCameraAnalysis({...complete,warnings:['Conflicting metal markings'],usable:false,sides:2});assert.equal(context.review,null);assert.equal(vm.runInContext('smartCameraAwaitingReverse',context),false)});
-test('Unidentified two-side result offers fresh attempt',()=>{context.renderSmartCameraAnalysis({...complete,metal:'',product:'',weight:0,usable:false,sides:2});assert.equal(context.review,null);assert.equal(get('smartAnalysisTitle').textContent,'I couldn’t identify this confidently')});
-test('Scanner screen has no evidence, value or multi-control report',()=>{const screen=html.slice(html.indexOf('<section id="smartCameraScreen"'),html.indexOf('</section>',html.indexOf('<section id="smartCameraScreen"')));for(const removed of ['smartAnalysisChecks','smartAnalysisGrid','smartAnalysisNotes','Reset Scanner','Start New Item','Use Suggested Details'])assert.equal(screen.includes(removed),false)});
-test('Blank front produces a reverse prompt without a guessed holding',()=>{context.renderSmartCameraAnalysis({metal:'',product:'',weight:0,usable:false,warnings:[],sides:1});assert.equal(context.review,null);assert.equal(vm.runInContext('smartCameraAwaitingReverse',context),true)});
+const nodes=new Map();
+const get=id=>{
+ if(!nodes.has(id)){
+  const classes=new Set();
+  const node={value:'',hidden:false,disabled:false,textContent:'',options:[],selectedIndex:0,
+   classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x),toggle(x,on){on?classes.add(x):classes.delete(x)}},setAttribute(){}};
+  Object.defineProperty(node,'innerHTML',{set(value){this.options=[...value.matchAll(/<option>(.*?)<\/option>/g)].map(m=>({value:m[1]}));this.value=this.options[0]?.value||''}});
+  nodes.set(id,node);
+ }
+ return nodes.get(id);
+};
+let active=true,updates=0;
+const context=vm.createContext({Date,Number,console,document:{getElementById:get,querySelectorAll:()=>[]},
+ isProActive:()=>active,isBenzaNativeRuntime:()=>false,smartCameraPlugin:()=>null,
+ ensureGlobalAddPortals(){},resetProInventoryForm(){get('holdingNotes').value='';get('holdingSerial').value=''},update(){updates++},
+ addScreen:get('addScreen'),weight:get('weight'),cost:get('cost')});
+vm.runInContext(html.slice(html.indexOf('const GOLD_PRODUCTS='),html.indexOf('function ensureGlobalAddPortals(')),context);
+vm.runInContext(html.slice(html.indexOf('let pendingSmartCameraSuggestion='),html.indexOf('function clearAttachmentObjectUrls')),context);
+vm.runInContext(html.slice(html.indexOf('function syncProInventoryVisibility('),html.indexOf('function editHolding(')),context);
+let count=0;const test=(name,fn)=>{get('addScreen').classList.remove('show');fn();count++;console.log('PASS',name)};
+const scan=text=>context.interpretSmartCameraScan({text,confidence:.95,sides:2});
+const complete=scan('American Silver Eagle 1 oz Fine silver .999 2011');
+test('Complete scan stays on compact result until review is selected',()=>{
+ context.renderSmartCameraAnalysis(complete);assert.equal(get('addScreen').classList.contains('show'),false);
+ assert.equal(get('smartAnalysisTitle').textContent,'Your scan is ready');assert.equal(get('smartScanProduct').textContent,'American Silver Eagle');
+ assert.equal(get('smartAnalysisUseButton').hidden,false);assert.equal(get('smartAnalysisUseButton').disabled,false);
+});
+test('Review transfers real product, metal and weight through the real holding setup',()=>{
+ context.renderSmartCameraAnalysis(complete);context.useSmartCameraAnalysis();
+ assert.equal(get('addScreen').classList.contains('show'),true);assert.equal(get('product').value,'American Silver Eagle');
+ assert.equal(get('weight').value,1);assert.equal(get('qty').value,1);assert.equal(get('cost').value,'');
+ assert.equal(vm.runInContext('metal',context),'silver');assert.match(get('holdingNotes').value,/2011/);
+ assert.equal(get('proInventoryFields').hidden,false);assert.equal(get('proInventoryTeaser').hidden,true);
+});
+test('Screenshot regression: two-side metal-only result never opens a blank holding',()=>{
+ const partial=scan('Fine silver');context.renderSmartCameraAnalysis(partial);context.useSmartCameraAnalysis();
+ assert.equal(get('addScreen').classList.contains('show'),false);assert.equal(get('smartScanMetal').textContent,'Silver');
+ assert.equal(get('smartScanProduct').textContent,'Not identified');assert.equal(get('smartScanWeight').textContent,'Not read');
+ assert.equal(get('smartAnalysisUseButton').hidden,true);assert.equal(get('smartAnalysisUseButton').disabled,true);
+ assert.equal(get('smartAnalysisTitle').textContent,'More details needed');
+});
+test('Product without weight cannot proceed',()=>{const s=scan('American Gold Eagle');context.renderSmartCameraAnalysis(s);assert.equal(context.applySmartCameraSuggestion(s),false);assert.equal(get('addScreen').classList.contains('show'),false)});
+test('Weight and metal without product cannot proceed',()=>{const s=scan('Fine silver 1 oz');context.renderSmartCameraAnalysis(s);assert.equal(context.applySmartCameraSuggestion(s),false);assert.equal(get('addScreen').classList.contains('show'),false)});
+test('Product outside the selected metal catalog cannot proceed',()=>{assert.equal(context.applySmartCameraSuggestion({...complete,metal:'gold'}),false);assert.equal(get('addScreen').classList.contains('show'),false)});
+test('Conflicting results cannot proceed even with filled fields',()=>{assert.equal(context.applySmartCameraSuggestion({...complete,warnings:['Conflicting weight']}),false)});
+test('Blank front asks for one reverse photo',()=>{context.renderSmartCameraAnalysis({...scan(''),sides:1});assert.equal(get('smartAnalysisTitle').textContent,'One more photo');assert.equal(vm.runInContext('smartCameraAwaitingReverse',context),true)});
+test('Failed two-side scan stays on result with a fresh retry',()=>{context.renderSmartCameraAnalysis(scan(''));assert.equal(get('smartAnalysisTitle').textContent,'More details needed');assert.equal(vm.runInContext('smartCameraAwaitingReverse',context),false);assert.equal(get('addScreen').classList.contains('show'),false)});
+test('Pro access is checked again at handoff',()=>{active=false;assert.equal(context.applySmartCameraSuggestion(complete),false);active=true});
+test('Free and Pro inventory sections are mutually exclusive',()=>{active=false;context.syncProInventoryVisibility();assert.equal(get('proInventoryFields').hidden,true);assert.equal(get('proInventoryTeaser').hidden,false);active=true;context.syncProInventoryVisibility();assert.equal(get('proInventoryTeaser').hidden,true);assert.match(html,/#smartAnalysisUseButton\[hidden\],#proInventoryFields\[hidden\],#proInventoryTeaser\[hidden\]\{display:none!important\}/)});
 test('Scanner has no photo transmission or persistence path',()=>{const scanner=html.slice(html.indexOf('function smartCameraPlugin('),html.indexOf('function clearAttachmentObjectUrls'));assert.doesNotMatch(scanner,/\bfetch\s*\(|XMLHttpRequest|sendBeacon|upload|localStorage|indexedDB|sessionStorage/);const native=fs.readFileSync('App/SceneDelegate.swift','utf8');const plugin=native.slice(native.indexOf('@objc(BenzaSmartCameraPlugin)'),native.indexOf('@objc(BenzaStoreKitPlugin)'));assert.doesNotMatch(plugin,/URLSession|URLRequest|base64EncodedString|write\(to:|UserDefaults/)});
-console.log(count+' simplified-flow checks passed');
+console.log(count+' scanner review checks passed');
