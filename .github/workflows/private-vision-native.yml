@@ -53,6 +53,8 @@ jobs:
           python3 -m unittest discover -s experiments/private-vision -p 'test_*.py'
       - name: Compile actual app integration without signing or model assets
         run: xcodebuild -project App.xcodeproj -scheme App -destination 'generic/platform=iOS' -derivedDataPath /tmp/benza-camera-app CODE_SIGNING_ALLOWED=NO build
+      - name: Verify app privacy manifest is bundled
+        run: plutil -lint /tmp/benza-camera-app/Build/Products/Debug-iphoneos/App.app/PrivacyInfo.xcprivacy
 
   real_photos:
     if: github.event.repository.private == false

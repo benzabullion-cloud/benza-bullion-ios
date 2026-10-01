@@ -6905,11 +6905,18 @@ function smartCameraProductGuess(text,metal){
       : METAL_NAMES[metal]+' '+(kind==='bar'?'Bar':'Round');
   return (PRODUCT_MAP[metal]||[]).includes(name)?name:'';
 }
-const SMART_CAMERA_WEIGHT_PARSER_VERSION=3;
+const SMART_CAMERA_WEIGHT_PARSER_VERSION=4;
 const SMART_CAMERA_WEIGHT_MIN_CONFIDENCE=.5;
+function normalizeSmartCameraWeightText(value){
+  // Expand vulgar fractions BEFORE NFKD: otherwise 1½ becomes 11/2 (5.5).
+  const fractions={'½':'1/2','¼':'1/4','¾':'3/4','⅛':'1/8','⅜':'3/8','⅝':'5/8','⅞':'7/8'};
+  const expanded=String(value||'').replace(/[½¼¾⅛⅜⅝⅞]/g,(fraction,index,input)=>
+    (index>0&&/\d/.test(input[index-1])?' ':'')+fractions[fraction]);
+  return normalizeSmartCameraText(expanded,false);
+}
 function smartCameraWeightReadingLines(lines){
   const normalized=lines.filter(line=>typeof line==='string').flatMap(line=>line.split(/[\r\n]+/))
-    .map(line=>normalizeSmartCameraText(line,false));
+    .map(normalizeSmartCameraWeightText);
   const readings=[...normalized];
   // Preserve a split inscription such as SILVER 1 / OZ ARGENT PUR within
   // ONE OCR pass. An isolated number or date never joins another line's unit.
@@ -6926,12 +6933,15 @@ function smartCameraWeightTokens(text,metal){
   const words={one:1,two:2,five:5,ten:10,half:.5};
   text=text.replace(/\b(one|two|five|ten|half)\s+(troy\s+)?(ounce|ounces|oz|onza|onzas)\b/g,(_,n,t,u)=>words[n]+' '+(t||'')+u);
   const tokens=[];
-  for(const m of text.matchAll(/(?:^|\s)((?:\d+(?:\.\d+)?|\.\d+)(?:\s*\/\s*\d+)?)\s*(?:troy\s*)?(oz|ounces?|onzas?|kg|kilograms?|g|grams?|gr|lbs?|pounds?)\b/g)){
-    const parts=m[1].split('/').map(Number);let n=parts.length===2?parts[0]/parts[1]:parts[0];
+  for(const m of text.matchAll(/(?:^|\s)(\d+\s+\d+\s*\/\s*\d+|(?:\d+(?:\.\d+)?|\.\d+)(?:\s*\/\s*\d+)?)\s*(?:troy\s*)?(oz|ounces?|onzas?|kg|kilograms?|g|grams?|gr|lbs?|pounds?)\b/g)){
+    const mixed=m[1].match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)$/);
+    const parts=m[1].split('/').map(Number);
+    let n=mixed?Number(mixed[1])+Number(mixed[2])/Number(mixed[3]):parts.length===2?parts[0]/parts[1]:parts[0];
     const amount=n;
     const prefix=text.slice(0,m.index).trim();
     const explicitMass=/\b(?:weight|weighs|mass)\s*[:=]?\s*$/.test(prefix);
     let reason='';
+    if(mixed&&(!(Number(mixed[2])>0&&Number(mixed[2])<Number(mixed[3]))||![2,4,8,16].includes(Number(mixed[3]))))reason='fragment';
     if(!explicitMass&&parts.length===1&&Number.isInteger(n)&&n>=1800&&n<=2099)reason='date';
     if(!explicitMass&&parts.length===1&&/^(?:\.?9999|\.?9995|\.?999|\.?925|\.?900|\.?9167|\.?958|999\.9)$/.test(m[1]))reason='purity';
     if(/\b(?:serial|certificate|cert|number|no)\s*[:#]?\s*$/.test(prefix))reason='identifier';
@@ -8109,9 +8119,7 @@ function isAuthSessionError(error){
   return error?.status===401 || msg.includes('jwt') || msg.includes('session')&&msg.includes('expired') || msg.includes('refresh token');
 }
 async function handleExpiredSession(message='Your session expired. Please sign in again.'){
-  currentUser=null;benzaEntitlement={tier:'free',status:'inactive',expires_at:null,trial_ends_at:null};holdings=[];holdingsLoaded=false;activities=[];chartSnapshots=[];liveChartPoints=[];liveCloudLoaded=false;lastLiveCloudSync=0;
-  updateWelcomeBack();renderHoldings();renderActivity();
-  try{document.getElementById('settingsScreen')?.classList.remove('show');}catch(_){}
+  clearBenzaAccountState();
   const auth=document.getElementById('authScreen');if(auth)auth.style.display='flex';
   const status=document.getElementById('authStatus');if(status)status.textContent='';
   setAuthError(message);
@@ -8304,7 +8312,9 @@ async function onSignedIn(){
 }
 async function loadHoldingsFromSupabase(){
   if(!supabaseClient||!currentUser){updateProIntegratedUI();return;}
+  const userId=currentUser.id;
   const {data,error}=await supabaseClient.from('holdings').select('*').order('created_at',{ascending:false});
+  if(currentUser?.id!==userId)return;
   if(error){if(isAuthSessionError(error)){await handleExpiredSession();return} console.warn('Holdings unavailable:',error.message);setConnectionBanner(navigator.onLine?'Could not refresh holdings. Showing saved data.':'You’re offline. Showing saved data.');return}
   holdings=(data||[]).map(h=>({id:h.id,metal:h.metal,product:h.product,qty:Number(h.quantity)||0,weight:Number(h.weight_oz)||0,oz:Number(h.total_oz)||0,cost:Number(h.cost_basis)||0,date:h.purchase_date,year:h.bullion_year||null,purity:h.purity||'',mint:h.mint||'',serial:h.serial_number||'',notes:h.notes||'',photoPath:h.photo_path||null,receiptPath:h.receipt_path||null,scannerPhotoPaths:Array.isArray(h.scanner_photo_paths)?h.scanner_photo_paths:[]}));
   holdingsLoaded=true;
@@ -8312,9 +8322,11 @@ async function loadHoldingsFromSupabase(){
 }
 async function loadActivityFromSupabase(){
   if(!supabaseClient||!currentUser)return;
+  const userId=currentUser.id;
   const state=document.getElementById('activityLoadState');
   if(state)state.classList.remove('show');
   const {data,error}=await supabaseClient.from('transactions').select('*').order('created_at',{ascending:false});
+  if(currentUser?.id!==userId)return;
   if(error){
     if(isAuthSessionError(error)){await handleExpiredSession();return}
     console.warn('Activity unavailable:',error.message);
@@ -8358,6 +8370,21 @@ function closeActivity(){
   setSettingsTab('settings');
 }
 
+function clearBenzaAccountState(){
+  currentUser=null;
+  benzaEntitlement={tier:'free',status:'inactive',expires_at:null,trial_ends_at:null};
+  holdings=[];holdingsLoaded=false;activities=[];chartSnapshots=[];liveChartPoints=[];
+  liveCloudLoaded=false;lastLiveCloudSync=0;
+  benzaWatchlist=[];
+  benzaNotificationPrefs={...DEFAULT_NOTIFICATION_PREFS};
+  closeSmartCamera();closeAdd();closeAddChoice();closeProUpgrade();
+  resetProInventoryForm();resetBullionDetails();
+  hideMainOverlays();
+  document.querySelectorAll('.modal.show').forEach(node=>node.classList.remove('show'));
+  document.body.style.overflow='';
+  updateWelcomeBack();renderHoldings();renderActivity();renderMarketsWatchlist();
+  renderNotificationPreferences();updateProIntegratedUI();setActiveNav('portfolio');
+}
 async function signOut(){
   try{
     if(isBenzaNativeRuntime()&&supabaseClient&&currentUser){
@@ -8367,11 +8394,7 @@ async function signOut(){
     console.warn('Could not detach this iPhone from the signed-out account:',e?.message||e);
   }
   if(supabaseClient) await supabaseClient.auth.signOut();
-  currentUser=null;
-  benzaEntitlement={tier:'free',status:'inactive',expires_at:null,trial_ends_at:null};
-  updateWelcomeBack();
-  holdings=[];holdingsLoaded=false;activities=[];chartSnapshots=[];liveChartPoints=[];liveCloudLoaded=false;lastLiveCloudSync=0;
-  renderHoldings();renderActivity();updateProIntegratedUI();
+  clearBenzaAccountState();
   document.getElementById('authScreen').style.display='flex';
   document.getElementById('authStatus').textContent='';
   setAuthError('');
@@ -9963,11 +9986,14 @@ async function optimizePrivateImage(file,kind){
 async function uploadPrivateHoldingFile(file,kind){
   if(!file)return null;
   if(!isProActive())throw new Error('Benza Bullion Pro is required for private inventory files.');
+  const userId=currentUser?.id;
+  if(!userId)throw new Error('Please sign in before adding private files.');
   file=await optimizePrivateImage(file,kind);
+  if(currentUser?.id!==userId)throw new Error('The account changed before this file could be saved.');
   const max=8*1024*1024;
   if(file.size>max)throw new Error('Files must be 8 MB or smaller.');
   const token=(crypto?.randomUUID?.()||String(Date.now())+Math.random().toString(36).slice(2));
-  const path=`${currentUser.id}/inventory/${token}/${kind}-${safeUploadName(file.name)}`;
+  const path=`${userId}/inventory/${token}/${kind}-${safeUploadName(file.name)}`;
   const {error}=await supabaseClient.storage.from('holding-documents').upload(path,file,{upsert:false,contentType:file.type||undefined});
   if(error)throw error;
   return path;
@@ -10033,6 +10059,10 @@ async function finishScannerPhotoUploads(holdingId,files=[]){
     const {data:response,error}=await supabaseClient.rpc('benza_update_scanner_photos',{p_holding_id:holdingId,p_paths:uploaded});
     const data=Array.isArray(response)?response[0]:response;
     if(error)throw error;
+    if(data?.id!==holdingId||!Array.isArray(data.scanner_photo_paths)||
+      uploaded.some(path=>!data.scanner_photo_paths.includes(path))){
+      throw new Error('The scanner photo update completed without a valid response.');
+    }
     const local=holdings.find(h=>h.id===holdingId);
     if(local){
       local.scannerPhotoPaths=Array.isArray(data?.scanner_photo_paths)?data.scanner_photo_paths:uploaded;
@@ -10075,6 +10105,7 @@ async function saveHolding(){
   const receiptFile=proActive?document.getElementById('holdingReceipt')?.files?.[0]:null;
   const scannerPhotoFiles=proActive?pendingScannerPhotoFiles.slice():[];
   const originalHolding=editingHoldingIndex!==null?holdings[editingHoldingIndex]:null;
+  const userId=currentUser?.id;
   const portfolioValueBeforeMutation=currentPortfolioMarketValue();
 
   if(!Number.isFinite(q)||q<=0||q>100000){alert('Enter a quantity greater than 0.');return}
@@ -10113,7 +10144,7 @@ async function saveHolding(){
         p_holding_id:existing.id,
         ...commonArgs
       });
-
+      if(currentUser?.id!==userId)return;
       if(error){
         if(isAuthSessionError(error)){await handleExpiredSession();return}
         alert(friendlyErrorMessage(error,'We could not update this holding. Please try again.'));
@@ -10162,7 +10193,7 @@ async function saveHolding(){
     }
 
     const {data,error}=await supabaseClient.rpc('benza_add_holding_details',commonArgs);
-
+    if(currentUser?.id!==userId)return;
     if(error){
       if(isAuthSessionError(error)){await handleExpiredSession();return}
       alert(friendlyErrorMessage(error,'We could not save this holding. Please try again.'));
@@ -10203,6 +10234,10 @@ async function saveHolding(){
       .then(()=>recordPortfolioSnapshot(true))
       .then(()=>{renderActivity();})
       .catch(()=>{});
+  }catch(error){
+    if(isAuthSessionError(error)){await handleExpiredSession();return;}
+    console.warn('Holding save failed:',error);
+    alert(friendlyErrorMessage(error,'We could not save this holding. Please try again.'));
   }finally{
     setButtonBusy(button,false);
   }
@@ -10282,15 +10317,16 @@ function mergeLiveChartPoints(...groups){
 
 async function loadLiveChartFromCloud(){
   if(!supabaseClient||!currentUser||liveCloudLoaded)return;
+  const userId=currentUser.id;
   liveCloudLoaded=true;
 
   try{
     const {data,error}=await supabaseClient
       .from('live_chart_state')
       .select('points,updated_at')
-      .eq('user_id',currentUser.id)
+      .eq('user_id',userId)
       .maybeSingle();
-
+    if(currentUser?.id!==userId)return;
     if(error){
       if(isAuthSessionError(error)){await handleExpiredSession();return}
       console.warn('LIVE chart cloud restore unavailable:',error.message);
@@ -10601,6 +10637,7 @@ async function loadPortfolioSnapshots(range=activeChartRange){
     return;
   }
 
+  const userId=currentUser.id;
   let query=supabaseClient
     .from('portfolio_snapshots')
     .select('captured_at,total_value')
@@ -10611,7 +10648,7 @@ async function loadPortfolioSnapshots(range=activeChartRange){
   if(start)query=query.gte('captured_at',start.toISOString());
 
   const {data,error}=await query;
-
+  if(currentUser?.id!==userId)return;
   if(error){
     if(isAuthSessionError(error)){await handleExpiredSession();return}
     console.warn('Portfolio history unavailable:',error.message);
@@ -11182,15 +11219,9 @@ async function deleteBenzaAccount(){
     }
 
     try{await supabaseClient.auth.signOut({scope:'local'});}catch(_){}
-    currentUser=null;
-    holdings=[];
-    activities=[];
-    chartSnapshots=[];
+    try{localStorage.removeItem(benzaWatchlistStorageKey());}catch(_){}
+    clearBenzaAccountState();
     localStorage.removeItem('benzaWatchlist');
-    updateWelcomeBack();
-    renderHoldings();
-    renderActivity();
-    closeSettings();
     document.getElementById('authScreen').style.display='flex';
     document.getElementById('authStatus').textContent='';
     setAuthError('');
@@ -11306,25 +11337,32 @@ const MARKETS_META={
   platinum:{name:'Platinum',symbol:'XPT',unit:'troy oz'},palladium:{name:'Palladium',symbol:'XPD',unit:'troy oz'},
   copper:{name:'Copper',symbol:'HG',unit:'avoirdupois oz'}
 };
+function benzaWatchlistStorageKey(){
+  return currentUser?.id?'benzaWatchlist:'+currentUser.id:'';
+}
 async function loadBenzaWatchlist(){
+  const userId=currentUser?.id;
+  const key=benzaWatchlistStorageKey();
   let local=[];
-  try{const v=JSON.parse(localStorage.getItem('benzaWatchlist')||'[]');local=Array.isArray(v)?v:[]}catch(e){local=[]}
+  try{const v=key?JSON.parse(localStorage.getItem(key)||'[]'):[];local=Array.isArray(v)?v.filter(x=>x&&MARKETS_META[x.metal]&&Number(x.target)>0):[]}catch(e){local=[]}
   benzaWatchlist=local;
   if(!supabaseClient||!currentUser){renderMarketsWatchlist();return}
   try{
     const {data,error}=await supabaseClient.from('price_alerts').select('metal,target,direction').eq('enabled',true).order('created_at',{ascending:true});
+    if(currentUser?.id!==userId)return;
     if(error)throw error;
-    if((data||[]).length){
-      benzaWatchlist=data.map(x=>({metal:x.metal,target:Number(x.target)||0,direction:x.direction==='lower'?'lower':'higher'}));
-    }else if(local.length){
-      const rows=local.filter(x=>MARKETS_META[x.metal]&&Number(x.target)>0).map(x=>({user_id:currentUser.id,metal:x.metal,target:Number(x.target),direction:x.direction==='lower'?'lower':'higher',enabled:true}));
-      if(rows.length)await supabaseClient.from('price_alerts').upsert(rows,{onConflict:'user_id,metal,direction'});
-    }
+    // A successful cloud read is authoritative, including an empty list.
+    // Never recreate deleted targets or import another account's legacy cache.
+    benzaWatchlist=(data||[]).filter(x=>MARKETS_META[x.metal]&&Number(x.target)>0)
+      .map(x=>({metal:x.metal,target:Number(x.target),direction:x.direction==='lower'?'lower':'higher'}));
     persistBenzaWatchlist();
   }catch(e){console.warn('Cloud watchlist unavailable; using this device:',e?.message||e)}
   renderMarketsWatchlist();
 }
-function persistBenzaWatchlist(){localStorage.setItem('benzaWatchlist',JSON.stringify(benzaWatchlist))}
+function persistBenzaWatchlist(){
+  const key=benzaWatchlistStorageKey();
+  if(key)try{localStorage.setItem(key,JSON.stringify(benzaWatchlist));}catch(e){console.warn('Watchlist device cache unavailable:',e);}
+}
 async function syncWatchItemToSupabase(item){
   if(!supabaseClient||!currentUser)return;
   const {error}=await supabaseClient.from('price_alerts').upsert({user_id:currentUser.id,metal:item.metal,target:Number(item.target),direction:item.direction==='lower'?'lower':'higher',enabled:true,is_triggered:false},{onConflict:'user_id,metal,direction'});
@@ -11415,8 +11453,10 @@ function renderNotificationPreferences(){
 async function loadNotificationPreferences(){
   renderNotificationPreferences();
   if(!supabaseClient||!currentUser)return;
+  const userId=currentUser.id;
   const tz=detectedBenzaTimezone();
-  const {data,error}=await supabaseClient.from('notification_preferences').select('*').eq('user_id',currentUser.id).maybeSingle();
+  const {data,error}=await supabaseClient.from('notification_preferences').select('*').eq('user_id',userId).maybeSingle();
+  if(currentUser?.id!==userId)return;
   if(error){
     if(String(error.code||'')!=='PGRST116')console.warn('Could not load notification preferences:',error.message||error);
     renderNotificationPreferences();return;
@@ -11424,11 +11464,12 @@ async function loadNotificationPreferences(){
   if(data){
     benzaNotificationPrefs={...DEFAULT_NOTIFICATION_PREFS,...data,timezone:data.timezone||tz};
     if(!data.timezone||data.timezone!==tz){
-      supabaseClient.from('notification_preferences').update({timezone:tz,updated_at:new Date().toISOString()}).eq('user_id',currentUser.id).then(()=>{});
+      supabaseClient.from('notification_preferences').update({timezone:tz,updated_at:new Date().toISOString()}).eq('user_id',userId).then(()=>{});
     }
   }else{
     benzaNotificationPrefs={...DEFAULT_NOTIFICATION_PREFS,timezone:tz};
-    const {error:insertError}=await supabaseClient.from('notification_preferences').insert({user_id:currentUser.id,...benzaNotificationPrefs});
+    const {error:insertError}=await supabaseClient.from('notification_preferences').insert({user_id:userId,...benzaNotificationPrefs});
+    if(currentUser?.id!==userId)return;
     if(insertError)console.warn('Could not create notification preferences:',insertError.message||insertError);
   }
   renderNotificationPreferences();
@@ -11548,8 +11589,11 @@ async function saveNativeBenzaSubscription(token){
 }
 async function removeNativeBenzaSubscriptions(){
   if(!supabaseClient||!currentUser)return;
+  const userId=currentUser.id;
+  const state=await nativeBenzaNotifications()?.status();
+  if(currentUser?.id!==userId||!state?.token)return;
   const {error}=await supabaseClient.from('notification_subscriptions')
-    .delete().eq('user_id',currentUser.id).like('endpoint','apns:%');
+    .delete().eq('user_id',userId).eq('endpoint',nativeBenzaEndpoint(state.token));
   if(error)throw error;
 }
 async function updateNotificationUI(message=''){
