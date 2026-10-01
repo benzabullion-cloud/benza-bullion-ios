@@ -81,3 +81,6 @@ test('Successful result hides diagnostics',()=>{
  context.renderSmartCameraAnalysis(complete);assert.equal(get('smartCameraDiagnostics').hidden,true);
 });
 console.log(count+' scanner review checks passed');
+
+test('First photo is acknowledged and both sources request opposite side',()=>{context.renderSmartCameraAnalysis({...scan('Fine silver'),sides:1});assert.match(get('smartAnalysisSub').textContent,/First photo received/);assert.equal(get('smartCameraProButton').textContent,'Scan Opposite Side');assert.equal(get('smartCameraLibraryButton').textContent,'Choose Opposite Side Photo')});
+test('Second photo restores fresh scan choices',()=>{context.renderSmartCameraAnalysis(scan('Fine silver'));assert.equal(get('smartCameraProButton').textContent,'Scan again');assert.equal(get('smartCameraLibraryButton').textContent,'Choose Bullion Photo')});
