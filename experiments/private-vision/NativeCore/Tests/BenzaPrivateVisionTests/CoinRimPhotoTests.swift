@@ -11,8 +11,25 @@ final class CoinRimPhotoTests: XCTestCase {
             bytesPerRow: 32, space: CGColorSpaceCreateDeviceGray(), bitmapInfo: 0)!
         XCTAssertTrue(BenzaCoinRim.readingImages(context.makeImage()!, isCanceled: { true }).isEmpty)
     }
+    func testGenericCoinOutlineAndRectification() throws {
+        let context = try XCTUnwrap(CGContext(data: nil, width: 800, height: 1000, bitsPerComponent: 8,
+            bytesPerRow: 800, space: CGColorSpaceCreateDeviceGray(), bitmapInfo: 0))
+        context.setFillColor(gray: 1, alpha: 1)
+        context.fill(CGRect(x: 0,y: 0,width: 800,height: 1000))
+        context.setStrokeColor(gray: 0, alpha: 1)
+        context.setLineWidth(4)
+        context.strokeEllipse(in: CGRect(x: 100,y: 200,width: 600,height: 600))
+        let image = try XCTUnwrap(context.makeImage())
+        let strips = BenzaCoinRim.readingImages(image, maximumCandidates: 1)
+        XCTAssertEqual(strips.count, 2)
+        XCTAssertTrue(strips.allSatisfy { $0.width > $0.height && $0.height >= 80 })
+    }
     func testActualMapleInscriptionsAndTiming() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures")
+        guard FileManager.default.fileExists(atPath: root.appendingPathComponent("maple-obverse.b64").path),
+              FileManager.default.fileExists(atPath: root.appendingPathComponent("maple-reverse.b64").path) else {
+            throw XCTSkip("Real-photo fixtures require explicit publication authorization; no accuracy claim from this CI run.")
+        }
         var report: [[String: Any]] = []
         for side in ["obverse", "reverse"] {
             let encoded = try String(contentsOf: root.appendingPathComponent("maple-\(side).b64"))
