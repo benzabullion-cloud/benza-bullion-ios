@@ -36,7 +36,14 @@ final class NativeBoundaryTests: XCTestCase {
         XCTAssertEqual(try BenzaDesignIdentity.parse("```json\n{\"design_id\":\"canadian_maple_leaf\"}\n```").design, .canadianMapleLeaf)
     }
 
-    func testExactAmericanEagleDesignIDsParse() throws {\n        XCTAssertEqual(try BenzaDesignIdentity.parse(#"{\"design_id\":\"american_silver_eagle\"}"#).design, .americanSilverEagle)\n        XCTAssertEqual(try BenzaDesignIdentity.parse(#"{\"design_id\":\"american_gold_eagle\"}"#).design, .americanGoldEagle)\n        XCTAssertEqual(try BenzaDesignIdentity.parse(#"{\"design_id\":\"american_platinum_eagle\"}"#).design, .americanPlatinumEagle)\n        XCTAssertEqual(try BenzaDesignIdentity.parse(#"{\"design_id\":\"american_palladium_eagle\"}"#).design, .americanPalladiumEagle)\n    }\n\n    func testCanceledHandleCannotStartOrBeReused() throws {
+    func testExactAmericanEagleDesignIDsParse() throws {
+        XCTAssertEqual(try BenzaDesignIdentity.parse(#"{"design_id":"american_silver_eagle"}"#).design, .americanSilverEagle)
+        XCTAssertEqual(try BenzaDesignIdentity.parse(#"{"design_id":"american_gold_eagle"}"#).design, .americanGoldEagle)
+        XCTAssertEqual(try BenzaDesignIdentity.parse(#"{"design_id":"american_platinum_eagle"}"#).design, .americanPlatinumEagle)
+        XCTAssertEqual(try BenzaDesignIdentity.parse(#"{"design_id":"american_palladium_eagle"}"#).design, .americanPalladiumEagle)
+    }
+
+    func testCanceledHandleCannotStartOrBeReused() throws {
         let handle = try XCTUnwrap(benza_scan_create())
         defer { XCTAssertEqual(benza_scan_destroy(handle), 0) }
         benza_scan_cancel(handle)
