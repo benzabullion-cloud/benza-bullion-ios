@@ -108,6 +108,31 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
    assert.equal(context.canUseSmartCameraSuggestion(pending()),false);
    assert.equal(context.applySmartCameraSuggestion(pending()),true);assert.equal(get('weight').value,'');
  });
+ await test('Build 87 weak direct gram reading invokes refinement instead of declaring ready',async()=>{
+   reset();vm.runInContext('smartCameraScanning=false',context);let refinements=0;
+   const observed={id:3,confidence:.7666667302449545,observations:[
+     {text:'CANADA 9999 FINE SILVER',confidence:1},{text:'666 G ARGENT PUR',confidence:.30000001192092896}
+   ]};
+   plugin.refine=async()=>{refinements++;return {passes:[{id:4,confidence:.95,observations:[
+     {text:'CANADA 9999 FINE SILVER 1 OZ ARGENT PUR',confidence:.95}
+   ]}],elapsedMs:1200}};
+   queued.push({lines:['CHARLES III 2026'],confidence:.95},{passes:[observed],appBuild:'87',confidence:.95,elapsedMs:722});
+   await context.runSmartCameraScan();await context.runSmartCameraScan(true);
+   assert.equal(refinements,1);assert.equal(pending().weight,1);assert.equal(context.canUseSmartCameraSuggestion(pending()),true);
+   assert.equal(vm.runInContext('smartCameraLastDiagnostic.elapsedMs',context),1922);
+   delete plugin.refine;
+ });
+ await test('Unrecovered weak weight stays blank and diagnostics explain its rejection',async()=>{
+   reset();vm.runInContext('smartCameraScanning=false',context);
+   queued.push({passes:[{id:3,confidence:.7666667302449545,observations:[
+     {text:'CANADA 9999 FINE SILVER',confidence:1},{text:'666 G ARGENT PUR',confidence:.30000001192092896}
+   ]}],appBuild:'87',confidence:.95});
+   await context.runSmartCameraScan();assert.equal(pending().weight,0);
+   const diagnostic=vm.runInContext('smartCameraLastDiagnostic',context);
+   assert.equal(diagnostic.weightPasses[0].rejectedReasons.lowConfidence,1);
+   assert.equal(diagnostic.weightPasses[0].weightsOz.length,0);assert.equal(diagnostic.weightPasses[0].direct.length,0);
+   assert.equal(context.applySmartCameraSuggestion(pending()),true);assert.equal(get('weight').value,'');
+ });
  console.log(count+' scanner flow checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1});
 
