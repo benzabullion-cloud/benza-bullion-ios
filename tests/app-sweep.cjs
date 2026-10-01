@@ -64,7 +64,7 @@ window.supabase={createClient:()=>({
   // Reproduce delayed responses from account A after B signs in.
   const stale=await page.evaluate(async()=>{
    const original=supabaseClient;const callbacks=[];
-   supabaseClient={from:()=>({select(){return this},order(){return this},then(resolve){callbacks.push(resolve)}})};
+   supabaseClient={from:()=>({select(){return this},order(){return this},range(){return this},then(resolve){callbacks.push(resolve)}})};
    const a=loadHoldingsFromSupabase(),b=loadActivityFromSupabase();
    await new Promise(resolve=>setTimeout(resolve,0));currentUser={id:'account-b'};holdings=[];activities=[];
    if(callbacks.length<2)throw Error('Delayed account query fixture was not initialized');
