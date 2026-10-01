@@ -9059,12 +9059,12 @@ function proHoldingInsightHtml(h){
 
 
 function proInventoryMetaHtml(h){
+  if(!isProActive())return '';
   const chips=[];
   if(h.year)chips.push(`<span class="inventoryChip">Year: ${escapeBullionHtml(String(h.year))}</span>`);
   if(h.purity)chips.push(`<span class="inventoryChip">${escapeBullionHtml(h.purity)}</span>`);
   if(h.mint)chips.push(`<span class="inventoryChip">${escapeBullionHtml(h.mint)}</span>`);
   if(h.serial)chips.push(`<span class="inventoryChip">Serial: ${escapeBullionHtml(h.serial)}</span>`);
-  if(!isProActive())return chips.length?`<div class="inventoryMeta">${chips.join('')}</div>`:'';
   if(h.notes)chips.push(`<span class="inventoryChip" title="${escapeBullionHtml(h.notes)}">Notes saved</span>`);
   if(h.photoPath)chips.push(`<button class="inventoryChip link" type="button" onclick="event.stopPropagation();openPrivateHoldingFile('${encodeURIComponent(h.photoPath)}'.split('%2F').join('/'))">View photo</button>`);
   (h.scannerPhotoPaths||[]).forEach((path,index)=>chips.push(`<button class="inventoryChip link" type="button" onclick="event.stopPropagation();openPrivateHoldingFile('${encodeURIComponent(path)}'.split('%2F').join('/'))">Scan photo ${index+1}</button>`));
