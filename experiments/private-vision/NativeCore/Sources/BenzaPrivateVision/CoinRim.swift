@@ -86,16 +86,17 @@ public enum BenzaCoinRim {
         guard drawn else { return nil }
         let rx = Double(box.width)*Double(w)/2, ry = Double(box.height)*Double(h)/2
         let cx = Double(box.midX)*Double(w), cy = (1-Double(box.midY))*Double(h)
-        let outWidth = min(2800, max(800, Int(2*Double.pi*max(rx,ry)*1.15)))
-        let outHeight = max(80, Int(max(rx,ry)*0.44))
+        let outWidth = min(2800, max(800, Int(2*Double.pi*max(rx,ry)*0.60)))
+        let outHeight = max(80, Int(max(rx,ry)*0.30))
         var output = [UInt8](repeating: 255, count: outWidth*outHeight)
         for x in 0..<outWidth {
-            // Extra 15% of a turn preserves words crossing the strip seam.
+            // Overlapping upper/lower arcs keep upright text separate from the
+            // opposite half's upside-down lettering and central artwork.
             let progress = Double(x)/Double(outWidth-1)
-            let theta = -Double.pi + (reverse ? -1 : 1)*progress*2*Double.pi*1.15
+            let theta = -Double.pi + (reverse ? 1 : -1)*Double.pi*0.10 + (reverse ? -1 : 1)*progress*2*Double.pi*0.60
             for y in 0..<outHeight {
                 let fraction = Double(y)/Double(outHeight-1)
-                let radius = reverse ? 0.58+fraction*0.44 : 1.02-fraction*0.44
+                let radius = reverse ? 0.72+fraction*0.30 : 1.02-fraction*0.30
                 let sx = cx+rx*radius*cos(theta), sy = cy+ry*radius*sin(theta)
                 let ix = Int(sx), iy = Int(sy)
                 guard ix>=0, iy>=0, ix+1<w, iy+1<h else { continue }
