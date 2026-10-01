@@ -1,7 +1,11 @@
 import Foundation
 
 public enum BenzaDesign: String, Sendable {
-    case americanEagle = "american_eagle"
+    case americanEagle = "american_eagle" // legacy broad ID accepted for compatibility
+    case americanSilverEagle = "american_silver_eagle"
+    case americanGoldEagle = "american_gold_eagle"
+    case americanPlatinumEagle = "american_platinum_eagle"
+    case americanPalladiumEagle = "american_palladium_eagle"
     case americanBuffalo = "american_buffalo"
     case canadianMapleLeaf = "canadian_maple_leaf"
     case britannia = "britannia"
@@ -40,7 +44,7 @@ public struct BenzaDesignIdentity: Sendable {
             text = String(text.dropFirst(8).dropLast(4)).trimmingCharacters(in: .whitespacesAndNewlines)
         }
         // Exact one-field grammar rejects duplicate keys and escaped/injected IDs.
-        let pattern = #"\A\s*\{\s*"design_id"\s*:\s*"(american_eagle|american_buffalo|canadian_maple_leaf|britannia|philharmonic|kangaroo|lunar|panda|libertad|krugerrand|kookaburra|koala|noahs_ark|somali_elephant|platinum_noble|palladium_ballerina|morgan_dollar|peace_dollar|walking_liberty_half_dollar|generic_bar|generic_round|unknown)"\s*\}\s*\z"#
+        let pattern = #"\A\s*\{\s*"design_id"\s*:\s*"(american_eagle|american_silver_eagle|american_gold_eagle|american_platinum_eagle|american_palladium_eagle|american_buffalo|canadian_maple_leaf|britannia|philharmonic|kangaroo|lunar|panda|libertad|krugerrand|kookaburra|koala|noahs_ark|somali_elephant|platinum_noble|palladium_ballerina|morgan_dollar|peace_dollar|walking_liberty_half_dollar|generic_bar|generic_round|unknown)"\s*\}\s*\z"#
         let expression = try NSRegularExpression(pattern: pattern)
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
         guard let match = expression.firstMatch(in: text, range: range),
