@@ -58,7 +58,7 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
    queued.push({lines:[],confidence:0});await context.runSmartCameraScan();assert.equal(refinements,0);assert.equal(pending().sides,1);
    delete plugin.refine;
  });
- await test('Unresolved second side requests one refinement and retains captured photo',async()=>{
+ await test('Unresolved second side requests one refinement and adds processing times',async()=>{
    let refinements=0;plugin.refine=async()=>{refinements++;return {text:'CANADA FINE SILVER 1 OZ 9999',confidence:.95,elapsedMs:500}};
    queued.push({text:'2022',confidence:.9},{text:'FINE SILVER',confidence:.95,elapsedMs:120});
    await context.runSmartCameraScan();await context.runSmartCameraScan(true);
@@ -71,7 +71,7 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
    queued.push({text:'2022',confidence:.9},{text:'FINE SILVER',confidence:.95});
    await context.runSmartCameraScan();const before=pending();const second=context.runSmartCameraScan(true);
    await new Promise(resolve=>setImmediate(resolve));context.closeSmartCamera();
-   done({text:'CANADA FINE SILVER 1 OZ',confidence:.95});await second;assert.equal(pending(),before);
+   done({text:'CANADA FINE SILVER 1 OZ',confidence:.95});await second;assert.equal(pending(),null);
    delete plugin.refine;
  });
  console.log(count+' scanner flow checks passed');
