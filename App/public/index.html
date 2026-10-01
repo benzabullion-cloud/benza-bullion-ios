@@ -7085,6 +7085,27 @@ function selectSmartCameraPhotoEvidence(result){
     if(next.warnings.length>reading.warnings.length)continue;
     accepted.push(c);reading=next;
   }
+
+  // Rim OCR often splits identity, metal and weight across different crops. Preserve
+  // high-value bullion inscriptions from otherwise weaker compatible passes, then
+  // accept the union only when it adds no conflict. This generalizes to sovereign
+  // coins and bars instead of special-casing one product at a time.
+  const bullionEvidenceRx=/\b(?:canada|britannia|krugerrand|philharmoniker|australia|kangaroo|kookaburra|koala|panda|libertad|sovereign|buffalo|eagle|noah|elephant|pamp|valcambi|engelhard|johnson matthey|scottsdale|sunshine|asahi|geiger|heraeus|fine\s+(?:gold|silver|platinum|palladium|copper)|argent pur|or pur|plata pura|oro puro|feinsilber|feingold|\d+(?:\.\d+)?\s*(?:troy\s*)?(?:oz|ounce|ounces|g|gram|grams|kg|lb|lbs)|9999|9995|999\.9|\.999|\.9995|\.9999)\b/i;
+  const evidenceLines=[...new Set(candidates.flatMap(c=>c.photo.lines).filter(line=>bullionEvidenceRx.test(line)))];
+  if(evidenceLines.length){
+    const unionLines=[...new Set(accepted.flatMap(c=>c.photo.lines).concat(evidenceLines,cautionLines))];
+    const union=interpretSmartCameraScan({...result,lines:unionLines,confidence:primary.photo.confidence});
+    if(union.warnings.length<=reading.warnings.length&&compatible(reading,union)){
+      reading=union;
+      const selected=new Set(accepted.map(c=>c.id));
+      for(const candidate of candidates){
+        if(candidate.photo.lines.some(line=>evidenceLines.includes(line)))selected.add(candidate.id);
+      }
+      for(const candidate of candidates){
+        if(selected.has(candidate.id)&&!accepted.includes(candidate))accepted.push(candidate);
+      }
+    }
+  }
   const lines=[...new Set(accepted.flatMap(c=>c.photo.lines).concat(cautionLines))];
   return {...result,lines,text:lines.join('\n'),confidence:primary.photo.confidence,
     selectedPasses:accepted.length,rejectedPasses:result.passes.length-accepted.length};
