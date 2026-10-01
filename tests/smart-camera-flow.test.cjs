@@ -90,5 +90,24 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
    assert.equal(context.applySmartCameraSuggestion(scan),true);assert.equal(get('weight').value,'');
    assert.match(get('holdingDetailsHint').textContent,/Different weights/);
  });
+ await test('Real two-photo handoff cannot combine rim digits with another pass unit',async()=>{
+   reset();vm.runInContext('smartCameraScanning=false',context);
+   const pass=text=>({observations:[{text,confidence:.95}],confidence:.95});
+   queued.push({passes:[pass('CHARLES III 5 DOLLARS 2026')],confidence:.95},
+     {passes:[pass('CANADA 9999 FINE SILVER 666'),pass('G ARGENT PUR')],confidence:.95});
+   await context.runSmartCameraScan();await context.runSmartCameraScan(true);
+   assert.equal(pending().product,'Canadian Silver Maple Leaf');assert.equal(pending().weight,1);
+   assert.equal(pending().inferredWeight,true);
+   // The value comes from the independently matched $5 specification, never 666 G.
+   assert.equal(context.applySmartCameraSuggestion(pending()),true);assert.equal(Number(get('weight').value),1);
+ });
+ await test('A false year-unit reading stays blank through actual scanner-to-holding flow',async()=>{
+   reset();vm.runInContext('smartCameraScanning=false',context);queued.push({lines:['BRITANNIA FINE GOLD','2026 OZ'],confidence:.95});
+   await context.runSmartCameraScan();
+   assert.equal(pending().weight,0);assert.equal(pending().year,2026);
+   assert.equal(context.canUseSmartCameraSuggestion(pending()),false);
+   assert.equal(context.applySmartCameraSuggestion(pending()),true);assert.equal(get('weight').value,'');
+ });
  console.log(count+' scanner flow checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1});
+

@@ -6790,7 +6790,7 @@ const SMART_CAMERA_CATALOG=[
     }
   }
 })();
-function normalizeSmartCameraText(value){
+function normalizeSmartCameraText(value,joinYearDigits=true){
   let text=String(value||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
     .replace(/[’‘]/g,"'").replace(/[½¼]/g,c=>c==='½'?'1/2':'1/4')
     .replace(/⁄/g,'/').replace(/[^\p{L}0-9.$%/#:\-\s]/gu,' ').replace(/\s+/g,' ').trim();
@@ -6798,10 +6798,10 @@ function normalizeSmartCameraText(value){
   for(const [pattern,word] of SMART_CAMERA_WORD_REPAIRS){
     text=text.replace(pattern,word);
   }
-  return text.replace(/\b(?:silv|silvr|stlver|stlvern|silvern|s1lver)\b/g,'silver')
+  text=text.replace(/\b(?:silv|silvr|stlver|stlvern|silvern|s1lver)\b/g,'silver')
     .replace(/\b(?:sine|f1ne)\s+(silver|gold)\b/g,'fine $1')
-    .replace(/\bo\s*z\b|\b(?:o[z2]|0z)\b/g,'oz')
-    .replace(/\b([12])\s+(\d)\s+(\d)\s+(\d)\b/g,'$1$2$3$4');
+    .replace(/\bo\s*z\b|\b(?:o[z2]|0z)\b/g,'oz');
+  return joinYearDigits?text.replace(/\b([12])\s+(\d)\s+(\d)\s+(\d)\b/g,'$1$2$3$4'):text;
 }
 function smartCameraMetalEvidence(text){
   const patterns={gold:/\bgold\b|\bau\b|\boro puro\b|\bor pur\b|\bfeingold\b|\b(?:22|24)\s*(?:k|karat|carat)\b/,
@@ -6905,17 +6905,49 @@ function smartCameraProductGuess(text,metal){
       : METAL_NAMES[metal]+' '+(kind==='bar'?'Bar':'Round');
   return (PRODUCT_MAP[metal]||[]).includes(name)?name:'';
 }
-function smartCameraWeightCandidates(text,metal){
+const SMART_CAMERA_WEIGHT_PARSER_VERSION=2;
+function smartCameraWeightReadingLines(lines){
+  const normalized=lines.filter(line=>typeof line==='string').flatMap(line=>line.split(/[\r\n]+/))
+    .map(line=>normalizeSmartCameraText(line,false));
+  const readings=[...normalized];
+  // Preserve a split inscription such as SILVER 1 / OZ ARGENT PUR within
+  // ONE OCR pass. An isolated number or date never joins another line's unit.
+  for(let i=0;i+1<normalized.length;i++){
+    if(/\b(?:gold|silver|platinum|palladium|copper|weight|mass)\s+(?:\d+(?:\.\d+)?(?:\s*\/\s*\d+)?|one|two|five|ten|half)$/.test(normalized[i])&&
+      /^(?:troy\s+)?(?:oz|ounces?|onzas?|kg|kilograms?|g|grams?|gr|lbs?|pounds?)\b/.test(normalized[i+1])){
+      readings.push(normalized[i]+' '+normalized[i+1]);
+    }
+  }
+  return [...new Set(readings)];
+}
+function smartCameraWeightTokens(text,metal){
   const ozPerGram=metal==='copper'?28.349523125:31.1034768;
   const words={one:1,two:2,five:5,ten:10,half:.5};
   text=text.replace(/\b(one|two|five|ten|half)\s+(troy\s+)?(ounce|ounces|oz|onza|onzas)\b/g,(_,n,t,u)=>words[n]+' '+(t||'')+u);
-  const values=[];
-  for(const m of text.matchAll(/(?:^|\s)(\d+(?:\.\d+)?(?:\s*\/\s*\d+)?)\s*(?:troy\s*)?(oz|ounces?|onzas?|kg|kilograms?|g|grams?|gr|lbs?|pounds?)\b/g)){
+  const tokens=[];
+  for(const m of text.matchAll(/(?:^|\s)((?:\d+(?:\.\d+)?|\.\d+)(?:\s*\/\s*\d+)?)\s*(?:troy\s*)?(oz|ounces?|onzas?|kg|kilograms?|g|grams?|gr|lbs?|pounds?)\b/g)){
     const parts=m[1].split('/').map(Number);let n=parts.length===2?parts[0]/parts[1]:parts[0];
+    const amount=n;
+    const prefix=text.slice(0,m.index).trim();
+    const explicitMass=/\b(?:weight|weighs|mass)\s*[:=]?\s*$/.test(prefix);
+    let reason='';
+    if(!explicitMass&&parts.length===1&&Number.isInteger(n)&&n>=1800&&n<=2099)reason='date';
+    if(!explicitMass&&parts.length===1&&/^(?:\.?9999|\.?9995|\.?999|\.?925|\.?900|\.?9167|\.?958|999\.9)$/.test(m[1]))reason='purity';
+    if(/\b(?:serial|certificate|cert|number|no)\s*[:#]?\s*$/.test(prefix))reason='identifier';
+    // Neither spaced digits nor the suffix of an unreadable decimal is a mass.
+    if(/(?:^|\s)\d\s*$|\d\s*\/\s*$|\.\s*$/.test(prefix))reason='fragment';
     if(/^kg|kilogram/.test(m[2]))n=n*1000/ozPerGram;
     else if(/^(g|gram|gr)$|^grams$/.test(m[2]))n=n/ozPerGram;
     else if(/^(lb|lbs|pound|pounds)$/.test(m[2]))n=n*(metal==='copper'?16:453.59237/31.1034768);
-    if(n>0&&n<=10000&&Number.isFinite(n)&&!values.some(v=>Math.abs(v-n)<=Math.max(v,n)*.002))values.push(n);
+    if(!(n>0&&n<=10000&&Number.isFinite(n)))reason='invalid';
+    tokens.push({amount,unit:m[2],value:n,reason});
+  }
+  return tokens;
+}
+function smartCameraWeightCandidates(text,metal){
+  const values=[];
+  for(const token of smartCameraWeightTokens(text,metal)){
+    if(!token.reason&&!values.some(v=>Math.abs(v-token.value)<=Math.max(v,token.value)*.002))values.push(token.value);
   }
   return values;
 }
@@ -7161,8 +7193,20 @@ function interpretSmartCameraScan(result){
     !/\b(?:franklin|walking liberty|barber)\b/.test(text)&&design.id!=='walking_liberty_half_dollar';
   const product=ambiguousHistoricalHalf?'U.S. 90% Silver Coinage':
     catalogMatch?.item.product||(historicalSpec?'U.S. 90% Silver Coinage':metal?smartCameraProductGuess(text,metal):'');
-  const weights=smartCameraWeightCandidates(text,metal);
+  // Identity can use combined inscriptions. Weight must retain its source line
+  // and pass; never manufacture a number-unit pair from the identity text union.
+  const weightLines=Array.isArray(result?.weightLines)?result.weightLines:
+    Array.isArray(result?.photoEvidence)?result.photoEvidence.flatMap(photo=>
+      Array.isArray(photo.weightLines)?photo.weightLines:smartCameraWeightReadingLines(photo.lines||[photo.text||''])):
+    smartCameraWeightReadingLines(Array.isArray(result?.lines)?result.lines:[result?.text||'']);
+  const weightTokens=weightLines.flatMap(line=>smartCameraWeightTokens(line,metal));
+  const weights=[];
+  for(const token of weightTokens){
+    if(!token.reason&&!weights.some(v=>Math.abs(v-token.value)<=Math.max(v,token.value)*.002))weights.push(token.value);
+  }
+  const rejectedWeight=weightTokens.some(token=>!!token.reason);
   let weight=weights.length===1?weights[0]:0;
+  if(!weights.length&&rejectedWeight)warnings.push('The weight reading contains a date, purity, or incomplete number. Confirm the weight manually.');
   if(weights.length>1)warnings.push('Different weights were read. Confirm the weight manually.');
   let inferredWeight=false;
   if(historicalSpec&&weights.length<=1){
@@ -7184,7 +7228,7 @@ function interpretSmartCameraScan(result){
     mapleDollarReadings.length>0&&mapleDollarReadings.every(value=>value===5);
   const expected=standardSilverMaple?1:fixedWeights[product];
   if(expected&&weight&&Math.abs(weight-expected)>.003){warnings.push('Weight disagrees with the matched product. Confirm product and weight.');weight=0;}
-  if(expected&&!weight&&weights.length===0&&!plated){
+  if(expected&&!weight&&weights.length===0&&!rejectedWeight&&!plated){
     // A fixed catalogue weight is safe only after independent product evidence:
     // either readable identifying inscriptions, or two photos of the same item.
     const twoSides=(Number(result?.sides)||1)>=2;
@@ -7236,13 +7280,14 @@ function selectSmartCameraPhotoEvidence(result){
   const candidates=result.passes.map(pass=>{
     const observations=Array.isArray(pass?.observations)?pass.observations:[];
     const lines=observations.filter(o=>typeof o?.text==='string'&&Number(o.confidence)>=.25).map(o=>o.text);
-    const photo={lines,confidence:Number(pass?.confidence)||0,designSuggestion:result.designSuggestion,designSuggestions:result.designSuggestions};
+    const weightLines=smartCameraWeightReadingLines(observations.filter(o=>typeof o?.text==='string'&&Number(o.confidence)>=.25).map(o=>o.text));
+    const photo={lines,weightLines,confidence:Number(pass?.confidence)||0,designSuggestion:result.designSuggestion,designSuggestions:result.designSuggestions};
     const reading=interpretSmartCameraScan(photo);
     const score=(reading.usable?3:0)+(reading.metal?3:0)+(reading.product?4:0)+(reading.weight>0?3:0)+
       (reading.purity?1:0)+(reading.year ? .25 : 0)+photo.confidence-reading.warnings.length*12;
     return {photo,reading,score,id:pass?.id};
   }).filter(c=>c.photo.lines.length).sort((a,b)=>b.score-a.score);
-  if(!candidates.length)return {...result,lines:[],text:'',confidence:0,selectedPasses:0,rejectedPasses:result.passes.length};
+  if(!candidates.length)return {...result,lines:[],weightLines:[],text:'',confidence:0,selectedPasses:0,rejectedPasses:result.passes.length};
   const primary=candidates[0];
   const accepted=[primary];
   const compatible=(a,b)=>!((a.metal&&b.metal&&a.metal!==b.metal)||
@@ -7257,7 +7302,7 @@ function selectSmartCameraPhotoEvidence(result){
     fieldCount(c.reading)>=fieldCount(primary.reading)&&!compatible(primary.reading,c.reading));
   if(competing.length){
     const lines=[...new Set(candidates.flatMap(c=>c.photo.lines))];
-    return {...result,lines,text:lines.join('\n'),confidence:primary.photo.confidence,
+    return {...result,lines,weightLines:candidates.flatMap(c=>c.photo.weightLines),text:lines.join('\n'),confidence:primary.photo.confidence,
       selectedPasses:candidates.length,rejectedPasses:result.passes.length-candidates.length};
   }
   // Keep directly read replica/plating warnings even if a crop omits them.
@@ -7271,7 +7316,8 @@ function selectSmartCameraPhotoEvidence(result){
     const currentYears=smartCameraYearCandidates(normalizeSmartCameraText(accepted.flatMap(p=>p.photo.lines).join(' ')));
     const candidateYears=smartCameraYearCandidates(normalizeSmartCameraText(c.photo.lines.join(' ')));
     if(currentYears.length===1&&candidateYears.length===1&&currentYears[0]!==candidateYears[0])continue;
-    const merged={...result,lines:accepted.flatMap(p=>p.photo.lines).concat(c.photo.lines),confidence:primary.photo.confidence};
+    const merged={...result,lines:accepted.flatMap(p=>p.photo.lines).concat(c.photo.lines),
+      weightLines:accepted.flatMap(p=>p.photo.weightLines).concat(c.photo.weightLines),confidence:primary.photo.confidence};
     const next=interpretSmartCameraScan(merged);
     // Combining partial passes must not invent conflicting weights, years, or purity.
     if(next.warnings.length>reading.warnings.length)continue;
@@ -7292,7 +7338,9 @@ function selectSmartCameraPhotoEvidence(result){
   }))];
   if(evidenceLines.length){
     const unionLines=[...new Set(accepted.flatMap(c=>c.photo.lines).concat(evidenceLines,cautionLines))];
-    const union=interpretSmartCameraScan({...result,lines:unionLines,confidence:primary.photo.confidence});
+    const union=interpretSmartCameraScan({...result,lines:unionLines,
+      weightLines:candidates.filter(c=>accepted.includes(c)||c.photo.lines.some(line=>evidenceLines.includes(line))).flatMap(c=>c.photo.weightLines),
+      confidence:primary.photo.confidence});
     if(union.warnings.length<=reading.warnings.length&&compatible(reading,union)){
       reading=union;
       const selected=new Set(accepted.map(c=>c.id));
@@ -7325,7 +7373,7 @@ function selectSmartCameraPhotoEvidence(result){
     }
   }
   const lines=[...new Set(finalAccepted.flatMap(c=>c.photo.lines).concat(cautionLines))];
-  return {...result,lines,text:lines.join('\n'),confidence:primary.photo.confidence,
+  return {...result,lines,weightLines:finalAccepted.flatMap(c=>c.photo.weightLines),text:lines.join('\n'),confidence:primary.photo.confidence,
     selectedPasses:finalAccepted.length,rejectedPasses:result.passes.length-finalAccepted.length};
 }
 function smartCameraFailureReason(suggestion){
@@ -7341,9 +7389,9 @@ function renderSmartCameraDiagnostics(suggestion){
   const panel=document.getElementById('smartCameraDiagnostics');
   const text=document.getElementById('smartCameraDiagnosticText');
   if(!panel||!text)return;
-  panel.hidden=canUseSmartCameraSuggestion(suggestion)||!smartCameraLastDiagnostic;
+  panel.hidden=!smartCameraLastDiagnostic;
   // Counts and field-presence flags only. Never include images, OCR text, or serials.
-  if(!panel.hidden)text.textContent=JSON.stringify({...smartCameraLastDiagnostic,
+  if(!panel.hidden)text.textContent=JSON.stringify({...smartCameraLastDiagnostic,weightParserVersion:SMART_CAMERA_WEIGHT_PARSER_VERSION,
     photoCount:smartCameraPhotoCount,metalRead:!!suggestion.metal,weightRead:suggestion.weight>0,
     productMatched:!!suggestion.product,conflictCount:suggestion.warnings?.length||0},null,2);
 }
@@ -7523,7 +7571,7 @@ async function runSmartCameraScan(append=false,source='camera'){
     // expensive fallbacks if the shared catalogue/specification gates still fail.
     if(append&&!result?.cancelled&&typeof plugin.refine==='function'){
       const trial=interpretSmartCameraScan({
-        photoEvidence:[...smartCameraScans,result].map(scan=>({lines:scan.lines||[scan.text||''],
+        photoEvidence:[...smartCameraScans,result].map(scan=>({lines:scan.lines||[scan.text||''],weightLines:scan.weightLines,
           confidence:Number(scan.confidence)||0,designSuggestion:scan.designSuggestion||null})),
         lines:[...smartCameraScans,result].flatMap(scan=>scan.lines||[scan.text||'']),
         confidence:Math.max(Number(result.confidence)||0,...smartCameraScans.map(scan=>Number(scan.confidence)||0)),
@@ -7559,12 +7607,17 @@ async function runSmartCameraScan(append=false,source='camera'){
         const observations=(Array.isArray(pass.observations)?pass.observations:[]).filter(o=>typeof o.text==='string'&&Number(o.confidence)>=.25);
         const lines=observations.map(o=>o.text);
         const metals=smartCameraMetalEvidence(normalizeSmartCameraText(lines.join(' ')));
-        const weights=smartCameraWeightCandidates(normalizeSmartCameraText(lines.join(' ')),metals.length===1?metals[0]:'');
-        if(!weights.length)return [];
-        return [{pass:pass.id,weightsOz:weights,confidence:Number(pass.confidence)||0,
-          direct:observations.flatMap(o=>{
-            const weights=smartCameraWeightCandidates(normalizeSmartCameraText(o.text),metals.length===1?metals[0]:'');
-            return weights.length?[{weightsOz:weights,confidence:Number(o.confidence)||0}]:[];
+        const metal=metals.length===1?metals[0]:'';
+        const tokens=smartCameraWeightReadingLines(lines).flatMap(line=>smartCameraWeightTokens(line,metal));
+        const weights=[...new Set(tokens.filter(token=>!token.reason).map(token=>token.value))];
+        const rejectedReasons=tokens.filter(token=>token.reason).reduce((counts,token)=>{
+          counts[token.reason]=(counts[token.reason]||0)+1;return counts;
+        },{});
+        if(!tokens.length)return [];
+        return [{pass:pass.id,weightsOz:weights,rejectedReasons,confidence:Number(pass.confidence)||0,
+          direct:observations.flatMap((o,lineIndex)=>{
+            const weights=smartCameraWeightCandidates(normalizeSmartCameraText(o.text,false),metal);
+            return weights.length?[{lineIndex,weightsOz:weights,confidence:Number(o.confidence)||0}]:[];
           })}];
       })};
     smartCameraPhotoCount++;
@@ -7584,7 +7637,7 @@ async function runSmartCameraScan(append=false,source='camera'){
     smartCameraScans.push(result);
     const combined={lines:smartCameraScans.flatMap(scan=>Array.isArray(scan.lines)?scan.lines:[scan.text||'']),
       confidence:Math.max(...smartCameraScans.map(scan=>Number(scan.confidence)||0)),sides:smartCameraPhotoCount,
-      photoEvidence:smartCameraScans.map(scan=>({lines:Array.isArray(scan.lines)?scan.lines:[scan.text||''],
+      photoEvidence:smartCameraScans.map(scan=>({lines:Array.isArray(scan.lines)?scan.lines:[scan.text||''],weightLines:scan.weightLines,
         confidence:Number(scan.confidence)||0,designSuggestion:scan.designSuggestion||null})),
       designSuggestions:smartCameraScans.flatMap(scan=>Array.isArray(scan.designSuggestions)?scan.designSuggestions:scan.designSuggestion?[scan.designSuggestion]:[])};
     const suggestion=interpretSmartCameraScan(combined);

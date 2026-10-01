@@ -2,6 +2,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const html=fs.readFileSync('App/public/index.html','utf8');
 const context=vm.createContext({Date,console});
 vm.runInContext(html.slice(html.indexOf('const GOLD_PRODUCTS='),html.indexOf('const METAL_SYMBOLS='))+html.slice(html.indexOf('let pendingSmartCameraSuggestion='),html.indexOf('function smartCameraConfidenceLabel')),context);
+vm.runInContext(html.slice(html.indexOf('function canUseSmartCameraSuggestion'),html.indexOf('function renderSmartCameraAnalysis')),context);
 const scan=(text,extra={})=>context.interpretSmartCameraScan({text,confidence:.95,...extra});
 let count=0;function test(name,fn){fn();count++;console.log('PASS',name)}
 test('Actual failed Maple OCR resolves silver profile',()=>{const r=scan('CAN 9999 9999 ARGENT PUR SINE STLVERN SILV');assert.equal(r.metal,'silver');assert.equal(r.product,'Canadian Silver Maple Leaf');assert.equal(r.weight,0);assert.equal(r.usable,true)});
@@ -209,3 +210,59 @@ test('Gram quantities remain valid for bars and are not globally blacklisted',()
  const r=scan('FINE SILVER BAR 666 G');assert.ok(Math.abs(r.weight-666/31.1034768)<1e-10);assert.equal(r.warnings.length,0);
 });
 console.log(count+' scanner regression checks passed');
+
+test('Calendar years cannot be accepted as ounce or gram weight',()=>{
+ for(const unit of ['oz','g','kg']){
+  const r=scan('BRITANNIA FINE GOLD 2026 '+unit);
+  assert.equal(r.weight,0);assert.equal(context.canUseSmartCameraSuggestion(r),false);assert.equal(context.canReviewSmartCameraSuggestion(r),true);
+  assert.match(r.warnings.join(' '),/weight/i);
+ }
+ assert.equal(scan('BRITANNIA 2026 OZ FINE GOLD 1 OZ').weight,1);
+});
+test('Separate OCR lines cannot manufacture gram weights from isolated rim digits',()=>{
+ const r=interpreted([pass('CANADA 9999\nFINE SILVER\n666\nG\nARGENT PUR')]);
+ assert.equal(r.product,'Canadian Silver Maple Leaf');assert.equal(r.weight,0);
+ assert.equal(context.canUseSmartCameraSuggestion(r),false);
+});
+test('Passes cannot manufacture weights when one ends in a number and another starts in a unit',()=>{
+ const r=interpreted([pass('CANADA 9999 FINE SILVER 666'),pass('G ARGENT PUR')]);
+ assert.equal(r.weight,0);assert.equal(r.product,'Canadian Silver Maple Leaf');
+ const date=interpreted([pass('BRITANNIA GOLD 2026'),pass('OZ')]);
+ assert.equal(date.weight,0);assert.equal(date.year,2026);
+});
+test('Explicit split metal weight inscriptions recover within their own OCR pass',()=>{
+ const r=interpreted([pass('CANADA 9999\nFINE SILVER 1\nOZ ARGENT PUR')]);
+ assert.equal(r.weight,1);assert.equal(r.product,'Canadian Silver Maple Leaf');assert.equal(r.warnings.length,0);
+ const fractional=interpreted([pass('BRITANNIA\nFINE GOLD 1/10\nOZ')]);
+ assert.equal(fractional.weight,.1);
+});
+test('Purity and serial numbers followed by units never become mass',()=>{
+ for(const text of ['FINE GOLD 9999 OZ','FINE GOLD .9999 OZ','FINE GOLD 999.9 G','FINE GOLD SERIAL: 123 G']){
+  assert.equal(scan(text).weight,0,text);
+ }
+ assert.equal(scan('FINE GOLD 9999 1 OZ').weight,1);
+ assert.equal(scan('FINE GOLD SERIAL: 123 G 1 OZ').weight,1);
+});
+test('Split year normalization for identity cannot concatenate weight digits',()=>{
+ const r=scan('BRITANNIA GOLD 2 0 2 6 OZ');assert.equal(r.year,2026);assert.equal(r.weight,0);
+ assert.equal(scan('SILVER BAR WEIGHT: 2026 G').weight,2026/31.1034768);
+ assert.equal(scan('SILVER BAR WEIGHT: 999 G').weight,999/31.1034768);
+});
+test('Each photo keeps independent weight evidence at two-side handoff',()=>{
+ const front=evidence([pass('BRITANNIA GOLD 2026')]);
+ const reverse=evidence([pass('OZ FINE GOLD')]);
+ const r=context.interpretSmartCameraScan({lines:[...front.lines,...reverse.lines],photoEvidence:[front,reverse],sides:2});
+ assert.equal(r.weight,0);assert.equal(r.year,2026);assert.equal(context.canReviewSmartCameraSuggestion(r),true);
+});
+test('Actual previously logged Apple Vision split reverse preserves one ounce without rotated purity noise',()=>{
+ const reverse=evidence([
+  pass('9999\nSILVER\n6666\nARCE'),
+  pass('NIA\nCANA.\nCANADA\nANADA\n666'),
+  pass('ER\nFINE SILVER 1\nOZ ARGEI\nSILVER 1\nOZ ARGENT PUF\nOZ ARGENT PUR'),
+  pass('6666\nFINE SIIVER 1\nARCENT PU\n9999')
+ ]);
+ const front=evidence([pass('CLLARS 2022')]);
+ const r=context.interpretSmartCameraScan({lines:[...front.lines,...reverse.lines],photoEvidence:[front,reverse],sides:2});
+ assert.equal(r.weight,1);assert.equal(r.year,2022);assert.equal(r.product,'Canadian Silver Maple Leaf');
+});
+console.log(count+' scanner regression checks passed after weight-source coverage');
