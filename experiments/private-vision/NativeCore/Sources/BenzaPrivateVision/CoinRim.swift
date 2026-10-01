@@ -21,7 +21,7 @@ public enum BenzaCoinRim {
             guard rx > min(width,height) * 0.16, ry > min(width,height) * 0.16,
                   rx / ry > 0.65, rx / ry < 1.5 else { continue }
             let area = Double(box.width * box.height)
-            guard area > 0.10, area < 0.92 else { continue }
+            guard area > 0.10, area < 0.995 else { continue }
             let cx = Double(box.midX), cy = Double(box.midY)
             guard abs(cx-0.5) < 0.28, abs(cy-0.5) < 0.30 else { continue }
             var deviation = 0.0
