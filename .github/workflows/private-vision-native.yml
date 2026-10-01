@@ -46,6 +46,7 @@ jobs:
           xcodebuild -scheme "$benza_scheme" -destination 'generic/platform=iOS' -derivedDataPath /tmp/benza-vision-ios CODE_SIGNING_ALLOWED=NO build
       - name: Scanner regressions
         run: |
+          node tests/real-photo-gate.cjs
           node tests/smart-camera.test.cjs
           node tests/smart-camera-flow.test.cjs
           node tests/smart-camera-simple-flow.test.cjs
