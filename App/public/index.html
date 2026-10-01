@@ -6450,8 +6450,8 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
 
       <label>Purchase date</label>
       <div class="dateField"><span id="dateDisplay" aria-hidden="true"></span><input id="date" type="date" aria-label="Purchase date"></div>
-      <details id="bullionDetailsFields" class="inventoryDetails">
-        <summary><span><strong>Bullion details</strong><small>Optional · available to everyone</small></span><span class="inventoryChevron">›</span></summary>
+      <details id="proInventoryFields" class="inventoryDetails" hidden>
+        <summary><span><strong>Inventory &amp; records<span class="proRecordBadge">PRO</span></strong><small>Bullion details, photos, receipts &amp; private notes</small></span><span class="inventoryChevron">›</span></summary>
         <div class="inventoryDetailsBody">
           <div class="row">
             <div><label for="holdingYear">Year</label><input id="holdingYear" type="number" inputmode="numeric" min="1000" max="9999" step="1" placeholder="e.g. 2024"></div>
@@ -6460,14 +6460,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
           <label for="holdingMint">Mint / refiner</label><input id="holdingMint" type="text" maxlength="120" placeholder="Optional">
           <label for="holdingSerial">Serial / certificate number</label><input id="holdingSerial" type="text" maxlength="120" placeholder="Optional">
           <p id="holdingDetailsHint" class="holdingDetailHint">Add the details stamped on your bullion. Leave anything unknown blank.</p>
-        </div>
-      </details>
-      <details id="proInventoryFields" class="inventoryDetails" hidden>
-        <summary>
-          <span><strong>Private inventory<span class="proRecordBadge">PRO</span></strong><small>Photos, receipts &amp; private notes</small></span>
-          <span class="inventoryChevron">›</span>
-        </summary>
-        <div class="inventoryDetailsBody">
+
           <label>Private notes</label>
           <textarea id="holdingNotes" maxlength="1000" placeholder="Dealer, condition, storage location, grading details…"></textarea>
 
@@ -6496,7 +6489,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
         </div>
       </details>
       <button id="proInventoryTeaser" class="inventoryLockedRow" type="button" onclick="openProUpgrade('inventory')">
-        <span><strong>Inventory &amp; records</strong><small>Private notes, photos &amp; receipts</small></span>
+        <span><strong>Inventory &amp; records</strong><small>Year, purity, mint, photos &amp; receipts</small></span>
         <span>PRO ›</span>
       </button>
 
@@ -7336,7 +7329,7 @@ function applySmartCameraSuggestion(suggestion){
   if(!suggestion.product)document.getElementById('product').selectedIndex=-1;
   document.getElementById('cost').value='';
   fillBullionDetails({year:suggestion.year,purity:suggestion.purity,mint:suggestion.mint,serial:suggestion.serial});
-  document.getElementById('bullionDetailsFields').open=true;
+  document.getElementById('proInventoryFields').open=true;
   document.getElementById('holdingDetailsHint').textContent='Details filled from your scan. Review every field before saving.';
   if(isProActive()&&suggestion.denomination){
     document.getElementById('holdingNotes').value='Denomination: '+suggestion.denomination;
@@ -7654,10 +7647,11 @@ function fillBullionDetails(details={}){
 }
 function resetBullionDetails(){
   fillBullionDetails();
-  const panel=document.getElementById('bullionDetailsFields');if(panel)panel.open=false;
+  const panel=document.getElementById('proInventoryFields');if(panel)panel.open=false;
   const hint=document.getElementById('holdingDetailsHint');if(hint)hint.textContent='Add the details stamped on your bullion. Leave anything unknown blank.';
 }
 function suggestBullionDetails(){
+  if(!isProActive())return;
   const product=document.getElementById('product')?.value;
   const entry=SMART_CAMERA_CATALOG.find(x=>x.product===product&&x.metal===metal);
   // Purity varies by year for several series. Only suggest stable specifications.
@@ -7729,7 +7723,7 @@ function editHolding(i){
   resetProInventoryForm();
   syncProInventoryVisibility();
   fillBullionDetails(h);
-  if(h.year||h.purity||h.mint||h.serial)document.getElementById('bullionDetailsFields').open=true;
+  if(h.year||h.purity||h.mint||h.serial)document.getElementById('proInventoryFields').open=true;
   if(isProActive()){
     document.getElementById('holdingNotes').value=h.notes||'';
     pendingHoldingPhotoPath=h.photoPath||null;
@@ -9065,12 +9059,12 @@ function proHoldingInsightHtml(h){
 
 
 function proInventoryMetaHtml(h){
+  if(!isProActive())return '';
   const chips=[];
   if(h.year)chips.push(`<span class="inventoryChip">Year: ${escapeBullionHtml(String(h.year))}</span>`);
   if(h.purity)chips.push(`<span class="inventoryChip">${escapeBullionHtml(h.purity)}</span>`);
   if(h.mint)chips.push(`<span class="inventoryChip">${escapeBullionHtml(h.mint)}</span>`);
   if(h.serial)chips.push(`<span class="inventoryChip">Serial: ${escapeBullionHtml(h.serial)}</span>`);
-  if(!isProActive())return chips.length?`<div class="inventoryMeta">${chips.join('')}</div>`:'';
   if(h.notes)chips.push(`<span class="inventoryChip" title="${escapeBullionHtml(h.notes)}">Notes saved</span>`);
   if(h.photoPath)chips.push(`<button class="inventoryChip link" type="button" onclick="event.stopPropagation();openPrivateHoldingFile('${encodeURIComponent(h.photoPath)}'.split('%2F').join('/'))">View photo</button>`);
   (h.scannerPhotoPaths||[]).forEach((path,index)=>chips.push(`<button class="inventoryChip link" type="button" onclick="event.stopPropagation();openPrivateHoldingFile('${encodeURIComponent(path)}'.split('%2F').join('/'))">Scan photo ${index+1}</button>`));
@@ -9895,11 +9889,11 @@ async function saveHolding(){
   const date=document.getElementById('date').value;
   const product=(document.getElementById('product').value||'').trim();
   const proActive=isProActive();
-  const serial=(document.getElementById('holdingSerial')?.value||'').trim();
-  const yearText=(document.getElementById('holdingYear')?.value||'').trim();
+  const serial=proActive?(document.getElementById('holdingSerial')?.value||'').trim() : '';
+  const yearText=proActive?(document.getElementById('holdingYear')?.value||'').trim() : '';
   const year=yearText?Number(yearText):null;
-  const purity=(document.getElementById('holdingPurity')?.value||'').trim();
-  const mint=(document.getElementById('holdingMint')?.value||'').trim();
+  const purity=proActive?(document.getElementById('holdingPurity')?.value||'').trim() : '';
+  const mint=proActive?(document.getElementById('holdingMint')?.value||'').trim() : '';
   const notes=proActive?(document.getElementById('holdingNotes')?.value||'').trim():'';
   const photoFile=proActive?document.getElementById('holdingPhoto')?.files?.[0]:null;
   const receiptFile=proActive?document.getElementById('holdingReceipt')?.files?.[0]:null;
@@ -9913,7 +9907,7 @@ async function saveHolding(){
   if(!product){alert('Choose a bullion product.');return}
   if(year!==null&&(!Number.isInteger(year)||year<1000||year>9999)){alert('Enter a four-digit bullion year, or leave it blank.');return}
   if(!supabaseClient||!currentUser){alert('Please log in before saving a holding.');return}
-  if(!proActive&&originalHolding&&(originalHolding.notes||originalHolding.photoPath||originalHolding.receiptPath||(originalHolding.scannerPhotoPaths||[]).length)){
+  if(!proActive&&originalHolding&&(originalHolding.year||originalHolding.purity||originalHolding.mint||originalHolding.serial||originalHolding.notes||originalHolding.photoPath||originalHolding.receiptPath||(originalHolding.scannerPhotoPaths||[]).length)){
     alert('This holding contains Pro inventory records. Renew Pro to edit it while keeping those records.');
     return;
   }
