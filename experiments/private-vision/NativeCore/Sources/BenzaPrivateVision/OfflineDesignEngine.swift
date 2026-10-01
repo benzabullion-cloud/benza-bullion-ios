@@ -77,7 +77,11 @@ public final class BenzaOfflineDesignEngine {
         if scan.isCanceled { throw Failure.canceled }
         let prompt = """
 Choose the pictured bullion design family from this CLOSED list:
-- american_eagle: U.S. Eagle bullion family artwork, including Walking Liberty silver or U.S. eagle reverse motifs.
+- american_silver_eagle: American Silver Eagle; Walking Liberty obverse with full-length Liberty, flowing flag and rising sun. Do not confuse with the historic Walking Liberty half dollar.
+- american_gold_eagle: American Gold Eagle; Saint-Gaudens standing Liberty obverse and eagle-family reverse.
+- american_platinum_eagle: American Platinum Eagle; Statue of Liberty portrait obverse.
+- american_palladium_eagle: American Palladium Eagle; Winged Liberty/Mercury-style obverse and eagle reverse.
+- american_eagle: Legacy fallback only when the image clearly shows a U.S. Eagle bullion family but the exact Eagle type cannot be distinguished.
 - american_buffalo: U.S. Buffalo / Indian Head bullion design.
 - canadian_maple_leaf: Canadian Maple Leaf bullion design.
 - britannia: British Britannia bullion design.
