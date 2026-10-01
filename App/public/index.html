@@ -7025,13 +7025,6 @@ function smartCameraResolveDesignConflict(design,text,metal,catalogMatch){
   // two-sided bullion. Prefer the named family rather than declaring a conflict.
   if(specific.length===1)return {...design,id:specific[0],conflict:false,resolvedBy:'specific-over-generic'};
 
-  // Strong readable catalogue evidence can adjudicate a visual disagreement.
-  // Require a non-baseline named product match and exactly one compatible design.
-  if(catalogMatch&&!catalogMatch.item?.baseline&&(catalogMatch.strongHits?.length||0)>0){
-    const compatible=design.ids.filter(id=>smartCameraDesignCompatibleProduct(id,catalogMatch.item.product));
-    if(compatible.length===1)return {...design,id:compatible[0],conflict:false,resolvedBy:'catalogue-text'};
-  }
-
   // Canadian Maple reverses carry unusually strong deterministic text evidence.
   // If OCR sees CANADA + .9999 + a single metal, prefer Maple over a portrait-side
   // misclassification. Do not use this shortcut for bars.
