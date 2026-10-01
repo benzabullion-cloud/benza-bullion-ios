@@ -100,5 +100,40 @@ await test('Unsupported sovereign bullion still resolves to safe generic coin ca
     assert.equal(r.weight,weight,text);
   }
 });
+await test('Two-sided Maple ignores generic portrait-side visual disagreement',()=>{
+  const r=context.interpretSmartCameraScan({
+    lines:['CANADA 9999','FINE SILVER 1 OZ ARGENT PUR'],
+    confidence:.9,
+    sides:2,
+    designSuggestions:[design('generic_coin'),design('canadian_maple_leaf')]
+  });
+  assert.equal(r.product,'Canadian Silver Maple Leaf');
+  assert.equal(r.metal,'silver');
+  assert.equal(r.weight,1);
+  assert.equal(r.designID,'canadian_maple_leaf');
+  assert.equal(r.warnings.length,0);
+  assert.equal(context.canUseSmartCameraSuggestion(r),true);
+});
+await test('Two-sided Maple readable reverse resolves specific false family on portrait side',()=>{
+  const r=context.interpretSmartCameraScan({
+    lines:['CANADA 9999 FINE SILVER 1 OZ ARGENT PUR'],
+    confidence:.9,
+    sides:2,
+    designSuggestions:[design('britannia'),design('canadian_maple_leaf')]
+  });
+  assert.equal(r.product,'Canadian Silver Maple Leaf');
+  assert.equal(r.designID,'canadian_maple_leaf');
+  assert.equal(r.warnings.length,0);
+});
+await test('Unresolved two-specific-family disagreement still blocks use',()=>{
+  const r=context.interpretSmartCameraScan({
+    lines:['FINE SILVER 1 OZ'],
+    confidence:.9,
+    sides:2,
+    designSuggestions:[design('britannia'),design('canadian_maple_leaf')]
+  });
+  assert.ok(r.warnings.some(w=>/different designs/.test(w)));
+  assert.equal(context.canUseSmartCameraSuggestion(r),false);
+});
 console.log(count+' design integration checks passed');
 })().catch(e=>{console.error(e);process.exitCode=1});
