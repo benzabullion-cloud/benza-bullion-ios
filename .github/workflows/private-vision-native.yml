@@ -53,3 +53,18 @@ jobs:
           python3 -m unittest discover -s experiments/private-vision -p 'test_*.py'
       - name: Compile actual app integration without signing or model assets
         run: xcodebuild -project App.xcodeproj -scheme App -destination 'generic/platform=iOS' -derivedDataPath /tmp/benza-camera-app CODE_SIGNING_ALLOWED=NO build
+
+  real_photos:
+    if: github.event.repository.private == false
+    runs-on: macos-15-intel
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Compile shared rim processing and standalone OCR
+        run: swiftc -O experiments/private-vision/NativeCore/Sources/BenzaPrivateVision/CoinRim.swift tests/real-photo-ocr.swift -o /tmp/benza-photo-ocr
+      - name: Read approved coin photos with Apple Vision
+        run: /tmp/benza-photo-ocr
+      - name: Validate actual OCR through shared holding gates
+        run: node tests/real-photo-gate.cjs

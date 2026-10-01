@@ -7438,8 +7438,30 @@ async function runSmartCameraScan(append=false,source='camera'){
     if(!append&&typeof plugin.reset==='function')await plugin.reset();
     if(run!==smartCameraRunId||session!==smartCameraSession)return;
     if(status)status.textContent='Reading your bullion…';
-    const captured=await plugin.scan({source});
-    const result=selectSmartCameraPhotoEvidence(captured);
+    let captured=await plugin.scan({source});
+    if(run!==smartCameraRunId||session!==smartCameraSession)return;
+    let result=selectSmartCameraPhotoEvidence(captured);
+    // First side: collect evidence promptly. After the opposite side, only run
+    // expensive fallbacks if the shared catalogue/specification gates still fail.
+    if(append&&!result?.cancelled&&typeof plugin.refine==='function'){
+      const trial=interpretSmartCameraScan({
+        photoEvidence:[...smartCameraScans,result].map(scan=>({lines:scan.lines||[scan.text||''],
+          confidence:Number(scan.confidence)||0,designSuggestion:scan.designSuggestion||null})),
+        lines:[...smartCameraScans,result].flatMap(scan=>scan.lines||[scan.text||'']),
+        confidence:Math.max(Number(result.confidence)||0,...smartCameraScans.map(scan=>Number(scan.confidence)||0)),
+        sides:smartCameraPhotoCount+1,
+        designSuggestions:[...smartCameraScans,result].flatMap(scan=>scan.designSuggestions|| (scan.designSuggestion?[scan.designSuggestion]:[]))
+      });
+      if(!canUseSmartCameraSuggestion(trial)){
+        if(status)status.textContent='Checking the design and harder-to-read markings…';
+        const refined=await plugin.refine();
+        if(run!==smartCameraRunId||session!==smartCameraSession)return;
+        if(refined?.cancelled)return;
+        const totalProcessingMs=(Number(captured.elapsedMs)||0)+(Number(refined.elapsedMs)||0);
+        captured={...captured,...refined,elapsedMs:totalProcessingMs};
+        result=selectSmartCameraPhotoEvidence(captured);
+      }
+    }
     if(run!==smartCameraRunId||session!==smartCameraSession)return;
     if(result?.cancelled){
       if(status)status.textContent=append?'Ready when you are. Photograph the other side.':'Ready when you are.';
@@ -7449,7 +7471,7 @@ async function runSmartCameraScan(append=false,source='camera'){
     const capturedFile=scannerPhotoFileFromResult(result,smartCameraPhotoCount);
     if(capturedFile)smartCameraCapturedFiles.push(capturedFile);
     smartCameraLastDiagnostic={engineVersion:Number(result.engineVersion)||0,
-      designStatus:['local-catalogue-v1','not-bundled','asset-pack-unavailable','device-limited','unavailable'].includes(result.designStatus)?result.designStatus:'unknown',
+      designStatus:['local-catalogue-v1','not-bundled','asset-pack-unavailable','device-limited','unavailable','ocr-first'].includes(result.designStatus)?result.designStatus:'unknown',
       appBuild:typeof result.appBuild==='string'&&/^[0-9.]+$/.test(result.appBuild)?result.appBuild:'unknown',
       ocrPasses:Number(result.ocrPasses)||0,selectedPasses:Number(result.selectedPasses)||0,
       rejectedPasses:Number(result.rejectedPasses)||0,lineCount:Array.isArray(result.lines)?result.lines.length:0,

@@ -123,6 +123,7 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
     let jsName = "BenzaSmartCamera"
     let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "scan", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "refine", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "reset", returnType: CAPPluginReturnPromise)
     ]
 
@@ -134,6 +135,7 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
     private let stateLock = NSLock()
     private var generation = 0
     private var activeRequest: VNRecognizeTextRequest?
+    private var refinementImage: CGImage?
     private var activeDesignScan: BenzaOfflineScan?
     private var offlineDesignEngine: BenzaOfflineDesignEngine?
     private var analysisInFlight = false
@@ -195,6 +197,7 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
         let designScan = activeDesignScan
         activeRequest = nil
         activeDesignScan = nil
+        refinementImage = nil
         stateLock.unlock()
         request?.cancel()
         designScan?.cancel()
@@ -234,7 +237,8 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
     private func finishResetWaiters() {
         guard !isAnalyzing() && !pickerDismissalInProgress else { return }
         if releaseModelsWhenIdle {
-            offlineDesignEngine = nil
+            // Engine retains verified paths only. Unload model memory while keeping
+            // file verification cached for subsequent scans in this app session.
             BenzaOfflineDesignEngine.releaseCachedRuntime()
             releaseModelsWhenIdle = false
         }
@@ -297,15 +301,9 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
             self.pendingCall = call
 
             Task { @MainActor in
+                // Prepare missing assets in the background; OCR/camera do not wait for a download.
                 if ProcessInfo.processInfo.physicalMemory >= 7 * 1024 * 1024 * 1024 {
-                    do {
-                        try await self.ensureManagedModelsAvailable()
-                    } catch {
-                        guard self.isCurrent(generation) else { return }
-                        self.pendingCall = nil
-                        call.reject("Smart Camera visual model is not ready: \(error.localizedDescription)")
-                        return
-                    }
+                    Task { try? await self.ensureManagedModelsAvailable() }
                 }
 
                 guard self.isCurrent(generation), self.pendingCall != nil else { return }
@@ -324,6 +322,19 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
                 picker.modalPresentationStyle = .fullScreen
                 presenter.present(picker, animated: true)
             }
+        }
+    }
+
+    @objc func refine(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard self.pendingCall == nil && !self.isAnalyzing(),
+                  let image = self.refinementImage else {
+                call.reject("No completed photo is available to refine.")
+                return
+            }
+            self.pendingCall = call
+            self.recognizeText(in: UIImage(cgImage: image), call: call,
+                               generation: self.currentGeneration(), fast: false)
         }
     }
 
@@ -360,7 +371,7 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
 
     // Multiple bounded OCR passes recover rotated rim inscriptions and small dates.
     // No generic image labels or color measurements are used as bullion evidence.
-    private func recognizeText(in image: UIImage, call: CAPPluginCall?, generation: Int) {
+    private func recognizeText(in image: UIImage, call: CAPPluginCall?, generation: Int, fast: Bool = true) {
         guard isCurrent(generation) else { return }
         guard let cgImage = normalizedCGImage(image) else {
             pendingCall = nil
@@ -373,6 +384,7 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
             return
         }
         analysisInFlight = true
+        refinementImage = cgImage
         stateLock.unlock()
         analysisQueue.async {
             var completion: (() -> Void)?
@@ -418,10 +430,9 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
             let right = CGRect(x: extent.maxX - bandWidth, y: extent.minY,
                                width: bandWidth, height: extent.height)
 
-            var passes: [(CGImage, CGImagePropertyOrientation, Bool)] = [
-                (cgImage, .up, true), (cgImage, .right, true),
-                (cgImage, .left, true), (cgImage, .down, true)
-            ]
+            var passes: [(CGImage, CGImagePropertyOrientation, Bool)] = [(cgImage, .up, true)]
+            let rimImages = BenzaCoinRim.readingImages(cgImage, maximumCandidates: fast ? 1 : 3) { !self.isCurrent(generation) }
+            passes.append(contentsOf: rimImages.map { ($0, .up, false) })
             func appendPasses(rect: CGRect,
                               orientations: [CGImagePropertyOrientation],
                               correction: Bool = false) {
@@ -436,13 +447,14 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
             appendPasses(rect: bottom, orientations: [.up, .down])
             appendPasses(rect: left, orientations: [.right])
             appendPasses(rect: right, orientations: [.left])
+            passes.append(contentsOf: [(cgImage, .right, true), (cgImage, .left, true), (cgImage, .down, true)])
             var found: [String: (String, Float)] = [:]
             var completed = 0
             var passReadings: [[String: Any]] = []
             var lastError: Error?
             for (passIndex, pass) in passes.enumerated() {
                 let (photo, orientation, correction) = pass
-                if !self.isCurrent(generation) || (completed >= 4 && Date().timeIntervalSince(started) > 12) { break }
+                if !self.isCurrent(generation) || (fast && completed >= 4) || (completed >= 4 && Date().timeIntervalSince(started) > 12) { break }
                 autoreleasepool {
                     let request = VNRecognizeTextRequest()
                     request.recognitionLevel = .accurate
@@ -498,8 +510,9 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
             context.clearCaches()
             guard self.isCurrent(generation) else { return }
             var designID: String?
-            var designStatus = "asset-pack-unavailable"
-            do {
+            var designStatus = fast ? "ocr-first" : "asset-pack-unavailable"
+            let ocrElapsedMs = Int(Date().timeIntervalSince(started) * 1000)
+            if !fast { do {
                 let directory = try self.managedModelDirectory()
                 let manifest = directory.appendingPathComponent("manifest.json")
                 var enabled = false
@@ -541,6 +554,7 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
                 // OCR remains available if the essential pack is temporarily unavailable.
                 designStatus = "asset-pack-unavailable"
             }
+            }
             guard self.isCurrent(generation) else { return }
             let readings = found.values.sorted { $0.1 > $1.1 }
             let lines = readings.map { $0.0 }
@@ -553,7 +567,8 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
                 } else {
                     var response: [String: Any] = ["cancelled": false, "lines": lines,
                                    "text": lines.joined(separator: "\n"), "confidence": confidence,
-                                   "ocrPasses": completed, "passes": passReadings, "engineVersion": 4,
+                                   "ocrPasses": completed, "passes": passReadings, "engineVersion": 5,
+                                   "ocrElapsedMs": ocrElapsedMs, "rimPasses": rimImages.count,
                                    "designStatus": designStatus,
                                    "elapsedMs": Int(Date().timeIntervalSince(started) * 1000),
                                    "appBuild": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"]
