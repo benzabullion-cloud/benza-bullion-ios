@@ -4,6 +4,7 @@ on:
     paths:
       - 'App/public/index.html'
       - 'tests/add-holding-layout.cjs'
+      - 'tests/app-sweep.cjs'
       - '.github/workflows/add-holding-ui.yml'
 permissions:
   contents: read
@@ -18,6 +19,7 @@ jobs:
       - run: npm install --no-save --ignore-scripts playwright@1.58.2
       - run: npx playwright install --with-deps chromium webkit
       - run: node tests/add-holding-layout.cjs
+      - run: node tests/app-sweep.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
