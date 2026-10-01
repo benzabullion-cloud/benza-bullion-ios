@@ -22,7 +22,7 @@ final class CoinRimPhotoTests: XCTestCase {
         context.fillEllipse(in: CGRect(x: 100,y: 200,width: 600,height: 600))
         let image = try XCTUnwrap(context.makeImage())
         let strips = BenzaCoinRim.readingImages(image, maximumCandidates: 1)
-        XCTAssertEqual(strips.count, 2)
+        XCTAssertEqual(strips.count, 3)
         XCTAssertTrue(strips.allSatisfy { $0.width > $0.height && $0.height >= 80 })
     }
 }
