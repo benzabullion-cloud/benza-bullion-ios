@@ -6687,6 +6687,32 @@ const SMART_CAMERA_CATALOG=[
   {product:'5 lb Copper Bar',metal:'copper',strong:['5 lb copper bar'],support:['copper','5 lb']},
   {product:'10 lb Copper Bar',metal:'copper',strong:['10 lb copper bar'],support:['copper','10 lb']}
 ];
+
+// Every bullion product exposed by the app automatically receives a baseline
+// recognition profile. Product-specific rules above can add stronger aliases,
+// mint, fineness, date ranges, etc. This keeps the scanner from requiring a
+// one-off code change every time a product is added to PRODUCT_MAP.
+(function completeSmartCameraCatalog(){
+  const existing=new Set(SMART_CAMERA_CATALOG.map(item=>item.product));
+  const stop=new Set(['gold','silver','platinum','palladium','copper','american','canadian','british','australian','austrian','chinese','mexican','south','african','u','s','coinage','collection']);
+  const aliases=product=>{
+    const normalized=normalizeSmartCameraText(product)
+      .replace(/\b(?:gold|silver|platinum|palladium|copper)\b/g,' ')
+      .replace(/\s+/g,' ').trim();
+    const terms=[normalized];
+    const words=normalized.split(' ').filter(w=>w.length>2&&!stop.has(w));
+    if(words.length>=2)terms.push(words.join(' '));
+    if(words.length>=1)terms.push(words.slice(-2).join(' '));
+    return [...new Set(terms.filter(t=>t.length>=4))];
+  };
+  for(const metal of METALS){
+    for(const product of PRODUCT_MAP[metal]||[]){
+      if(existing.has(product))continue;
+      SMART_CAMERA_CATALOG.push({product,metal,strong:aliases(product),support:[]});
+      existing.add(product);
+    }
+  }
+})();
 function normalizeSmartCameraText(value){
   let text=String(value||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
     .replace(/[’‘]/g,"'").replace(/[½¼]/g,c=>c==='½'?'1/2':'1/4')
@@ -6727,6 +6753,15 @@ function smartCameraCatalogMatch(text,metal){
       let score=strongHits.length*7+supportHits.length;
       if(item.product.includes('Maple Leaf') && metal===item.metal && /\b(?:canada|can)\b/.test(text) && /9999|999\.9/.test(text) && !/\bbar\b/.test(text)){
         strongHits.push('Canadian metal + .9999 markings');score+=8;
+      }
+      if(item.product.includes('Britannia') && metal===item.metal && /\bbritannia\b/.test(text)){
+        strongHits.push('Britannia inscription');score+=8;
+      }
+      if(item.product.includes('Krugerrand') && metal===item.metal && /\bkrugerrand\b|\bsuid afrika\b/.test(text)){
+        strongHits.push('Krugerrand inscription');score+=8;
+      }
+      if(item.product.includes('Philharmonic') && metal===item.metal && /\bphilharmoniker\b|\bwiener philharmoniker\b/.test(text)){
+        strongHits.push('Philharmonic inscription');score+=8;
       }
       if(item.product==='American Silver Eagle' && metal==='silver' && /\bunited states of america\b/.test(text) && /\b(?:one|1) dollar\b/.test(text) && /\b(?:one|1) (?:troy )?(?:oz|ounce)\b/.test(text)){
         strongHits.push('United States + one dollar + one ounce silver');score+=8;
