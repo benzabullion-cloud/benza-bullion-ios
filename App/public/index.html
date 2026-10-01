@@ -7144,7 +7144,7 @@ function setSmartCameraBusy(busy){
   const useButton=document.getElementById('smartAnalysisUseButton');
   if(useButton)useButton.disabled=busy||!canUseSmartCameraSuggestion(pendingSmartCameraSuggestion);
 }
-async function resetSmartCameraScan(silent=false){
+async function resetSmartCameraScan(silent=false,releaseModels=false){
   const run=++smartCameraRunId;
   smartCameraSession++;
   clearSmartCameraEvidence();
@@ -7155,7 +7155,7 @@ async function resetSmartCameraScan(silent=false){
   if(status&&!silent)status.textContent='Resetting scanner…';
   try{
     const plugin=smartCameraPlugin();
-    if(typeof plugin?.reset==='function')await plugin.reset();
+    if(typeof plugin?.reset==='function')await plugin.reset({releaseModels});
     if(run===smartCameraRunId&&status&&!silent)status.textContent='Ready for a new item.';
     return run===smartCameraRunId;
   }catch(error){
@@ -7278,7 +7278,7 @@ async function openSmartCamera(){
   }
 }
 function closeSmartCamera(){
-  void resetSmartCameraScan(true);
+  void resetSmartCameraScan(true,true);
   const screen=document.getElementById('smartCameraScreen');
   screen.classList.remove('show');
   screen.setAttribute('aria-hidden','true');
