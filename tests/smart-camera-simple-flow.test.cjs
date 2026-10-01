@@ -45,17 +45,16 @@ test('Smart Camera menu uses explicit capture choices',()=>{
  const open=html.slice(html.indexOf('async function openSmartCamera()'),html.indexOf('function closeSmartCamera()'));
  assert.doesNotMatch(open,/runSmartCameraScan\s*\(/);
 });
-test('Screenshot regression: two-side metal-only result never opens a blank holding',()=>{
- const partial=scan('Fine silver');context.renderSmartCameraAnalysis(partial);context.useSmartCameraAnalysis();
- assert.equal(get('addScreen').classList.contains('show'),false);assert.equal(get('smartScanMetal').textContent,'Silver');
+test('Two-side metal-only result opens partial review with weight blank',()=>{
+ const partial=scan('Fine silver');context.renderSmartCameraAnalysis(partial);assert.equal(get('smartAnalysisUseButton').hidden,false);assert.equal(get('smartAnalysisUseButton').disabled,false);assert.equal(get('smartAnalysisUseButton').textContent,'Review and complete holding');context.useSmartCameraAnalysis();
+ assert.equal(get('addScreen').classList.contains('show'),true);assert.equal(get('weight').value,'');assert.equal(get('product').selectedIndex,-1);assert.equal(get('smartScanMetal').textContent,'Silver');
  assert.equal(get('smartScanProduct').textContent,'Not identified');assert.equal(get('smartScanWeight').textContent,'Not read');
- assert.equal(get('smartAnalysisUseButton').hidden,true);assert.equal(get('smartAnalysisUseButton').disabled,true);
  assert.equal(get('smartAnalysisTitle').textContent,'More details needed');
 });
-test('Product without weight cannot proceed',()=>{const s=scan('American Gold Eagle');context.renderSmartCameraAnalysis(s);assert.equal(context.applySmartCameraSuggestion(s),false);assert.equal(get('addScreen').classList.contains('show'),false)});
-test('Weight and metal without product cannot proceed',()=>{const s=scan('Fine silver 1 oz');context.renderSmartCameraAnalysis(s);assert.equal(context.applySmartCameraSuggestion(s),false);assert.equal(get('addScreen').classList.contains('show'),false)});
+test('Product without weight proceeds with the weight blank',()=>{const s=scan('American Gold Eagle');context.renderSmartCameraAnalysis(s);assert.equal(context.applySmartCameraSuggestion(s),true);assert.equal(get('addScreen').classList.contains('show'),true);assert.equal(get('weight').value,'');assert.equal(get('product').value,'American Gold Eagle')});
+test('Weight and metal without product proceed with no selected product',()=>{const s=scan('Fine silver 1 oz');context.renderSmartCameraAnalysis(s);assert.equal(context.applySmartCameraSuggestion(s),true);assert.equal(get('addScreen').classList.contains('show'),true);assert.equal(get('weight').value,1);assert.equal(get('product').selectedIndex,-1)});
 test('Product outside the selected metal catalog cannot proceed',()=>{assert.equal(context.applySmartCameraSuggestion({...complete,metal:'gold'}),false);assert.equal(get('addScreen').classList.contains('show'),false)});
-test('Conflicting results cannot proceed even with filled fields',()=>{assert.equal(context.applySmartCameraSuggestion({...complete,warnings:['Conflicting weight']}),false)});
+test('Weight conflicts proceed to review without a prefilled weight',()=>{assert.equal(context.applySmartCameraSuggestion({...complete,warnings:['Conflicting weight']}),true);assert.equal(get('weight').value,'');assert.match(get('holdingDetailsHint').textContent,/Conflicting weight/)});
 test('Blank front asks for one reverse photo',()=>{context.renderSmartCameraAnalysis({...scan(''),sides:1});assert.equal(get('smartAnalysisTitle').textContent,'One more photo');assert.equal(vm.runInContext('smartCameraAwaitingReverse',context),true)});
 test('Failed two-side scan stays on result with a fresh retry',()=>{context.renderSmartCameraAnalysis(scan(''));assert.equal(get('smartAnalysisTitle').textContent,'More details needed');assert.equal(vm.runInContext('smartCameraAwaitingReverse',context),false);assert.equal(get('addScreen').classList.contains('show'),false)});
 test('Pro access is checked again at handoff',()=>{active=false;assert.equal(context.applySmartCameraSuggestion(complete),false);active=true});
@@ -86,6 +85,6 @@ test('First photo is acknowledged and both sources request opposite side',()=>{c
 test('Second photo restores fresh scan choices',()=>{context.renderSmartCameraAnalysis(scan('Fine silver'));assert.equal(get('smartCameraProButton').textContent,'Scan again');assert.equal(get('smartCameraLibraryButton').textContent,'Choose Bullion Photo')});
 
 
-test('Free users can fill all bullion details while records stay locked',()=>{active=false;context.fillBullionDetails({year:2024,purity:'.999',mint:'Example mint',serial:'123'});context.syncProInventoryVisibility();assert.equal(get('holdingYear').value,2024);assert.equal(get('holdingSerial').value,'123');assert.equal(get('proInventoryFields').hidden,true);active=true});
+test('Free account cannot see the Pro bullion detail fields',()=>{active=false;context.fillBullionDetails({year:2024,purity:'.999',mint:'Example mint',serial:'123'});context.syncProInventoryVisibility();assert.equal(get('holdingYear').value,2024);assert.equal(get('holdingSerial').value,'123');assert.equal(get('proInventoryFields').hidden,true);active=true});
 test('Product suggestions do not replace user-entered purity or mint',()=>{get('product').value='American Silver Eagle';vm.runInContext("metal='silver'",context);get('holdingPurity').value='.999 confirmed';get('holdingMint').value='Custom mint';context.suggestBullionDetails();assert.equal(get('holdingPurity').value,'.999 confirmed');assert.equal(get('holdingMint').value,'Custom mint')});
 test('Fresh form clears previous year and serial and suggests known product details',()=>{context.openAdd();assert.equal(get('holdingYear').value,'');assert.equal(get('holdingSerial').value,'');assert.equal(get('holdingPurity').value,'22K gold');assert.equal(get('holdingMint').value,'United States Mint')});

@@ -3,12 +3,13 @@ const html=fs.readFileSync('App/public/index.html','utf8');
 const nodes=new Map();const get=id=>{if(!nodes.has(id))nodes.set(id,{value:'old',disabled:false,textContent:'',options:[],selectedIndex:0,classList:{values:new Set(),add(v){this.values.add(v)},remove(v){this.values.delete(v)},contains(v){return this.values.has(v)}},setAttribute(){}});return nodes.get(id)};
 let queued=[],calls=[],resetCalls=0,resetOptions=[],resetHook=async()=>{};const plugin={reset:async options=>{resetCalls++;resetOptions.push(options||{});await resetHook();},scan:async options=>{calls.push(options);return await queued.shift()}};
 const context=vm.createContext({Date,console,document:{getElementById:get,querySelectorAll:()=>[get('smartAnalysisUseButton')]},
-  isProActive:()=>true,isBenzaNativeRuntime:()=>true,smartCameraPlugin:()=>plugin,ensureGlobalAddPortals(){},closeAddChoice(){},isFounderPro:()=>false,openAdd(){},selectMetal(){},update(){}});
+  isProActive:()=>true,isBenzaNativeRuntime:()=>true,smartCameraPlugin:()=>plugin,ensureGlobalAddPortals(){},closeAddChoice(){},isFounderPro:()=>false,openAdd(){},selectMetal(){},update(){},fillBullionDetails(){},previewPendingScannerPhotos(){}});
 vm.runInContext(html.slice(html.indexOf('const GOLD_PRODUCTS='),html.indexOf('const METAL_SYMBOLS='))+html.slice(html.indexOf('let pendingSmartCameraSuggestion='),html.indexOf('function clearAttachmentObjectUrls')),context);
 vm.runInContext('renderSmartCameraAnalysis=(suggestion)=>{pendingSmartCameraSuggestion=suggestion;globalThis.lastSuggestion=suggestion;}',context);
 const reset=()=>vm.runInContext('smartCameraScans=[];smartCameraPhotoCount=0;pendingSmartCameraSuggestion=null;',context);
 const pending=()=>vm.runInContext('pendingSmartCameraSuggestion',context);
 const views=()=>vm.runInContext('smartCameraScans.length',context);
+context.previewPendingScannerPhotos=()=>{};
 let count=0;async function test(name,fn){await fn();count++;console.log('PASS',name)}
 (async()=>{
  await test('Reverse merges same-item year and markings',async()=>{queued.push({text:'LIBERTY 2011',confidence:.9},{text:'UNITED STATES OF AMERICA 1 OZ FINE SILVER ONE DOLLAR',confidence:.9});await context.runSmartCameraScan();await context.runSmartCameraScan(true);assert.equal(context.lastSuggestion.year,2011);assert.equal(context.lastSuggestion.product,'American Silver Eagle');assert.equal(context.lastSuggestion.sides,2)});
@@ -17,13 +18,13 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
  await test('Library option reaches native photo picker',async()=>{queued.push({text:'argent pur 1 oz',confidence:.9});await context.runSmartCameraScan(false,'library');assert.equal(calls.at(-1).source,'library')});
  await test('Double tap calls native only once',async()=>{let done;queued.push(new Promise(resolve=>done=resolve));const first=context.runSmartCameraScan();await new Promise(resolve=>setImmediate(resolve));const n=calls.length;await context.runSmartCameraScan();assert.equal(calls.length,n);assert.equal(get('smartAnalysisUseButton').disabled,true);done({text:'Fine silver',confidence:.9});await first});
  await test('Closing prevents late result from being applied',async()=>{let done;const before=context.lastSuggestion;queued.push(new Promise(resolve=>done=resolve));const first=context.runSmartCameraScan();await new Promise(resolve=>setImmediate(resolve));context.closeSmartCamera();done({text:'Fine gold',confidence:.9});await first;assert.equal(context.lastSuggestion,before)});
- await test('Metal-only result cannot open or change holding form',async()=>{get('weight').value='1';get('product').selectedIndex=0;assert.equal(context.applySmartCameraSuggestion(context.interpretSmartCameraScan({text:'Fine silver',confidence:.9})),false);assert.equal(get('weight').value,'1');assert.equal(get('product').selectedIndex,0)});
+ await test('Metal-only scan opens review with missing fields blank',async()=>{get('weight').value='1';get('product').selectedIndex=0;const scan=context.interpretSmartCameraScan({text:'Fine silver',confidence:.9});assert.equal(context.canUseSmartCameraSuggestion(scan),false);assert.equal(context.applySmartCameraSuggestion(scan),true);assert.equal(get('weight').value,'');assert.equal(get('product').selectedIndex,-1);assert.match(get('holdingDetailsHint').textContent,/Partial scan/)});
  await test('Unsupported suggestion cannot open or fill form',async()=>{get('weight').value='sentinel';assert.equal(context.applySmartCameraSuggestion(context.interpretSmartCameraScan({text:'',visualColor:{tone:'golden'}})),false);assert.equal(get('weight').value,'sentinel')});
  await test('Reverse metal contradiction blocks suggestion',async()=>{reset();queued.push({text:'Fine silver',confidence:.9},{text:'Fine gold',confidence:.9});await context.runSmartCameraScan();await context.runSmartCameraScan(true);assert.equal(context.lastSuggestion.usable,false);assert.equal(get('smartAnalysisUseButton').disabled,true)});
 
  await test('New item clears existing details before camera opens',async()=>{queued.push({text:'fine silver 2011 1 oz',confidence:.9});await context.runSmartCameraScan();let done;queued.push(new Promise(resolve=>done=resolve));const next=context.runSmartCameraScan();assert.equal(pending(),null);assert.equal(views(),0);await new Promise(resolve=>setImmediate(resolve));done({cancelled:true});await next;assert.equal(pending(),null);assert.equal(get('smartAnalysisUseButton').disabled,true)});
  await test('Failed fresh scan cannot resurrect old suggestion',async()=>{queued.push({text:'fine gold 1 oz',confidence:.9});await context.runSmartCameraScan();const oldConsole=context.console;context.console={...console,error(){}};queued.push(Promise.reject(Error('Camera failure')));await context.runSmartCameraScan();context.console=oldConsole;assert.equal(pending(),null);assert.equal(views(),0);assert.equal(get('smartAnalysisUseButton').disabled,true)});
- await test('Blank reverse does not stack or reduce evidence',async()=>{queued.push({text:'fine silver 1 oz .999',confidence:.95});await context.runSmartCameraScan();const before=pending();queued.push({lines:[],confidence:0});await context.runSmartCameraScan(true);assert.equal(pending().metal,before.metal);assert.equal(pending().weight,before.weight);assert.equal(views(),1);assert.equal(get('smartAnalysisUseButton').disabled,true)});
+ await test('Blank reverse does not stack or reduce evidence',async()=>{queued.push({text:'fine silver 1 oz .999',confidence:.95});await context.runSmartCameraScan();const before=pending();queued.push({lines:[],confidence:0});await context.runSmartCameraScan(true);assert.equal(pending().metal,before.metal);assert.equal(pending().weight,before.weight);assert.equal(views(),1);assert.equal(get('smartAnalysisUseButton').disabled,false)});
  await test('Noise-only reverse is ignored',async()=>{queued.push({text:'fine silver 1 oz .999',confidence:.95});await context.runSmartCameraScan();const before=pending();queued.push({text:'art textile',confidence:.1});await context.runSmartCameraScan(true);assert.equal(pending().metal,before.metal);assert.equal(pending().weight,before.weight);assert.equal(views(),1)});
  await test('Lower confidence detail cannot reduce prior good evidence',async()=>{queued.push({text:'fine silver 1 oz .999',confidence:.95});await context.runSmartCameraScan();const before=pending().confidence;queued.push({text:'2011',confidence:.25});await context.runSmartCameraScan(true);assert.ok(pending().confidence>=before)});
  await test('Two-side limit preserves the first side',async()=>{queued.push({text:'2011',confidence:.9},{text:'Fine silver 1 oz',confidence:.9});await context.runSmartCameraScan();await context.runSmartCameraScan(true);const n=calls.length;await context.runSmartCameraScan(true);assert.equal(calls.length,n);assert.equal(views(),2);assert.equal(pending().year,2011)});
@@ -73,6 +74,21 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
    await new Promise(resolve=>setImmediate(resolve));context.closeSmartCamera();
    done({text:'CANADA FINE SILVER 1 OZ',confidence:.95});await second;assert.equal(pending(),null);
    delete plugin.refine;
+ });
+ await test('Maple without weight opens review and keeps captured photos',async()=>{
+   const scan=context.interpretSmartCameraScan({text:'CANADA 9999 FINE SILVER 2026',confidence:.95});
+   get('product').options=[{value:'Canadian Silver Maple Leaf'}];
+   vm.runInContext("smartCameraCapturedFiles=[{name:'front.jpg'},{name:'back.jpg'}]",context);
+   assert.equal(context.canUseSmartCameraSuggestion(scan),false);
+   assert.equal(context.applySmartCameraSuggestion(scan),true);
+   assert.equal(get('product').value,'Canadian Silver Maple Leaf');assert.equal(get('weight').value,'');
+   assert.equal(vm.runInContext('pendingScannerPhotoFiles.length',context),2);
+ });
+ await test('Conflicting weights open manual review without autofilling weight',async()=>{
+   const scan=context.interpretSmartCameraScan({text:'CANADA 9999 FINE SILVER 1 OZ 2 OZ',confidence:.95});
+   assert.equal(context.canUseSmartCameraSuggestion(scan),false);
+   assert.equal(context.applySmartCameraSuggestion(scan),true);assert.equal(get('weight').value,'');
+   assert.match(get('holdingDetailsHint').textContent,/Different weights/);
  });
  console.log(count+' scanner flow checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1});
