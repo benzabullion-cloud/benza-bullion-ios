@@ -59,6 +59,17 @@ extern "C" int benza_scan_destroy(benza_scan *scan) {
     return 0;
 }
 
+extern "C" int benza_runtime_unload(void) {
+    std::unique_lock<std::mutex> worker(worker_mutex, std::try_to_lock);
+    if (!worker.owns_lock()) return 3;
+    cached_vision.reset();
+    cached_model.reset();
+    cached_model_path.clear();
+    cached_projector_path.clear();
+    cached_use_gpu = false;
+    return 0;
+}
+
 extern "C" int benza_scan_rgb(benza_scan *scan, const char *model_path,
                                 const char *projector_path, const char *catalogue_prompt,
                                 const uint8_t *rgb, size_t rgb_bytes,
