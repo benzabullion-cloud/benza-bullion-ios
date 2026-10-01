@@ -7423,7 +7423,7 @@ async function runSmartCameraScan(append=false,source='camera'){
     const capturedFile=scannerPhotoFileFromResult(result,smartCameraPhotoCount);
     if(capturedFile)smartCameraCapturedFiles.push(capturedFile);
     smartCameraLastDiagnostic={engineVersion:Number(result.engineVersion)||0,
-      designStatus:['local-catalogue-v1','not-bundled','device-limited','unavailable'].includes(result.designStatus)?result.designStatus:'unknown',
+      designStatus:['local-catalogue-v1','not-bundled','asset-pack-unavailable','device-limited','unavailable'].includes(result.designStatus)?result.designStatus:'unknown',
       appBuild:typeof result.appBuild==='string'&&/^[0-9.]+$/.test(result.appBuild)?result.appBuild:'unknown',
       ocrPasses:Number(result.ocrPasses)||0,selectedPasses:Number(result.selectedPasses)||0,
       rejectedPasses:Number(result.rejectedPasses)||0,lineCount:Array.isArray(result.lines)?result.lines.length:0,
@@ -7481,6 +7481,7 @@ async function openSmartCamera(){
         : '<strong>Smart Camera is a Pro feature</strong>Upgrade to Benza Bullion Pro to scan supported bullion and prefill holding details.';
   }
   smartCameraSession++;
+  smartCameraSource='camera';
   pendingScannerPhotoFiles=[];
   clearSmartCameraEvidence();
   if(status)status.textContent=active
@@ -7499,7 +7500,7 @@ function closeSmartCamera(){
   screen.setAttribute('aria-hidden','true');
 }
 function handleSmartCameraProAction(){
-  if(isProActive()){runSmartCameraScan(smartCameraAwaitingReverse,smartCameraSource);return;}
+  if(isProActive()){runSmartCameraScan(smartCameraAwaitingReverse,'camera');return;}
   closeSmartCamera();
   openProUpgrade('smart-camera');
 }
