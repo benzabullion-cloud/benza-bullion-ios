@@ -6934,7 +6934,15 @@ function interpretSmartCameraScan(result){
   const expected=fixedWeights[product];
   if(expected&&weight&&Math.abs(weight-expected)>.003){warnings.push('Weight disagrees with the matched product. Confirm product and weight.');weight=0;}
   let inferredWeight=false;
-  if(expected&&!weight&&weights.length===0&&!plated){weight=expected;inferredWeight=true;}
+  if(expected&&!weight&&weights.length===0&&!plated){
+    // A fixed catalogue weight is safe only after independent product evidence:
+    // either readable identifying inscriptions, or two photos of the same item.
+    const twoSides=(Number(result?.sides)||1)>=2;
+    const identifyingText=/\b(?:one|1) dollar\b/.test(text)||
+      /\b(?:25|twenty five) dollars?\b/.test(text)||
+      (design.id==='american_eagle'&&smartCameraYearCandidates(text).some(year=>year>=1986));
+    if(twoSides||identifyingText){weight=expected;inferredWeight=true;}
+  }
   const years=smartCameraYearCandidates(text);
   const year=years.length===1?years[0]:null;
   if(years.length>1)warnings.push('More than one possible year was read. Confirm the year.');
