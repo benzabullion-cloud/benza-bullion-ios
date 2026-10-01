@@ -9,7 +9,7 @@ window.Capacitor={isNativePlatform:()=>true,Plugins:{BenzaSmartCamera:{reset:asy
 window.alert=message=>sweep.alerts.push(message);window.confirm=()=>true;
 window.supabase={createClient:()=>({
  auth:{getSession:async()=>({data:{session:null}}),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}}),signOut:async()=>({error:null})},
- from(table){const query={select(){return this},eq(){return this},gte(){return this},order(){return this},limit(){return this},maybeSingle(){return this},insert(value){sweep.writes.push({table,value});return this},upsert(value){sweep.writes.push({table,value});return this},update(){return this},delete(){return this},then(resolve,reject){return Promise.resolve({data:sweep.tables[table]??null,error:null}).then(resolve,reject)}};return query},
+ from(table){const query={_from:0,_to:null,select(){return this},eq(){return this},gte(){return this},order(){return this},limit(){return this},range(from,to){this._from=from;this._to=to;return this},maybeSingle(){return this},insert(value){sweep.writes.push({table,value});return this},upsert(value){sweep.writes.push({table,value});return this},update(){return this},delete(){return this},then(resolve,reject){const rows=sweep.tables[table]??null;const data=Array.isArray(rows)&&this._to!==null?rows.slice(this._from,this._to+1):rows;return Promise.resolve({data,error:null}).then(resolve,reject)}};return query},
  rpc:async(name,args)=>{if(sweep.failRpc)throw Error('Network unavailable');sweep.writes.push({name,args});const row={id:args.p_holding_id||'sweep-holding',metal:args.p_metal,product:args.p_product,quantity:args.p_quantity,weight_oz:args.p_weight_oz,total_oz:args.p_quantity*args.p_weight_oz,cost_basis:args.p_cost_basis,purchase_date:args.p_purchase_date};return {data:row,error:null}},
  storage:{from:()=>({remove:async paths=>{sweep.removed.push(...paths);return {error:null}},upload:async()=>({error:null}),createSignedUrl:async()=>({data:{signedUrl:'https://sweep.test/photo.jpg'},error:null})})}
 })};`;
@@ -64,7 +64,7 @@ window.supabase={createClient:()=>({
   // Reproduce delayed responses from account A after B signs in.
   const stale=await page.evaluate(async()=>{
    const original=supabaseClient;const callbacks=[];
-   supabaseClient={from:()=>({select(){return this},order(){return this},then(resolve){callbacks.push(resolve)}})};
+   supabaseClient={from:()=>({select(){return this},order(){return this},range(){return this},then(resolve){callbacks.push(resolve)}})};
    const a=loadHoldingsFromSupabase(),b=loadActivityFromSupabase();
    await new Promise(resolve=>setTimeout(resolve,0));currentUser={id:'account-b'};holdings=[];activities=[];
    if(callbacks.length<2)throw Error('Delayed account query fixture was not initialized');
