@@ -73,6 +73,28 @@ public enum BenzaCoinRim {
         }
     }
 
+    static func boxBlur(_ source:[UInt8],width:Int,height:Int,rx:Int,ry:Int)->[UInt8] {
+        var horizontal=[UInt8](repeating:0,count:source.count)
+        var result=horizontal
+        for y in 0..<height {
+            var prefix=[Int](repeating:0,count:width+1)
+            for x in 0..<width { prefix[x+1]=prefix[x]+Int(source[y*width+x]) }
+            for x in 0..<width {
+                let lo=max(0,x-rx),hi=min(width,x+rx+1)
+                horizontal[y*width+x]=UInt8((prefix[hi]-prefix[lo])/(hi-lo))
+            }
+        }
+        for x in 0..<width {
+            var prefix=[Int](repeating:0,count:height+1)
+            for y in 0..<height { prefix[y+1]=prefix[y]+Int(horizontal[y*width+x]) }
+            for y in 0..<height {
+                let lo=max(0,y-ry),hi=min(height,y+ry+1)
+                result[y*width+x]=UInt8((prefix[hi]-prefix[lo])/(hi-lo))
+            }
+        }
+        return result
+    }
+
     static func unwrap(_ image: CGImage, box: CGRect, reverse: Bool) -> CGImage? {
         let w = image.width, h = image.height
         var pixels = [UInt8](repeating: 0, count: w*h)
@@ -105,6 +127,13 @@ public enum BenzaCoinRim {
                 let bottom=Double(pixels[(iy+1)*w+ix])*(1-fx)+Double(pixels[(iy+1)*w+ix+1])*fx
                 output[y*outWidth+x]=UInt8(max(0,min(255,top*(1-fy)+bottom*fy)))
             }
+        }
+        // Suppress fine radial texture, then flatten slow glare gradients.
+        // This is luminance processing only; no letter or number substitutions.
+        let smooth = boxBlur(output,width:outWidth,height:outHeight,rx:3,ry:1)
+        let background = boxBlur(smooth,width:outWidth,height:outHeight,rx:20,ry:20)
+        for index in output.indices {
+            output[index] = UInt8(max(0,min(255,160+4*(Int(smooth[index])-Int(background[index])))))
         }
         // Very wide strips shrink lettering in OCR's internal image pyramid.
         // Three overlapping rows retain the same inscription pixels at a useful scale.
