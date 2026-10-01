@@ -6675,7 +6675,17 @@ const SMART_CAMERA_CATALOG=[
   {product:'Gold Bar',metal:'gold',strong:['gold bar'],support:['fine gold','9999 gold','999.9 gold'],purity:'.9999 fine gold'},
   {product:'Silver Bar',metal:'silver',strong:['silver bar'],support:['fine silver','999 silver','9999 silver'],purity:'.999 fine silver'},
   {product:'Platinum Bar',metal:'platinum',strong:['platinum bar'],support:['fine platinum'],purity:'.9995 platinum'},
-  {product:'Palladium Bar',metal:'palladium',strong:['palladium bar'],support:['fine palladium'],purity:'.9995 palladium'}
+  {product:'Palladium Bar',metal:'palladium',strong:['palladium bar'],support:['fine palladium'],purity:'.9995 palladium'},
+  {product:'Gold Round',metal:'gold',strong:['gold round'],support:['fine gold'],purity:'.9999 fine gold'},
+  {product:'Silver Round',metal:'silver',strong:['silver round'],support:['fine silver'],purity:'.999 fine silver'},
+  {product:'Platinum Round',metal:'platinum',strong:['platinum round'],support:['fine platinum'],purity:'.9995 platinum'},
+  {product:'Palladium Round',metal:'palladium',strong:['palladium round'],support:['fine palladium'],purity:'.9995 palladium'},
+  {product:'Copper Bullion Bar',metal:'copper',strong:['copper bar','copper bullion bar'],support:['fine copper']},
+  {product:'Copper Bullion Round',metal:'copper',strong:['copper round','copper bullion round'],support:['fine copper']},
+  {product:'1 oz Copper Round',metal:'copper',strong:['1 oz copper round'],support:['copper','1 oz']},
+  {product:'1 lb Copper Bar',metal:'copper',strong:['1 lb copper bar'],support:['copper','1 lb']},
+  {product:'5 lb Copper Bar',metal:'copper',strong:['5 lb copper bar'],support:['copper','5 lb']},
+  {product:'10 lb Copper Bar',metal:'copper',strong:['10 lb copper bar'],support:['copper','10 lb']}
 ];
 function normalizeSmartCameraText(value){
   let text=String(value||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
@@ -6817,7 +6827,7 @@ function smartCameraDenominationGuess(text){
 function smartCameraDesignEvidence(result){
   const entries=Array.isArray(result?.designSuggestions)?result.designSuggestions:
     result?.designSuggestion?[result.designSuggestion]:[];
-  const allowed=['american_eagle','american_buffalo','canadian_maple_leaf','britannia','philharmonic','kangaroo','lunar','panda','libertad','krugerrand','kookaburra','koala','noahs_ark','somali_elephant','platinum_noble','palladium_ballerina','morgan_dollar','peace_dollar','walking_liberty_half_dollar','generic_bar','generic_round','unknown'];
+  const allowed=['american_eagle','american_silver_eagle','american_gold_eagle','american_platinum_eagle','american_palladium_eagle','american_buffalo','canadian_maple_leaf','britannia','philharmonic','kangaroo','lunar','panda','libertad','krugerrand','kookaburra','koala','noahs_ark','somali_elephant','platinum_noble','palladium_ballerina','morgan_dollar','peace_dollar','walking_liberty_half_dollar','generic_bar','generic_round','unknown'];
   let invalid=false;
   const ids=[];
   for(const entry of entries){
@@ -6828,10 +6838,27 @@ function smartCameraDesignEvidence(result){
   }
   return {id:ids.length===1?ids[0]:'',conflict:ids.length>1,invalid};
 }
+function smartCameraDesignUniqueMetal(design){
+  const exact={
+    american_silver_eagle:'silver',american_gold_eagle:'gold',
+    american_platinum_eagle:'platinum',american_palladium_eagle:'palladium',
+    american_buffalo:'gold',kookaburra:'silver',koala:'silver',noahs_ark:'silver',
+    somali_elephant:'silver',platinum_noble:'platinum',palladium_ballerina:'palladium',
+    morgan_dollar:'silver',peace_dollar:'silver',walking_liberty_half_dollar:'silver'
+  };
+  return exact[design]||'';
+}
 function smartCameraDesignCatalogMatch(design,text,metal){
-  if(!metal||/\b(?:plated|replica|copy|tribute)\b/.test(text))return null;
+  if(/\b(?:plated|replica|copy|tribute)\b/.test(text))return null;
+  const uniqueMetal=smartCameraDesignUniqueMetal(design);
+  const resolvedMetal=metal||uniqueMetal;
+  if(!resolvedMetal)return null;
   const familyProducts={
-    american_eagle:{gold:'American Gold Eagle',silver:'American Silver Eagle',platinum:'American Platinum Eagle',palladium:'American Palladium Eagle'},
+    american_eagle:{silver:'American Silver Eagle'},
+    american_silver_eagle:{silver:'American Silver Eagle'},
+    american_gold_eagle:{gold:'American Gold Eagle'},
+    american_platinum_eagle:{platinum:'American Platinum Eagle'},
+    american_palladium_eagle:{palladium:'American Palladium Eagle'},
     american_buffalo:{gold:'American Gold Buffalo'},
     canadian_maple_leaf:{gold:'Canadian Gold Maple Leaf',silver:'Canadian Silver Maple Leaf',platinum:'Canadian Platinum Maple Leaf',palladium:'Canadian Palladium Maple Leaf'},
     britannia:{gold:'British Gold Britannia',silver:'British Silver Britannia',platinum:'British Platinum Britannia'},
@@ -6857,14 +6884,14 @@ function smartCameraDesignCatalogMatch(design,text,metal){
       gold:'Gold Round',silver:'Silver Round',platinum:'Platinum Round',palladium:'Palladium Round',copper:'Copper Bullion Round'
     }
   };
-  const product=familyProducts[design]?.[metal]||'';
-  if(!product||(PRODUCT_MAP[metal]||[]).includes(product)===false)return null;
-  const item=SMART_CAMERA_CATALOG.find(item=>item.product===product&&item.metal===metal);
+  const product=familyProducts[design]?.[resolvedMetal]||'';
+  if(!product||(PRODUCT_MAP[resolvedMetal]||[]).includes(product)===false)return null;
+  const item=SMART_CAMERA_CATALOG.find(item=>item.product===product&&item.metal===resolvedMetal);
   if(!item)return null;
   if(design==='walking_liberty_half_dollar'&&!/\b(?:half dollar|50 cents?|liberty)\b/.test(text))return null;
   if(design==='morgan_dollar'&&!/\b(?:morgan|one dollar|dollar)\b/.test(text))return null;
   if(design==='peace_dollar'&&!/\b(?:peace|one dollar|dollar)\b/.test(text))return null;
-  return {item,strongHits:['on-device artwork family + metal inscription'],supportHits:[],score:7};
+  return {item,strongHits:['on-device artwork family'+(metal?' + metal inscription':'')],supportHits:[],score:7};
 }
 function interpretSmartCameraScan(result){
   const raw=Array.isArray(result?.lines)?result.lines.join(' '):(result?.text||'');
@@ -6878,6 +6905,8 @@ function interpretSmartCameraScan(result){
   const design=smartCameraDesignEvidence(result);
   if(design.invalid)warnings.push('The artwork result was invalid. Scan again.');
   if(design.conflict)warnings.push('The two photos suggest different designs. Scan this item again.');
+  const visualMetal=!metal&&!design.invalid&&!design.conflict?smartCameraDesignUniqueMetal(design.id):'';
+  if(visualMetal)metal=visualMetal;
   let catalogMatch=metals.length>1?null:smartCameraCatalogMatch(text,metal);
   const artworkMatch=!design.invalid&&!design.conflict?smartCameraDesignCatalogMatch(design.id,text,metal):null;
   if(artworkMatch&&catalogMatch&&artworkMatch.item.product!==catalogMatch.item.product){
