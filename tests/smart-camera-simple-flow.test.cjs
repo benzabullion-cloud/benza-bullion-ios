@@ -78,7 +78,7 @@ test('Fresh retry clears diagnostic and recognized evidence',()=>{
 test('Successful result retains optional local build and weight-parser diagnostics',()=>{
  vm.runInContext('smartCameraLastDiagnostic={engineVersion:3}',context);
  context.renderSmartCameraAnalysis(complete);assert.equal(get('smartCameraDiagnostics').hidden,false);
- assert.equal(JSON.parse(get('smartCameraDiagnosticText').textContent).weightParserVersion,3);
+ assert.equal(JSON.parse(get('smartCameraDiagnosticText').textContent).weightParserVersion,4);
 });
 console.log(count+' scanner review checks passed');
 
@@ -89,4 +89,3 @@ test('Second photo restores fresh scan choices',()=>{context.renderSmartCameraAn
 test('Free account cannot see the Pro bullion detail fields',()=>{active=false;context.fillBullionDetails({year:2024,purity:'.999',mint:'Example mint',serial:'123'});context.syncProInventoryVisibility();assert.equal(get('holdingYear').value,2024);assert.equal(get('holdingSerial').value,'123');assert.equal(get('proInventoryFields').hidden,true);active=true});
 test('Product suggestions do not replace user-entered purity or mint',()=>{get('product').value='American Silver Eagle';vm.runInContext("metal='silver'",context);get('holdingPurity').value='.999 confirmed';get('holdingMint').value='Custom mint';context.suggestBullionDetails();assert.equal(get('holdingPurity').value,'.999 confirmed');assert.equal(get('holdingMint').value,'Custom mint')});
 test('Fresh form clears previous year and serial and suggests known product details',()=>{context.openAdd();assert.equal(get('holdingYear').value,'');assert.equal(get('holdingSerial').value,'');assert.equal(get('holdingPurity').value,'22K gold');assert.equal(get('holdingMint').value,'United States Mint')});
-
