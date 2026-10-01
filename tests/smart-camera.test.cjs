@@ -179,4 +179,33 @@ test('Separate native readings combine historic country denomination and date',(
  const selected=context.selectSmartCameraPhotoEvidence({passes:[pass('UNITED STATES OF AMERICA ONE DIME'),pass('LIBERTY 1944')]});
  const r=context.interpretSmartCameraScan(selected);assert.equal(r.product,'Mercury Dime');assert.ok(r.weight>0);assert.equal(r.warnings.length,0);
 });
+test('Reported 21.4124 oz false gram reading cannot become a ready five-dollar Silver Maple',()=>{
+ const text='CANADA 9999 FINE SILVER 666 G ARGENT PUR CHARLES III 5 DOLLARS 2026';
+ const r=scan(text,{sides:2});assert.equal(r.product,'Canadian Silver Maple Leaf');
+ assert.equal(scan('CAN 9999 SILVER 666 G 5 DOLLARS').weight,0);
+ assert.ok(Math.abs(context.smartCameraWeightGuess(context.normalizeSmartCameraText(text),'silver')-21.4124)<.0001);
+ assert.equal(r.weight,0);assert.match(r.warnings.join(' '),/Weight disagrees/);assert.equal(r.inferredWeight,false);
+});
+test('Five-dollar Silver Maple validates the real ounce marking',()=>{
+ for(const text of ['CANADA 9999 FINE SILVER 1 OZ ARGENT PUR CHARLES III 5 DOLLARS 2026',
+ 'CANADA 9999 FINE SILVER 31.11 G ARGENT PUR ELIZABETH II FIVE DOLLARS 2022']){
+  const r=scan(text,{sides:2});assert.ok(Math.abs(r.weight-1)<.001);assert.equal(r.warnings.length,0);
+ }
+});
+test('Missing Maple weight uses independently identified denomination and date with specification label',()=>{
+ const r=scan('CANADA 9999 FINE SILVER CHARLES III 5 DOLLARS 2026',{sides:2});
+ assert.equal(r.weight,1);assert.equal(r.inferredWeight,true);assert.equal(r.warnings.length,0);
+});
+test('Other Maple sizes and gold fractions are not overwritten by a one-ounce default',()=>{
+ for(const [text,weight] of [['CANADA 9999 FINE SILVER 2 OZ 10 DOLLARS 2026',2],
+ ['CANADA 9999 FINE SILVER 1 KG 250 DOLLARS 2026',1000/31.1034768],
+ ['CANADA 9999 FINE GOLD 1/10 OZ 5 DOLLARS 2026',.1],
+ ['CANADA 9999 FINE SILVER 1/2 OZ 2026',.5]]){
+  const r=scan(text,{sides:2});assert.ok(Math.abs(r.weight-weight)<1e-10,text);assert.equal(r.warnings.length,0,text);
+ }
+ assert.equal(scan('CANADA 9999 FINE SILVER 5 DOLLARS 10 DOLLARS 2026',{sides:2}).weight,0);
+});
+test('Gram quantities remain valid for bars and are not globally blacklisted',()=>{
+ const r=scan('FINE SILVER BAR 666 G');assert.ok(Math.abs(r.weight-666/31.1034768)<1e-10);assert.equal(r.warnings.length,0);
+});
 console.log(count+' scanner regression checks passed');
