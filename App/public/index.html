@@ -7337,7 +7337,7 @@ function applySmartCameraSuggestion(suggestion){
   document.getElementById('cost').value='';
   fillBullionDetails({year:suggestion.year,purity:suggestion.purity,mint:suggestion.mint,serial:suggestion.serial});
   document.getElementById('proInventoryFields').open=true;
-  document.getElementById('holdingDetailsHint').textContent=canUseSmartCameraSuggestion(suggestion)?'Details filled from your scan. Review every field before saving.':'Partial scan. Complete missing fields and review every field before saving.'+(suggestion.warnings.length?' '+suggestion.warnings.join(' '):'');
+  document.getElementById('holdingDetailsHint').textContent=canUseSmartCameraSuggestion(suggestion)?'Details filled from your scan. Review every field before saving.':'Partial scan. Review the details before saving. Additional bullion details are optional.'+(suggestion.warnings.length?' '+suggestion.warnings.join(' '):'');
   if(isProActive()&&suggestion.denomination){
     document.getElementById('holdingNotes').value='Denomination: '+suggestion.denomination;
   }
