@@ -6876,7 +6876,7 @@ function smartCameraDesignEvidence(result){
        entry.source!=='local-catalogue-v1'||!allowed.includes(entry.id)){invalid=true;continue;}
     if(entry.id!=='unknown'&&!ids.includes(entry.id))ids.push(entry.id);
   }
-  return {id:ids.length===1?ids[0]:'',conflict:ids.length>1,invalid};
+  return {id:ids.length===1?ids[0]:'',ids,conflict:ids.length>1,invalid};
 }
 function smartCameraDesignUniqueMetal(design){
   const exact={
@@ -6972,6 +6972,31 @@ function smartCameraDesignCompatibleProduct(design,product){
   if(design==='generic_round')return /Round$/.test(product);
   return design==='unknown';
 }
+function smartCameraResolveDesignConflict(design,text,metal,catalogMatch){
+  if(!design?.conflict||!Array.isArray(design.ids)||!design.ids.length)return design;
+  const generic=new Set(['generic_coin','generic_bar','generic_round']);
+  const specific=design.ids.filter(id=>!generic.has(id));
+  // A generic shape on one side and a named family on the other is normal for
+  // two-sided bullion. Prefer the named family rather than declaring a conflict.
+  if(specific.length===1)return {...design,id:specific[0],conflict:false,resolvedBy:'specific-over-generic'};
+
+  // Strong readable catalogue evidence can adjudicate a visual disagreement.
+  // Require a non-baseline named product match and exactly one compatible design.
+  if(catalogMatch&&!catalogMatch.item?.baseline&&(catalogMatch.strongHits?.length||0)>0){
+    const compatible=design.ids.filter(id=>smartCameraDesignCompatibleProduct(id,catalogMatch.item.product));
+    if(compatible.length===1)return {...design,id:compatible[0],conflict:false,resolvedBy:'catalogue-text'};
+  }
+
+  // Canadian Maple reverses carry unusually strong deterministic text evidence.
+  // If OCR sees CANADA + .9999 + a single metal, prefer Maple over a portrait-side
+  // misclassification. Do not use this shortcut for bars.
+  if(metal&&/\b(?:canada|can)\b/.test(text)&&/\b(?:9999|999\.9)\b/.test(text)&&!/\bbar\b/.test(text)&&
+     design.ids.includes('canadian_maple_leaf')){
+    return {...design,id:'canadian_maple_leaf',conflict:false,resolvedBy:'maple-inscription'};
+  }
+  return design;
+}
+
 function interpretSmartCameraScan(result){
   const raw=Array.isArray(result?.lines)?result.lines.join(' '):(result?.text||'');
   const text=normalizeSmartCameraText(raw);
@@ -6981,12 +7006,20 @@ function interpretSmartCameraScan(result){
   if(metals.length>1)warnings.push('Conflicting metal markings. Scan the other side and confirm the metal manually.');
   const plated=/\b(?:plated|clad|filled|replica|copy|tribute|layered)\b/.test(text);
   if(plated)warnings.push('Plated, replica, or layered marking detected. Fine-metal content needs manual verification.');
-  const design=smartCameraDesignEvidence(result);
+  let design=smartCameraDesignEvidence(result);
   if(design.invalid)warnings.push('The artwork result was invalid. Scan again.');
-  if(design.conflict)warnings.push('The two photos suggest different designs. Scan this item again.');
-  const visualMetal=!metal&&!design.invalid&&!design.conflict?smartCameraDesignUniqueMetal(design.id):'';
+  let visualMetal=!metal&&!design.invalid&&!design.conflict?smartCameraDesignUniqueMetal(design.id):'';
   if(visualMetal)metal=visualMetal;
   let catalogMatch=metals.length>1?null:smartCameraCatalogMatch(text,metal);
+  design=smartCameraResolveDesignConflict(design,text,metal,catalogMatch);
+  if(design.conflict)warnings.push('The two photos suggest different designs. Scan this item again.');
+  if(!metal&&!design.invalid&&!design.conflict){
+    visualMetal=smartCameraDesignUniqueMetal(design.id);
+    if(visualMetal){
+      metal=visualMetal;
+      catalogMatch=metals.length>1?null:smartCameraCatalogMatch(text,metal);
+    }
+  }
   const artworkMatch=!design.invalid&&!design.conflict?smartCameraDesignCatalogMatch(design.id,text,metal):null;
   if(artworkMatch&&catalogMatch&&artworkMatch.item.product!==catalogMatch.item.product){
     // Auto-generated baseline profiles are intentionally weak. A generic visual
@@ -7357,6 +7390,8 @@ async function runSmartCameraScan(append=false,source='camera'){
     smartCameraScans.push(result);
     const combined={lines:smartCameraScans.flatMap(scan=>Array.isArray(scan.lines)?scan.lines:[scan.text||'']),
       confidence:Math.max(...smartCameraScans.map(scan=>Number(scan.confidence)||0)),sides:smartCameraPhotoCount,
+      photoEvidence:smartCameraScans.map(scan=>({lines:Array.isArray(scan.lines)?scan.lines:[scan.text||''],
+        confidence:Number(scan.confidence)||0,designSuggestion:scan.designSuggestion||null})),
       designSuggestions:smartCameraScans.flatMap(scan=>Array.isArray(scan.designSuggestions)?scan.designSuggestions:scan.designSuggestion?[scan.designSuggestion]:[])};
     const suggestion=interpretSmartCameraScan(combined);
     renderSmartCameraAnalysis(suggestion);
