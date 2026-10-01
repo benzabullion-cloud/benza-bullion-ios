@@ -6897,6 +6897,35 @@ function smartCameraDesignCatalogMatch(design,text,metal){
   if(design==='peace_dollar'&&!/\b(?:peace|one dollar|dollar)\b/.test(text))return null;
   return {item,strongHits:['on-device artwork family'+(metal?' + metal inscription':'')],supportHits:[],score:7};
 }
+function smartCameraDesignCompatibleProduct(design,product){
+  if(!design||!product)return true;
+  const exact={
+    american_eagle:'American Silver Eagle',
+    american_silver_eagle:'American Silver Eagle',
+    american_gold_eagle:'American Gold Eagle',
+    american_platinum_eagle:'American Platinum Eagle',
+    american_palladium_eagle:'American Palladium Eagle',
+    american_buffalo:'American Gold Buffalo',
+    kookaburra:'Australian Silver Kookaburra',
+    koala:'Australian Silver Koala',
+    noahs_ark:'Armenian Silver Noah’s Ark',
+    somali_elephant:'Somali Silver Elephant',
+    platinum_noble:'Isle of Man Platinum Noble',
+    palladium_ballerina:'Russian Palladium Ballerina',
+    morgan_dollar:'Morgan Silver Dollar',
+    peace_dollar:'Peace Silver Dollar',
+    walking_liberty_half_dollar:'Walking Liberty Half Dollar'
+  };
+  if(exact[design])return exact[design]===product;
+  const contains={
+    canadian_maple_leaf:'Maple Leaf',britannia:'Britannia',philharmonic:'Philharmonic',
+    kangaroo:'Kangaroo',lunar:'Lunar',panda:'Panda',libertad:'Libertad',krugerrand:'Krugerrand'
+  };
+  if(contains[design])return product.includes(contains[design]);
+  if(design==='generic_bar')return /Bar$/.test(product);
+  if(design==='generic_round')return /Round$/.test(product);
+  return design==='unknown';
+}
 function interpretSmartCameraScan(result){
   const raw=Array.isArray(result?.lines)?result.lines.join(' '):(result?.text||'');
   const text=normalizeSmartCameraText(raw);
@@ -6919,8 +6948,7 @@ function interpretSmartCameraScan(result){
   if(design.id==='walking_liberty_half_dollar'&&catalogMatch?.item.product==='American Silver Eagle'){
     warnings.push('Artwork and inscriptions disagree. Confirm the product.');
   }
-  const designMatch=design.id?smartCameraDesignCatalogMatch(design.id,text,metal):null;
-  const familyFits=!catalogMatch||!design.id||!designMatch||designMatch.item.product===catalogMatch.item.product;
+  const familyFits=!catalogMatch||!design.id||smartCameraDesignCompatibleProduct(design.id,catalogMatch.item.product);
   if(!familyFits&&!warnings.includes('Artwork and inscriptions disagree. Confirm the product.')){
     warnings.push('Artwork and inscriptions disagree. Confirm the product.');
   }
