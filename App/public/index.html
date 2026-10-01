@@ -5794,12 +5794,12 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
       </div>
       <div class="smartCameraActions">
         <button id="smartCameraProButton" class="smartCameraPrimary" type="button" onclick="handleSmartCameraProAction()">Scan Bullion</button>
-        <button class="smartCameraSecondary" data-scan-control type="button" onclick="runSmartCameraScan(smartCameraAwaitingReverse,'library')">Use a photo</button>
+        <button class="smartCameraSecondary" data-scan-control type="button" onclick="runSmartCameraScan(smartCameraAwaitingReverse,'library')">Choose Bullion Photo</button>
         <button class="smartCameraSecondary" type="button" onclick="closeSmartCamera();openManualAdd();">Enter manually</button>
       </div>
       <div id="smartCameraStatus" class="smartCameraFine" role="status"></div>
       <details id="smartCameraDiagnostics" class="smartCameraFine" hidden><summary>Scanner check · stays on this phone</summary><p id="smartCameraDiagnosticText"></p></details>
-      <div class="smartCameraFine">Scan photos stay on your iPhone. Scanning does not verify authenticity.</div>
+      <div class="smartCameraFine">Scan photos stay private. Photos are attached to the holding only after you save it. Scanning does not verify authenticity.</div>
     </div>
   </section>
 
@@ -6614,6 +6614,7 @@ function closeAddChoice(){
 })();
 function openManualAdd(){
   closeAddChoice();
+  pendingScannerPhotoFiles=[];
   openAdd();
 }
 function smartCameraPlugin(){
@@ -6622,6 +6623,8 @@ function smartCameraPlugin(){
 let pendingSmartCameraSuggestion=null;
 let smartCameraScans=[];
 let smartCameraPhotoCount=0;
+let smartCameraCapturedFiles=[];
+let pendingScannerPhotoFiles=[];
 let smartCameraLastDiagnostic=null;
 let smartCameraScanning=false;
 let smartCameraSession=0;
@@ -6642,7 +6645,7 @@ const SMART_CAMERA_CATALOG=[
   {product:'British Gold Britannia',metal:'gold',strong:['britannia'],support:['fine gold','great britain'],mint:'The Royal Mint',purity:'.9999 fine gold'},
   {product:'British Silver Britannia',metal:'silver',strong:['britannia'],support:['fine silver','great britain'],mint:'The Royal Mint',purity:'.999 fine silver'},
   {product:'British Platinum Britannia',metal:'platinum',strong:['britannia'],support:['platinum','great britain'],mint:'The Royal Mint',purity:'.9995 platinum'},
-  {product:'British Silver Queen’s Beasts',metal:'silver',strong:["queen's beasts",'queens beasts'],support:['fine silver'],mint:'The Royal Mint',purity:'.9999 fine silver'},
+  {product:'British Silver Queen’s Beasts',metal:'silver',strong:["queen's beasts",'queens beasts','queen s beasts'],support:['fine silver'],mint:'The Royal Mint',purity:'.9999 fine silver'},
   {product:'South African Gold Krugerrand',metal:'gold',strong:['krugerrand'],support:['suid afrika','south africa'],mint:'South African Mint',purity:'22K gold'},
   {product:'South African Silver Krugerrand',metal:'silver',strong:['krugerrand'],support:['fine silver','south africa'],mint:'South African Mint',purity:'.999 fine silver'},
   {product:'Austrian Gold Philharmonic',metal:'gold',strong:['philharmoniker','wiener philharmoniker'],support:['republik osterreich','fine gold'],mint:'Austrian Mint',purity:'.9999 fine gold'},
@@ -6666,12 +6669,43 @@ const SMART_CAMERA_CATALOG=[
   {product:'Mexican 5 Peso Gold',metal:'gold',strong:['5 pesos'],support:['oro puro'],mint:'Casa de Moneda de México',purity:'.900 gold'},
   {product:'Mexican 2.5 Peso Gold',metal:'gold',strong:['2 1/2 pesos','2.5 pesos'],support:['oro puro'],mint:'Casa de Moneda de México',purity:'.900 gold'},
   {product:'British Gold Sovereign',metal:'gold',strong:['sovereign'],support:['dei gra rex fid def'],mint:'The Royal Mint',purity:'22K gold'},
-  {product:'Morgan Silver Dollar',metal:'silver',strong:['morgan'],support:['e pluribus unum','one dollar','in god we trust'],mint:'United States Mint',purity:'.900 silver',yearMin:1878,yearMax:1921},
-  {product:'Peace Silver Dollar',metal:'silver',strong:['peace dollar','peace'],support:['one dollar','in god we trust'],mint:'United States Mint',purity:'.900 silver',yearMin:1921,yearMax:1935},
-  {product:'Walking Liberty Half Dollar',metal:'silver',strong:['half dollar'],support:['walking liberty'],mint:'United States Mint',purity:'.900 silver',yearMin:1916,yearMax:1947},
-  {product:'Franklin Half Dollar',metal:'silver',strong:['franklin'],support:['half dollar'],mint:'United States Mint',purity:'.900 silver',yearMin:1948,yearMax:1963},
-  {product:'1964 Kennedy Half Dollar',metal:'silver',strong:['kennedy'],support:['half dollar'],mint:'United States Mint',purity:'.900 silver',yearMin:1964,yearMax:1964},
-  {product:'Mercury Dime',metal:'silver',strong:['mercury dime'],support:['one dime','liberty'],mint:'United States Mint',purity:'.900 silver',yearMin:1916,yearMax:1945},
+  {product:'Morgan Silver Dollar',metal:'silver',strong:['morgan','one dollar'],support:['e pluribus unum','in god we trust'],mint:'United States Mint',purity:'.900 silver',yearMin:1878,yearMax:1921,requiresYear:true},
+  {product:'Peace Silver Dollar',metal:'silver',strong:['peace dollar','peace','one dollar'],support:['in god we trust'],mint:'United States Mint',purity:'.900 silver',yearMin:1921,yearMax:1935,requiresYear:true},
+  {product:'Walking Liberty Half Dollar',metal:'silver',strong:['half dollar'],support:['walking liberty'],mint:'United States Mint',purity:'.900 silver',yearMin:1916,yearMax:1947,requiresYear:true},
+  {product:'Franklin Half Dollar',metal:'silver',strong:['franklin','half dollar'],support:['united states of america'],mint:'United States Mint',purity:'.900 silver',yearMin:1948,yearMax:1963,requiresYear:true},
+  {product:'1964 Kennedy Half Dollar',metal:'silver',strong:['kennedy','half dollar'],support:['united states of america'],mint:'United States Mint',purity:'.900 silver',yearMin:1964,yearMax:1964,requiresYear:true},
+  {product:'Mercury Dime',metal:'silver',strong:['mercury dime','one dime','1 dime'],support:['liberty'],mint:'United States Mint',purity:'.900 silver',yearMin:1916,yearMax:1945,requiresYear:true},
+  {product:'British Gold Half Sovereign',metal:'gold',strong:['half sovereign'],support:['dei gra rex fid def'],mint:'The Royal Mint',purity:'22K gold'},
+  {product:'Swiss 20 Franc Gold',metal:'gold',strong:['helvetia','confederatio helvetica'],support:['20 francs','20 franc'],purity:'.900 gold'},
+  {product:'French 20 Franc Rooster',metal:'gold',strong:['republique francaise','liberte egalite fraternite'],support:['20 francs','20 franc'],purity:'.900 gold'},
+  {product:'Austrian 100 Corona Gold',metal:'gold',strong:['100 corona','100 korona'],support:['austria','osterreich'],purity:'.900 gold'},
+  {product:'Austrian 20 Corona Gold',metal:'gold',strong:['20 corona','20 korona'],support:['austria','osterreich'],purity:'.900 gold'},
+  {product:'U.S. $20 Saint-Gaudens Double Eagle',metal:'gold',strong:['twenty dollars','20 dollars'],support:['united states of america'],mint:'United States Mint',purity:'.900 gold',yearMin:1907,yearMax:1933,requiresYear:true},
+  {product:'U.S. $20 Liberty Head Double Eagle',metal:'gold',strong:['twenty dollars','20 dollars'],support:['united states of america'],mint:'United States Mint',purity:'.900 gold',yearMin:1849,yearMax:1907,requiresYear:true},
+  {product:'U.S. $10 Indian Head Eagle',metal:'gold',strong:['ten dollars','10 dollars'],support:['united states of america'],mint:'United States Mint',purity:'.900 gold',yearMin:1907,yearMax:1933,requiresYear:true},
+  {product:'U.S. $10 Liberty Head Eagle',metal:'gold',strong:['ten dollars','10 dollars'],support:['united states of america'],mint:'United States Mint',purity:'.900 gold',yearMin:1838,yearMax:1907,requiresYear:true},
+  {product:'U.S. $5 Indian Head Half Eagle',metal:'gold',strong:['five dollars','5 dollars'],support:['united states of america'],mint:'United States Mint',purity:'.900 gold',yearMin:1908,yearMax:1929,requiresYear:true},
+  {product:'U.S. $5 Liberty Head Half Eagle',metal:'gold',strong:['five dollars','5 dollars'],support:['united states of america'],mint:'United States Mint',purity:'.900 gold',yearMin:1839,yearMax:1908,requiresYear:true},
+  {product:'U.S. $2.50 Indian Head Quarter Eagle',metal:'gold',strong:['2 1/2 dollars','2.5 dollars','2 50 dollars'],support:['united states of america'],mint:'United States Mint',purity:'.900 gold',yearMin:1908,yearMax:1929,requiresYear:true},
+  {product:'U.S. $2.50 Liberty Head Quarter Eagle',metal:'gold',strong:['2 1/2 dollars','2.5 dollars','2 50 dollars'],support:['united states of america'],mint:'United States Mint',purity:'.900 gold',yearMin:1840,yearMax:1907,requiresYear:true},
+  {product:'Gold Bullion Coin',metal:'gold',strong:['gold bullion coin'],support:['fine gold'],purity:'.9999 fine gold',baseline:true},
+  {product:'Armenian Silver Noah’s Ark',metal:'silver',strong:["noah's ark",'noahs ark','noah s ark'],support:['armenia','republic of armenia'],purity:'.999 fine silver'},
+  {product:'Somali Silver Elephant',metal:'silver',strong:['somali elephant','african wildlife elephant'],support:['somalia','african wildlife'],purity:'.9999 fine silver'},
+  {product:'Washington Silver Quarter',metal:'silver',strong:['quarter dollar'],support:['united states of america'],mint:'United States Mint',purity:'.900 silver',yearMin:1932,yearMax:1964,requiresYear:true},
+  {product:'Standing Liberty Quarter',metal:'silver',strong:['quarter dollar'],support:['united states of america'],mint:'United States Mint',purity:'.900 silver',yearMin:1916,yearMax:1930,requiresYear:true},
+  {product:'Barber Quarter',metal:'silver',strong:['quarter dollar'],support:['united states of america'],mint:'United States Mint',purity:'.900 silver',yearMin:1892,yearMax:1916,requiresYear:true},
+  {product:'Roosevelt Silver Dime',metal:'silver',strong:['one dime','1 dime'],support:['united states of america'],mint:'United States Mint',purity:'.900 silver',yearMin:1946,yearMax:1964,requiresYear:true},
+  {product:'Barber Dime',metal:'silver',strong:['one dime','1 dime'],support:['united states of america'],mint:'United States Mint',purity:'.900 silver',yearMin:1892,yearMax:1916,requiresYear:true},
+  {product:'Barber Half Dollar',metal:'silver',strong:['half dollar'],support:['united states of america'],mint:'United States Mint',purity:'.900 silver',yearMin:1892,yearMax:1915,requiresYear:true},
+  {product:'U.S. 90% Silver Coinage',metal:'silver',strong:['90% silver','90 percent silver','us 90 silver','u s 90 silver'],support:['united states'],purity:'.900 silver',baseline:true},
+  {product:'Silver Bullion Coin',metal:'silver',strong:['silver bullion coin'],support:['fine silver'],purity:'.999 fine silver',baseline:true},
+  {product:'Isle of Man Platinum Noble',metal:'platinum',strong:['platinum noble','isle of man noble'],support:['isle of man','noble'],purity:'.9995 platinum'},
+  {product:'Platinum Bullion Coin',metal:'platinum',strong:['platinum bullion coin'],support:['fine platinum'],purity:'.9995 platinum',baseline:true},
+  {product:'Russian Palladium Ballerina',metal:'palladium',strong:['palladium ballerina','russian ballerina'],support:['russia','ballerina'],purity:'.999 palladium'},
+  {product:'Palladium Bullion Coin',metal:'palladium',strong:['palladium bullion coin'],support:['fine palladium'],purity:'.9995 palladium',baseline:true},
+  {product:'Copper Bullion Coin',metal:'copper',strong:['copper bullion coin'],support:['fine copper'],baseline:true},
+  {product:'Copper Coin Collection',metal:'copper',strong:['copper coin collection'],support:['copper'],baseline:true},
+  {product:'U.S. Copper Cents',metal:'copper',strong:['copper cent','copper cents'],support:['one cent','united states of america'],yearMin:1793,yearMax:1981,requiresYear:true},
   {product:'Gold Bar',metal:'gold',strong:['gold bar'],support:['fine gold','9999 gold','999.9 gold'],purity:'.9999 fine gold'},
   {product:'Silver Bar',metal:'silver',strong:['silver bar'],support:['fine silver','999 silver','9999 silver'],purity:'.999 fine silver'},
   {product:'Platinum Bar',metal:'platinum',strong:['platinum bar'],support:['fine platinum'],purity:'.9995 platinum'},
@@ -6746,10 +6780,22 @@ function smartCameraCatalogMatch(text,metal){
   const years=smartCameraYearCandidates(text);
   const ranked=SMART_CAMERA_CATALOG.filter(item=>(!metal||item.metal===metal)&&(PRODUCT_MAP[item.metal]||[]).includes(item.product))
     .map(item=>{
-      // A generic weight/metal inscription cannot identify a sovereign coin.
-      const strongHits=(item.strong||[]).filter(term=>text.includes(term)&&!['1 oz fine silver','1 oz fine gold','.9999 fine gold','half dollar'].includes(term));
-      const supportHits=(item.support||[]).filter(term=>text.includes(term));
+      // Generic metal/weight text cannot identify a sovereign coin. Historic
+      // denomination-only families may use "half dollar", "quarter dollar", etc.,
+      // but only when a readable year places the coin in that exact series.
       const plausibleYears=years.filter(y=>(!item.yearMin||y>=item.yearMin)&&(!item.yearMax||y<=item.yearMax));
+      const strongHits=(item.strong||[]).filter(term=>{
+        if(!text.includes(term))return false;
+        if(['1 oz fine silver','1 oz fine gold','.9999 fine gold'].includes(term))return false;
+        // "Half sovereign" contains "sovereign"; do not let the broader title tie
+        // the exact Half Sovereign match and force an ambiguous result.
+        if(item.product==='British Gold Sovereign'&&term==='sovereign'&&/\bhalf sovereign\b/.test(text))return false;
+        // Historic denomination-only matches (half dollar, quarter dollar, etc.)
+        // must have both a plausible year and an independently identified metal.
+        if(item.requiresYear&&(!plausibleYears.length||!metal))return false;
+        return true;
+      });
+      const supportHits=(item.support||[]).filter(term=>text.includes(term));
       let score=strongHits.length*7+supportHits.length;
       if(item.product.includes('Maple Leaf') && metal===item.metal && /\b(?:canada|can)\b/.test(text) && /9999|999\.9/.test(text) && !/\bbar\b/.test(text)){
         strongHits.push('Canadian metal + .9999 markings');score+=8;
@@ -6876,7 +6922,7 @@ function smartCameraDesignEvidence(result){
        entry.source!=='local-catalogue-v1'||!allowed.includes(entry.id)){invalid=true;continue;}
     if(entry.id!=='unknown'&&!ids.includes(entry.id))ids.push(entry.id);
   }
-  return {id:ids.length===1?ids[0]:'',conflict:ids.length>1,invalid};
+  return {id:ids.length===1?ids[0]:'',ids,conflict:ids.length>1,invalid};
 }
 function smartCameraDesignUniqueMetal(design){
   const exact={
@@ -6972,6 +7018,24 @@ function smartCameraDesignCompatibleProduct(design,product){
   if(design==='generic_round')return /Round$/.test(product);
   return design==='unknown';
 }
+function smartCameraResolveDesignConflict(design,text,metal,catalogMatch){
+  if(!design?.conflict||!Array.isArray(design.ids)||!design.ids.length)return design;
+  const generic=new Set(['generic_coin','generic_bar','generic_round']);
+  const specific=design.ids.filter(id=>!generic.has(id));
+  // A generic shape on one side and a named family on the other is normal for
+  // two-sided bullion. Prefer the named family rather than declaring a conflict.
+  if(specific.length===1)return {...design,id:specific[0],conflict:false,resolvedBy:'specific-over-generic'};
+
+  // Canadian Maple reverses carry unusually strong deterministic text evidence.
+  // If OCR sees CANADA + .9999 + a single metal, prefer Maple over a portrait-side
+  // misclassification. Do not use this shortcut for bars.
+  if(metal&&/\b(?:canada|can)\b/.test(text)&&/\b(?:9999|999\.9)\b/.test(text)&&!/\bbar\b/.test(text)&&
+     design.ids.includes('canadian_maple_leaf')){
+    return {...design,id:'canadian_maple_leaf',conflict:false,resolvedBy:'maple-inscription'};
+  }
+  return design;
+}
+
 function interpretSmartCameraScan(result){
   const raw=Array.isArray(result?.lines)?result.lines.join(' '):(result?.text||'');
   const text=normalizeSmartCameraText(raw);
@@ -6981,12 +7045,20 @@ function interpretSmartCameraScan(result){
   if(metals.length>1)warnings.push('Conflicting metal markings. Scan the other side and confirm the metal manually.');
   const plated=/\b(?:plated|clad|filled|replica|copy|tribute|layered)\b/.test(text);
   if(plated)warnings.push('Plated, replica, or layered marking detected. Fine-metal content needs manual verification.');
-  const design=smartCameraDesignEvidence(result);
+  let design=smartCameraDesignEvidence(result);
   if(design.invalid)warnings.push('The artwork result was invalid. Scan again.');
-  if(design.conflict)warnings.push('The two photos suggest different designs. Scan this item again.');
-  const visualMetal=!metal&&!design.invalid&&!design.conflict?smartCameraDesignUniqueMetal(design.id):'';
+  let visualMetal=!metal&&!design.invalid&&!design.conflict?smartCameraDesignUniqueMetal(design.id):'';
   if(visualMetal)metal=visualMetal;
   let catalogMatch=metals.length>1?null:smartCameraCatalogMatch(text,metal);
+  design=smartCameraResolveDesignConflict(design,text,metal,catalogMatch);
+  if(design.conflict)warnings.push('The two photos suggest different designs. Scan this item again.');
+  if(!metal&&!design.invalid&&!design.conflict){
+    visualMetal=smartCameraDesignUniqueMetal(design.id);
+    if(visualMetal){
+      metal=visualMetal;
+      catalogMatch=metals.length>1?null:smartCameraCatalogMatch(text,metal);
+    }
+  }
   const artworkMatch=!design.invalid&&!design.conflict?smartCameraDesignCatalogMatch(design.id,text,metal):null;
   if(artworkMatch&&catalogMatch&&artworkMatch.item.product!==catalogMatch.item.product){
     // Auto-generated baseline profiles are intentionally weak. A generic visual
@@ -7212,6 +7284,7 @@ function applySmartCameraSuggestion(suggestion){
     if(status)status.textContent='A product, metal, and weight are needed before continuing. Try another scan or enter this item manually.';
     return false;
   }
+  pendingScannerPhotoFiles=smartCameraCapturedFiles.slice();
   closeSmartCamera();
   openAdd();
   selectMetal(suggestion.metal,true);
@@ -7248,9 +7321,22 @@ function useSmartCameraAnalysis(){
   }
   applySmartCameraSuggestion(pendingSmartCameraSuggestion);
 }
+function scannerPhotoFileFromResult(result,index){
+  const encoded=typeof result?.capturedPhotoBase64==='string'?result.capturedPhotoBase64:'';
+  if(!encoded)return null;
+  try{
+    const binary=atob(encoded);
+    const bytes=new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+    const mime=result?.capturedPhotoMime==='image/jpeg'?'image/jpeg':'image/jpeg';
+    return new File([bytes],`smart-camera-${index+1}.jpg`,{type:mime,lastModified:Date.now()});
+  }catch(_){return null;}
+}
+
 function clearSmartCameraEvidence(){
   smartCameraScans=[];
   smartCameraPhotoCount=0;
+  smartCameraCapturedFiles=[];
   smartCameraLastDiagnostic=null;
   const diagnostic=document.getElementById('smartCameraDiagnostics');
   if(diagnostic){diagnostic.hidden=true;diagnostic.open=false;}
@@ -7334,6 +7420,8 @@ async function runSmartCameraScan(append=false,source='camera'){
       return;
     }
     if(!result||typeof result!=='object')throw new Error('Invalid camera result');
+    const capturedFile=scannerPhotoFileFromResult(result,smartCameraPhotoCount);
+    if(capturedFile)smartCameraCapturedFiles.push(capturedFile);
     smartCameraLastDiagnostic={engineVersion:Number(result.engineVersion)||0,
       designStatus:['local-catalogue-v1','not-bundled','device-limited','unavailable'].includes(result.designStatus)?result.designStatus:'unknown',
       appBuild:typeof result.appBuild==='string'&&/^[0-9.]+$/.test(result.appBuild)?result.appBuild:'unknown',
@@ -7357,6 +7445,8 @@ async function runSmartCameraScan(append=false,source='camera'){
     smartCameraScans.push(result);
     const combined={lines:smartCameraScans.flatMap(scan=>Array.isArray(scan.lines)?scan.lines:[scan.text||'']),
       confidence:Math.max(...smartCameraScans.map(scan=>Number(scan.confidence)||0)),sides:smartCameraPhotoCount,
+      photoEvidence:smartCameraScans.map(scan=>({lines:Array.isArray(scan.lines)?scan.lines:[scan.text||''],
+        confidence:Number(scan.confidence)||0,designSuggestion:scan.designSuggestion||null})),
       designSuggestions:smartCameraScans.flatMap(scan=>Array.isArray(scan.designSuggestions)?scan.designSuggestions:scan.designSuggestion?[scan.designSuggestion]:[])};
     const suggestion=interpretSmartCameraScan(combined);
     renderSmartCameraAnalysis(suggestion);
@@ -7387,23 +7477,20 @@ async function openSmartCamera(){
     promise.innerHTML=founder
       ? '<strong>Included permanently with Founder access</strong>Smart Camera is active as part of your Founder Lifetime Pro access.'
       : active
-        ? '<strong>Included with your Pro plan</strong>Your scan photos stay on your iPhone.'
+        ? '<strong>Included with your Pro plan</strong>Scan photos stay private and are saved with the holding after you add it.'
         : '<strong>Smart Camera is a Pro feature</strong>Upgrade to Benza Bullion Pro to scan supported bullion and prefill holding details.';
   }
   smartCameraSession++;
+  pendingScannerPhotoFiles=[];
   clearSmartCameraEvidence();
   if(status)status.textContent=active
     ? ''
     : 'Upgrade to Pro to use Smart Camera. Add Manually remains free.';
   screen.classList.add('show');
   screen.setAttribute('aria-hidden','false');
-  // Pro users go straight to capture when they choose Smart Camera.
-  if(active&&isBenzaNativeRuntime()){
-    const reset=resetSmartCameraScan(true);
-    const openingRun=smartCameraRunId;
-    const ready=await reset;
-    if(ready&&openingRun===smartCameraRunId&&screen.classList.contains('show'))await runSmartCameraScan();
-  }
+  // Opening Smart Camera now lands on the choice screen. The user explicitly
+  // chooses Scan Bullion or Choose bullion photo before native capture begins.
+  if(active&&isBenzaNativeRuntime())await resetSmartCameraScan(true);
 }
 function closeSmartCamera(){
   void resetSmartCameraScan(true,true);
@@ -7509,10 +7596,11 @@ function openAdd(){
   update();
   addScreen.classList.add('show');
 }
-function closeAdd(){
+function closeAdd({preserveScannerPhotos=false}={}){
   addScreen.classList.remove('show');
   editingHoldingIndex=null;
   setHoldingSheetMode('add');
+  if(!preserveScannerPhotos)pendingScannerPhotoFiles=[];
 }
 function selectMetal(m, preserveValues=false){
   metal=m;
@@ -7547,7 +7635,7 @@ function editHolding(i){
     pendingHoldingPhotoPath=h.photoPath||null;
     pendingHoldingReceiptPath=h.receiptPath||null;
     const details=document.getElementById('proInventoryFields');
-    if(details&&(h.serial||h.notes||h.photoPath||h.receiptPath))details.open=true;
+    if(details&&(h.serial||h.notes||h.photoPath||h.receiptPath||(h.scannerPhotoPaths||[]).length))details.open=true;
     hydrateExistingAttachmentPreviews(h).catch(e=>console.warn('Attachment preview unavailable',e));
   }
   update();
@@ -7948,7 +8036,7 @@ async function loadHoldingsFromSupabase(){
   if(!supabaseClient||!currentUser){updateProIntegratedUI();return;}
   const {data,error}=await supabaseClient.from('holdings').select('*').order('created_at',{ascending:false});
   if(error){if(isAuthSessionError(error)){await handleExpiredSession();return} console.warn('Holdings unavailable:',error.message);setConnectionBanner(navigator.onLine?'Could not refresh holdings. Showing saved data.':'You’re offline. Showing saved data.');return}
-  holdings=(data||[]).map(h=>({id:h.id,metal:h.metal,product:h.product,qty:Number(h.quantity)||0,weight:Number(h.weight_oz)||0,oz:Number(h.total_oz)||0,cost:Number(h.cost_basis)||0,date:h.purchase_date,serial:h.serial_number||'',notes:h.notes||'',photoPath:h.photo_path||null,receiptPath:h.receipt_path||null}));
+  holdings=(data||[]).map(h=>({id:h.id,metal:h.metal,product:h.product,qty:Number(h.quantity)||0,weight:Number(h.weight_oz)||0,oz:Number(h.total_oz)||0,cost:Number(h.cost_basis)||0,date:h.purchase_date,serial:h.serial_number||'',notes:h.notes||'',photoPath:h.photo_path||null,receiptPath:h.receipt_path||null,scannerPhotoPaths:Array.isArray(h.scanner_photo_paths)?h.scanner_photo_paths:[]}));
   holdingsLoaded=true;
   renderHoldings();
 }
@@ -8882,6 +8970,7 @@ function proInventoryMetaHtml(h){
   if(h.serial)chips.push(`<span class="inventoryChip">Serial: ${escapeBullionHtml(h.serial)}</span>`);
   if(h.notes)chips.push(`<span class="inventoryChip" title="${escapeBullionHtml(h.notes)}">Notes saved</span>`);
   if(h.photoPath)chips.push(`<button class="inventoryChip link" type="button" onclick="event.stopPropagation();openPrivateHoldingFile('${encodeURIComponent(h.photoPath)}'.split('%2F').join('/'))">View photo</button>`);
+  (h.scannerPhotoPaths||[]).forEach((path,index)=>chips.push(`<button class="inventoryChip link" type="button" onclick="event.stopPropagation();openPrivateHoldingFile('${encodeURIComponent(path)}'.split('%2F').join('/'))">Scan photo ${index+1}</button>`));
   if(h.receiptPath)chips.push(`<button class="inventoryChip link" type="button" onclick="event.stopPropagation();openPrivateHoldingFile('${encodeURIComponent(h.receiptPath)}'.split('%2F').join('/'))">View receipt</button>`);
   return chips.length?`<div class="inventoryMeta">${chips.join('')}</div>`:'';
 }
@@ -9438,7 +9527,7 @@ async function deleteHolding(i){
     return;
   }
 
-  await removePrivateHoldingFiles([h.photoPath,h.receiptPath]);
+  await removePrivateHoldingFiles([h.photoPath,h.receiptPath,...(h.scannerPhotoPaths||[])]);
   holdings.splice(i,1);
   rebaseLiveChartForPortfolioFlow(portfolioValueBeforeMutation,currentPortfolioMarketValue());
   renderHoldings();
@@ -9658,6 +9747,38 @@ async function finishHoldingAttachmentUploads({holdingId,photoFile,receiptFile,o
   }
 }
 
+async function finishScannerPhotoUploads(holdingId,files=[]){
+  if(!holdingId||!files.length)return [];
+  const uploaded=[];
+  try{
+    for(let index=0;index<files.length;index++){
+      const file=files[index];
+      const path=await uploadPrivateHoldingFile(file,`scan-${index+1}`);
+      if(path){uploaded.push(path);}
+    }
+    if(!uploaded.length)return [];
+    const {data,error}=await supabaseClient
+      .from('holdings')
+      .update({scanner_photo_paths:uploaded})
+      .eq('id',holdingId)
+      .eq('user_id',currentUser.id)
+      .select('id,scanner_photo_paths')
+      .single();
+    if(error)throw error;
+    const local=holdings.find(h=>h.id===holdingId);
+    if(local){
+      local.scannerPhotoPaths=Array.isArray(data?.scanner_photo_paths)?data.scanner_photo_paths:uploaded;
+      renderHoldings();
+    }
+    return uploaded;
+  }catch(error){
+    await removePrivateHoldingFiles(uploaded);
+    console.warn('Smart Camera photo upload failed:',error);
+    alert('Your holding was saved, but the Smart Camera photos could not be attached. You can add photos from Edit Holding.');
+    return [];
+  }
+}
+
 async function openPrivateHoldingFile(path){
   if(!path||!supabaseClient)return;
   const popup=window.open('about:blank','_blank');
@@ -9680,6 +9801,7 @@ async function saveHolding(){
   const notes=proActive?(document.getElementById('holdingNotes')?.value||'').trim():'';
   const photoFile=proActive?document.getElementById('holdingPhoto')?.files?.[0]:null;
   const receiptFile=proActive?document.getElementById('holdingReceipt')?.files?.[0]:null;
+  const scannerPhotoFiles=proActive?pendingScannerPhotoFiles.slice():[];
   const originalHolding=editingHoldingIndex!==null?holdings[editingHoldingIndex]:null;
   const portfolioValueBeforeMutation=currentPortfolioMarketValue();
 
@@ -9742,12 +9864,15 @@ async function saveHolding(){
         serial:row.serial_number||'',
         notes:row.notes||'',
         photoPath:row.photo_path||null,
-        receiptPath:row.receipt_path||null
+        receiptPath:row.receipt_path||null,
+        scannerPhotoPaths:Array.isArray(row.scanner_photo_paths)?row.scanner_photo_paths:[]
       };
 
       rebaseLiveChartForPortfolioFlow(portfolioValueBeforeMutation,currentPortfolioMarketValue());
       renderHoldings();
-      closeAdd();
+      if(scannerPhotoFiles.length)await finishScannerPhotoUploads(row.id,scannerPhotoFiles);
+      pendingScannerPhotoFiles=[];
+      closeAdd({preserveScannerPhotos:true});
       setButtonBusy(button,false);
       if(photoFile||receiptFile)finishHoldingAttachmentUploads({
         holdingId:row.id,photoFile,receiptFile,
@@ -9788,12 +9913,15 @@ async function saveHolding(){
       serial:row.serial_number||'',
       notes:row.notes||'',
       photoPath:row.photo_path||null,
-      receiptPath:row.receipt_path||null
+      receiptPath:row.receipt_path||null,
+      scannerPhotoPaths:Array.isArray(row.scanner_photo_paths)?row.scanner_photo_paths:[]
     });
 
     rebaseLiveChartForPortfolioFlow(portfolioValueBeforeMutation,currentPortfolioMarketValue());
     renderHoldings();
-    closeAdd();
+    if(scannerPhotoFiles.length)await finishScannerPhotoUploads(row.id,scannerPhotoFiles);
+    pendingScannerPhotoFiles=[];
+    closeAdd({preserveScannerPhotos:true});
     setButtonBusy(button,false);
     if(photoFile||receiptFile)finishHoldingAttachmentUploads({holdingId:row.id,photoFile,receiptFile});
     Promise.resolve()

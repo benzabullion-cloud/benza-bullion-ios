@@ -34,6 +34,17 @@ test('Review transfers real product, metal and weight through the real holding s
  assert.equal(vm.runInContext('metal',context),'silver');assert.match(get('holdingNotes').value,/2011/);
  assert.equal(get('proInventoryFields').hidden,false);assert.equal(get('proInventoryTeaser').hidden,true);
 });
+test('Successful scan stages both captured photos for the holding save',()=>{
+ vm.runInContext('smartCameraCapturedFiles=[{name:"front.jpg"},{name:"back.jpg"}]',context);
+ context.applySmartCameraSuggestion(complete);
+ assert.equal(vm.runInContext('pendingScannerPhotoFiles.length',context),2);
+});
+test('Smart Camera menu uses explicit capture choices',()=>{
+ assert.match(html,/>Scan Bullion<\/button>/);
+ assert.match(html,/>Choose Bullion Photo<\/button>/);
+ const open=html.slice(html.indexOf('async function openSmartCamera()'),html.indexOf('function closeSmartCamera()'));
+ assert.doesNotMatch(open,/runSmartCameraScan\s*\(/);
+});
 test('Screenshot regression: two-side metal-only result never opens a blank holding',()=>{
  const partial=scan('Fine silver');context.renderSmartCameraAnalysis(partial);context.useSmartCameraAnalysis();
  assert.equal(get('addScreen').classList.contains('show'),false);assert.equal(get('smartScanMetal').textContent,'Silver');
@@ -49,7 +60,7 @@ test('Blank front asks for one reverse photo',()=>{context.renderSmartCameraAnal
 test('Failed two-side scan stays on result with a fresh retry',()=>{context.renderSmartCameraAnalysis(scan(''));assert.equal(get('smartAnalysisTitle').textContent,'More details needed');assert.equal(vm.runInContext('smartCameraAwaitingReverse',context),false);assert.equal(get('addScreen').classList.contains('show'),false)});
 test('Pro access is checked again at handoff',()=>{active=false;assert.equal(context.applySmartCameraSuggestion(complete),false);active=true});
 test('Free and Pro inventory sections are mutually exclusive',()=>{active=false;context.syncProInventoryVisibility();assert.equal(get('proInventoryFields').hidden,true);assert.equal(get('proInventoryTeaser').hidden,false);active=true;context.syncProInventoryVisibility();assert.equal(get('proInventoryTeaser').hidden,true);assert.match(html,/#smartAnalysisUseButton\[hidden\],#proInventoryFields\[hidden\],#proInventoryTeaser\[hidden\]\{display:none!important\}/)});
-test('Scanner has no photo transmission or persistence path',()=>{const scanner=html.slice(html.indexOf('function smartCameraPlugin('),html.indexOf('function clearAttachmentObjectUrls'));assert.doesNotMatch(scanner,/\bfetch\s*\(|XMLHttpRequest|sendBeacon|upload|localStorage|indexedDB|sessionStorage/);const native=fs.readFileSync('App/SceneDelegate.swift','utf8');const plugin=native.slice(native.indexOf('@objc(BenzaSmartCameraPlugin)'),native.indexOf('@objc(BenzaStoreKitPlugin)'));assert.doesNotMatch(plugin,/URLSession|URLRequest|base64EncodedString|write\(to:|UserDefaults/)});
+test('Scanner photos cross only the local bridge until holding save',()=>{const scanner=html.slice(html.indexOf('function smartCameraPlugin('),html.indexOf('function clearAttachmentObjectUrls'));assert.doesNotMatch(scanner,/\bfetch\s*\(|XMLHttpRequest|sendBeacon|localStorage|indexedDB|sessionStorage/);const native=fs.readFileSync('App/SceneDelegate.swift','utf8');const plugin=native.slice(native.indexOf('@objc(BenzaSmartCameraPlugin)'),native.indexOf('@objc(BenzaStoreKitPlugin)'));assert.doesNotMatch(plugin,/URLSession|URLRequest|write\(to:|UserDefaults/);assert.match(plugin,/capturedPhotoBase64/);assert.match(html,/finishScannerPhotoUploads/);assert.match(html,/scanner_photo_paths/)});
 
 test('Failure diagnostics contain counts and flags, never recognized text',()=>{
  vm.runInContext('smartCameraLastDiagnostic={engineVersion:3,appBuild:"44",ocrPasses:10,selectedPasses:2,rejectedPasses:8,lineCount:3,elapsedMs:1200};smartCameraPhotoCount=2',context);

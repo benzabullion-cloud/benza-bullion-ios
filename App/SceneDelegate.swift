@@ -560,10 +560,29 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
                     if let designID {
                         response["designSuggestion"] = ["id": designID, "source": "local-catalogue-v1"]
                     }
+                    if let photoBase64 = self.scannerArchiveBase64(from: cgImage) {
+                        response["capturedPhotoBase64"] = photoBase64
+                        response["capturedPhotoMime"] = "image/jpeg"
+                    }
                     call?.resolve(response)
                 }
             }
         }
+    }
+
+    private func scannerArchiveBase64(from cgImage: CGImage) -> String? {
+        let longest = CGFloat(max(cgImage.width, cgImage.height))
+        guard longest > 0 else { return nil }
+        let scale = min(1, 1400 / longest)
+        let size = CGSize(width: CGFloat(cgImage.width) * scale,
+                          height: CGFloat(cgImage.height) * scale)
+        UIGraphicsBeginImageContextWithOptions(size, false, 1)
+        defer { UIGraphicsEndImageContext() }
+        UIImage(cgImage: cgImage).draw(in: CGRect(origin: .zero, size: size))
+        guard let image = UIGraphicsGetImageFromCurrentImageContext(),
+              let data = image.jpegData(compressionQuality: 0.80),
+              data.count <= 4 * 1024 * 1024 else { return nil }
+        return data.base64EncodedString()
     }
 
     private func normalizedCGImage(_ image: UIImage) -> CGImage? {

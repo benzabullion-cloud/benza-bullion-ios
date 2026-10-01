@@ -38,6 +38,53 @@ await test('Every selectable bullion product has scanner catalogue coverage',()=
     }
   }
 });
+await test('All five holding groups have complete title coverage',()=>{
+  const map=vm.runInContext('PRODUCT_MAP',context);
+  const catalog=vm.runInContext('SMART_CAMERA_CATALOG',context);
+  for(const metal of ['gold','silver','platinum','palladium','copper']){
+    assert.ok((map[metal]||[]).length>0,metal+' group is empty');
+    const missing=(map[metal]||[]).filter(product=>!catalog.some(item=>item.product===product&&item.metal===metal));
+    assert.equal(missing.length,0,metal+' missing scanner titles: '+missing.join(', '));
+  }
+});
+await test('Representative pre-1933 and U.S. silver titles resolve by denomination plus year',()=>{
+  const cases=[
+    ['FINE GOLD UNITED STATES OF AMERICA TWENTY DOLLARS 1924','U.S. $20 Saint-Gaudens Double Eagle'],
+    ['FINE GOLD UNITED STATES OF AMERICA TWENTY DOLLARS 1904','U.S. $20 Liberty Head Double Eagle'],
+    ['FINE GOLD UNITED STATES OF AMERICA TEN DOLLARS 1912','U.S. $10 Indian Head Eagle'],
+    ['FINE GOLD UNITED STATES OF AMERICA TEN DOLLARS 1901','U.S. $10 Liberty Head Eagle'],
+    ['FINE GOLD UNITED STATES OF AMERICA FIVE DOLLARS 1914','U.S. $5 Indian Head Half Eagle'],
+    ['FINE GOLD UNITED STATES OF AMERICA FIVE DOLLARS 1906','U.S. $5 Liberty Head Half Eagle'],
+    ['FINE SILVER UNITED STATES OF AMERICA QUARTER DOLLAR 1942','Washington Silver Quarter'],
+    ['FINE SILVER UNITED STATES OF AMERICA QUARTER DOLLAR 1925','Standing Liberty Quarter'],
+    ['FINE SILVER UNITED STATES OF AMERICA QUARTER DOLLAR 1905','Barber Quarter'],
+    ['FINE SILVER UNITED STATES OF AMERICA ONE DIME 1958','Roosevelt Silver Dime'],
+    ['FINE SILVER UNITED STATES OF AMERICA ONE DIME 1908','Barber Dime'],
+    ['FINE SILVER UNITED STATES OF AMERICA HALF DOLLAR 1908','Barber Half Dollar']
+  ];
+  for(const [text,product] of cases){
+    const r=context.interpretSmartCameraScan({text,confidence:.95,sides:2});
+    assert.equal(r.product,product,text);
+  }
+});
+await test('Rare and category titles resolve to exact holding names when their inscriptions are present',()=>{
+  const cases=[
+    ['HALF SOVEREIGN 22K GOLD','British Gold Half Sovereign'],
+    ['CONFEDERATIO HELVETICA 20 FRANCS GOLD','Swiss 20 Franc Gold'],
+    ['REPUBLIQUE FRANCAISE 20 FRANCS GOLD','French 20 Franc Rooster'],
+    ['100 CORONA GOLD AUSTRIA','Austrian 100 Corona Gold'],
+    ['20 CORONA GOLD AUSTRIA','Austrian 20 Corona Gold'],
+    ["NOAH'S ARK ARMENIA FINE SILVER 1 OZ",'Armenian Silver Noah’s Ark'],
+    ['AFRICAN WILDLIFE ELEPHANT SOMALIA FINE SILVER 1 OZ','Somali Silver Elephant'],
+    ['PLATINUM NOBLE ISLE OF MAN 1 OZ','Isle of Man Platinum Noble'],
+    ['PALLADIUM BALLERINA RUSSIA 1 OZ','Russian Palladium Ballerina'],
+    ['COPPER COIN COLLECTION','Copper Coin Collection']
+  ];
+  for(const [text,product] of cases){
+    const r=context.interpretSmartCameraScan({text,confidence:.95,sides:2});
+    assert.equal(r.product,product,text);
+  }
+});
 await test('Fragmented Maple rim OCR recombines product metal and weight',()=>{
   const result=context.selectSmartCameraPhotoEvidence({
     passes:[
@@ -99,6 +146,41 @@ await test('Unsupported sovereign bullion still resolves to safe generic coin ca
     assert.equal(r.metal,metal,text);
     assert.equal(r.weight,weight,text);
   }
+});
+await test('Two-sided Maple ignores generic portrait-side visual disagreement',()=>{
+  const r=context.interpretSmartCameraScan({
+    lines:['CANADA 9999','FINE SILVER 1 OZ ARGENT PUR'],
+    confidence:.9,
+    sides:2,
+    designSuggestions:[design('generic_coin'),design('canadian_maple_leaf')]
+  });
+  assert.equal(r.product,'Canadian Silver Maple Leaf');
+  assert.equal(r.metal,'silver');
+  assert.equal(r.weight,1);
+  assert.equal(r.designID,'canadian_maple_leaf');
+  assert.equal(r.warnings.length,0);
+  assert.equal(context.canUseSmartCameraSuggestion(r),true);
+});
+await test('Two-sided Maple readable reverse resolves specific false family on portrait side',()=>{
+  const r=context.interpretSmartCameraScan({
+    lines:['CANADA 9999 FINE SILVER 1 OZ ARGENT PUR'],
+    confidence:.9,
+    sides:2,
+    designSuggestions:[design('britannia'),design('canadian_maple_leaf')]
+  });
+  assert.equal(r.product,'Canadian Silver Maple Leaf');
+  assert.equal(r.designID,'canadian_maple_leaf');
+  assert.equal(r.warnings.length,0);
+});
+await test('Unresolved two-specific-family disagreement still blocks use',()=>{
+  const r=context.interpretSmartCameraScan({
+    lines:['FINE SILVER 1 OZ'],
+    confidence:.9,
+    sides:2,
+    designSuggestions:[design('britannia'),design('canadian_maple_leaf')]
+  });
+  assert.ok(r.warnings.some(w=>/different designs/.test(w)));
+  assert.equal(context.canUseSmartCameraSuggestion(r),false);
 });
 console.log(count+' design integration checks passed');
 })().catch(e=>{console.error(e);process.exitCode=1});
