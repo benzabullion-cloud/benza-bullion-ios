@@ -69,7 +69,8 @@ public enum BenzaCoinRim {
         return boxes.flatMap { box -> [CGImage] in
             guard !isCanceled() else { return [] }
             return [unwrap(image, box: box, reverse: false),
-                    unwrap(image, box: box, reverse: true)].compactMap { $0 }
+                    unwrap(image, box: box, reverse: true),
+                    unwrap(image, box: box, reverse: false, whole: true)].compactMap { $0 }
         }
     }
 
@@ -95,7 +96,7 @@ public enum BenzaCoinRim {
         return result
     }
 
-    static func unwrap(_ image: CGImage, box: CGRect, reverse: Bool) -> CGImage? {
+    static func unwrap(_ image: CGImage, box: CGRect, reverse: Bool, whole: Bool = false) -> CGImage? {
         let w = image.width, h = image.height
         var pixels = [UInt8](repeating: 0, count: w*h)
         let drawn = pixels.withUnsafeMutableBytes { buffer -> Bool in
@@ -108,17 +109,17 @@ public enum BenzaCoinRim {
         guard drawn else { return nil }
         let rx = Double(box.width)*Double(w)/2, ry = Double(box.height)*Double(h)/2
         let cx = Double(box.midX)*Double(w), cy = (1-Double(box.midY))*Double(h)
-        let outWidth = min(2800, max(800, Int(2*Double.pi*max(rx,ry)*0.60)))
-        let outHeight = max(80, Int(max(rx,ry)*0.30))
+        let outWidth = min(2800, max(800, Int(2*Double.pi*max(rx,ry)*(whole ? 1.15 : 0.60))))
+        let outHeight = max(80, Int(max(rx,ry)*(whole ? 0.44 : 0.30)))
         var output = [UInt8](repeating: 255, count: outWidth*outHeight)
         for x in 0..<outWidth {
             // Overlapping upper/lower arcs keep upright text separate from the
             // opposite half's upside-down lettering and central artwork.
             let progress = Double(x)/Double(outWidth-1)
-            let theta = -Double.pi + (reverse ? 1 : -1)*Double.pi*0.10 + (reverse ? -1 : 1)*progress*2*Double.pi*0.60
+            let theta = whole ? -Double.pi+progress*2*Double.pi*1.15 : -Double.pi + (reverse ? 1 : -1)*Double.pi*0.10 + (reverse ? -1 : 1)*progress*2*Double.pi*0.60
             for y in 0..<outHeight {
                 let fraction = Double(y)/Double(outHeight-1)
-                let radius = reverse ? 0.72+fraction*0.30 : 1.02-fraction*0.30
+                let radius = whole ? 1.02-fraction*0.44 : (reverse ? 0.72+fraction*0.30 : 1.02-fraction*0.30)
                 let sx = cx+rx*radius*cos(theta), sy = cy+ry*radius*sin(theta)
                 let ix = Int(sx), iy = Int(sy)
                 guard ix>=0, iy>=0, ix+1<w, iy+1<h else { continue }
@@ -127,6 +128,13 @@ public enum BenzaCoinRim {
                 let bottom=Double(pixels[(iy+1)*w+ix])*(1-fx)+Double(pixels[(iy+1)*w+ix+1])*fx
                 output[y*outWidth+x]=UInt8(max(0,min(255,top*(1-fy)+bottom*fy)))
             }
+        }
+        if whole {
+            let data=Data(output) as CFData
+            guard let provider=CGDataProvider(data:data) else { return nil }
+            return CGImage(width:outWidth,height:outHeight,bitsPerComponent:8,bitsPerPixel:8,
+                bytesPerRow:outWidth,space:CGColorSpaceCreateDeviceGray(),bitmapInfo:CGBitmapInfo(rawValue:0),
+                provider:provider,decode:nil,shouldInterpolate:true,intent:.defaultIntent)
         }
         // Suppress fine radial texture, then flatten slow glare gradients.
         // This is luminance processing only; no letter or number substitutions.
@@ -137,7 +145,7 @@ public enum BenzaCoinRim {
         }
         // Very wide strips shrink lettering in OCR's internal image pyramid.
         // Three overlapping rows retain the same inscription pixels at a useful scale.
-        let panelWidth = Int(Double(outWidth)*0.45)
+        let panelWidth = Int(Double(outWidth)*0.70)
         let padding = max(16,outHeight/5)
         let pageWidth = panelWidth+padding*2
         let pageHeight = (outHeight+padding)*3+padding
