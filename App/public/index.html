@@ -6708,7 +6708,7 @@ const SMART_CAMERA_CATALOG=[
   for(const metal of METALS){
     for(const product of PRODUCT_MAP[metal]||[]){
       if(existing.has(product))continue;
-      SMART_CAMERA_CATALOG.push({product,metal,strong:aliases(product),support:[]});
+      SMART_CAMERA_CATALOG.push({product,metal,strong:aliases(product),support:[],baseline:true});
       existing.add(product);
     }
   }
@@ -6989,7 +6989,14 @@ function interpretSmartCameraScan(result){
   let catalogMatch=metals.length>1?null:smartCameraCatalogMatch(text,metal);
   const artworkMatch=!design.invalid&&!design.conflict?smartCameraDesignCatalogMatch(design.id,text,metal):null;
   if(artworkMatch&&catalogMatch&&artworkMatch.item.product!==catalogMatch.item.product){
-    warnings.push('Artwork and inscriptions disagree. Confirm the product.');
+    // Auto-generated baseline profiles are intentionally weak. A generic visual
+    // shape (coin/bar/round) plus confirmed metal should beat an accidental
+    // baseline text hit, while explicit named-family catalogue rules still win.
+    if(catalogMatch.item.baseline&&['generic_coin','generic_bar','generic_round'].includes(design.id)){
+      catalogMatch=artworkMatch;
+    }else{
+      warnings.push('Artwork and inscriptions disagree. Confirm the product.');
+    }
   }else if(!catalogMatch&&artworkMatch){catalogMatch=artworkMatch;}
   if(design.id==='walking_liberty_half_dollar'&&catalogMatch?.item.product==='American Silver Eagle'){
     warnings.push('Artwork and inscriptions disagree. Confirm the product.');
