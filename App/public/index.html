@@ -7293,7 +7293,7 @@ function canUseSmartCameraSuggestion(suggestion){
 function canReviewSmartCameraSuggestion(suggestion){
   return !!(suggestion&&Object.hasOwn(PRODUCT_MAP,suggestion.metal)&&
     (!suggestion.product||(PRODUCT_MAP[suggestion.metal]||[]).includes(suggestion.product))&&
-    Array.isArray(suggestion.warnings));
+    Array.isArray(suggestion.warnings)&&suggestion.warnings.every(w=>/weight/i.test(w)));
 }
 function renderSmartCameraAnalysis(suggestion){
   pendingSmartCameraSuggestion=suggestion;
