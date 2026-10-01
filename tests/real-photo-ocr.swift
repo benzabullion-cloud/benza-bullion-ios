@@ -22,6 +22,16 @@ import Vision
             let started=Date()
             let rims=BenzaCoinRim.readingImages(image)
             guard !rims.isEmpty else { throw NSError(domain:"RimLocalization",code:3,userInfo:[NSLocalizedDescriptionKey:side+" found no coin outline"]) }
+            // Small image diagnostics from approved coin-only fixtures.
+            for (index,rim) in rims.prefix(2).enumerated() {
+                let thumb=CGContext(data:nil,width:min(1200,rim.width),height:max(1,rim.height*min(1200,rim.width)/rim.width),bitsPerComponent:8,bytesPerRow:0,space:CGColorSpaceCreateDeviceGray(),bitmapInfo:0)!
+                thumb.draw(rim,in:CGRect(x:0,y:0,width:thumb.width,height:thumb.height))
+                let bytes=NSMutableData()
+                if let preview=thumb.makeImage(),let destination=CGImageDestinationCreateWithData(bytes,"public.jpeg" as CFString,1,nil) {
+                    CGImageDestinationAddImage(destination,preview,[kCGImageDestinationLossyCompressionQuality:0.75] as CFDictionary)
+                    if CGImageDestinationFinalize(destination) { print("RIM_PREVIEW \(side) \(index) "+(bytes as Data).base64EncodedString()) }
+                }
+            }
             var readings:[[String:Any]]=[]
             for (index,photo) in ([image]+rims).enumerated() {
                 let request=VNRecognizeTextRequest()
