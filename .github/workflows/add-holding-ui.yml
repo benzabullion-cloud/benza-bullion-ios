@@ -1,0 +1,25 @@
+name: Add Holding responsive UI
+on:
+  pull_request:
+    paths:
+      - 'App/public/index.html'
+      - 'tests/add-holding-layout.cjs'
+      - '.github/workflows/add-holding-ui.yml'
+permissions:
+  contents: read
+jobs:
+  layout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - run: npm install --no-save --ignore-scripts playwright@1.58.2
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/add-holding-layout.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: add-holding-ui
+          path: ui-artifacts/
