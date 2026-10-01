@@ -1,51 +1,70 @@
 import Foundation
 import CoreGraphics
-import Vision
 
 /// Geometry only: never supplies a bullion identity, metal, purity or weight.
 public enum BenzaCoinRim {
     public static func readingImages(_ image: CGImage, maximumCandidates: Int = 2, isCanceled: () -> Bool = { false }) -> [CGImage] {
         guard !isCanceled() else { return [] }
-        let request = VNDetectContoursRequest()
-        request.maximumImageDimension = 768
-        request.contrastAdjustment = 1.5
-        guard (try? VNImageRequestHandler(cgImage: image).perform([request])) != nil,
-              let observation = request.results?.first else { return [] }
-        let width = Double(image.width), height = Double(image.height)
-        var candidates: [(CGRect, Double)] = []
-        for index in 0..<min(observation.contourCount, 4000) {
-            if isCanceled() { return [] }
-            guard let contour = try? observation.contour(at: index), contour.pointCount >= 30 else { continue }
-            let box = contour.normalizedPath.boundingBox
-            let rx = Double(box.width) * width / 2, ry = Double(box.height) * height / 2
-            guard rx > min(width,height) * 0.16, ry > min(width,height) * 0.16,
-                  rx / ry > 0.65, rx / ry < 1.5 else { continue }
-            let area = Double(box.width * box.height)
-            guard area > 0.10, area < 0.995 else { continue }
-            let cx = Double(box.midX), cy = Double(box.midY)
-            guard abs(cx-0.5) < 0.28, abs(cy-0.5) < 0.30 else { continue }
-            var deviation = 0.0
-            var occupied = Set<Int>()
-            for point in contour.normalizedPoints {
-                let dx = (Double(point.x)-cx) / Double(box.width/2)
-                let dy = (Double(point.y)-cy) / Double(box.height/2)
-                deviation += abs(hypot(dx,dy)-1)
-                occupied.insert(Int((atan2(dy,dx)+Double.pi)/(2*Double.pi)*24) % 24)
-            }
-            deviation /= Double(contour.pointCount)
-            // Reject lettering, leaves, bars and incomplete arcs. Retain nested coin/capsule rims.
-            guard deviation < 0.085, occupied.count >= 21 else { continue }
-            candidates.append((box, area * (1-deviation)))
+        // A small software raster avoids Vision contour/model startup and gives
+        // a bounded geometric search independent of coin family and inscriptions.
+        let scale = min(1, 224.0 / Double(max(image.width,image.height)))
+        let w = max(1,Int(Double(image.width)*scale)), h = max(1,Int(Double(image.height)*scale))
+        var pixels = [UInt8](repeating:255,count:w*h)
+        let drawn = pixels.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(data:buffer.baseAddress,width:w,height:h,bitsPerComponent:8,
+                bytesPerRow:w,space:CGColorSpaceCreateDeviceGray(),bitmapInfo:0) else { return false }
+            context.interpolationQuality = .high
+            context.draw(image,in:CGRect(x:0,y:0,width:w,height:h))
+            return true
         }
-        candidates.sort { $0.1 > $1.1 }
-        var boxes: [CGRect] = []
+        guard drawn else { return [] }
+        let angles = (0..<48).map { index -> (Double,Double) in
+            let theta = Double(index)*2*Double.pi/48
+            return (cos(theta),sin(theta))
+        }
+        let shorter = Double(min(w,h))
+        var candidates: [(CGRect,Double)] = []
+        for cy in stride(from:Int(Double(h)*0.20),to:Int(Double(h)*0.80),by:4) {
+            if isCanceled() { return [] }
+            for cx in stride(from:Int(Double(w)*0.22),to:Int(Double(w)*0.78),by:4) {
+                for ratio in [0.75,0.85,1.0,1.15,1.30] {
+                    for rx in stride(from:shorter*0.18,to:shorter*0.54,by:2) {
+                        let ry = rx*ratio
+                        var valid=0,covered=0
+                        var strength=0.0,signed=0.0
+                        for (cosine,sine) in angles {
+                            let x0=Int((Double(cx)+(rx-2)*cosine).rounded())
+                            let y0=Int((Double(cy)+(ry-2)*sine).rounded())
+                            let x1=Int((Double(cx)+(rx+2)*cosine).rounded())
+                            let y1=Int((Double(cy)+(ry+2)*sine).rounded())
+                            guard x0>=0,x0<w,y0>=0,y0<h,x1>=0,x1<w,y1>=0,y1<h else { continue }
+                            let difference=Double(pixels[y0*w+x0])-Double(pixels[y1*w+x1])
+                            valid+=1;strength+=abs(difference);signed+=difference
+                            if abs(difference)>16 { covered+=1 }
+                        }
+                        guard valid>=46,covered>=32 else { continue }
+                        strength/=48
+                        let coverage=Double(covered)/48
+                        let score=strength*(0.5+coverage)*(0.75+0.25*abs(signed/48)/max(strength,1))
+                        guard score>15 else { continue }
+                        // Vision/CoreGraphics boxes use lower-left normalized coordinates.
+                        let box=CGRect(x:(Double(cx)-rx)/Double(w),
+                            y:1-(Double(cy)+ry)/Double(h),width:2*rx/Double(w),height:2*ry/Double(h))
+                        candidates.append((box,score))
+                    }
+                }
+            }
+        }
+        candidates.sort { $0.1>$1.1 }
+        var boxes:[CGRect]=[]
         for candidate in candidates {
             if boxes.contains(where: {
-                abs($0.midX-candidate.0.midX)<0.035 && abs($0.midY-candidate.0.midY)<0.035 &&
-                abs($0.width-candidate.0.width)<0.075
+                abs(($0.midX-candidate.0.midX)*Double(w))<shorter*0.05 &&
+                abs(($0.midY-candidate.0.midY)*Double(h))<shorter*0.05 &&
+                abs(($0.width-candidate.0.width)*Double(w))<shorter*0.14
             }) { continue }
             boxes.append(candidate.0)
-            if boxes.count == max(1,min(3,maximumCandidates)) { break }
+            if boxes.count==max(1,min(3,maximumCandidates)) { break }
         }
         return boxes.flatMap { box -> [CGImage] in
             guard !isCanceled() else { return [] }
