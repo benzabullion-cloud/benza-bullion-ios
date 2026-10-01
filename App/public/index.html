@@ -805,6 +805,8 @@ html[data-theme="dark"] .marketCard{background:linear-gradient(145deg,#1a1b20,#1
 .smartCameraPrimary{border:0;background:linear-gradient(135deg,#f0d47e,#d6a53a 52%,#b77a17);color:#151008}
 .smartCameraPrimary:disabled{opacity:.72}
 .smartCameraSecondary{border:1px solid var(--border);background:var(--surface3);color:var(--text)}
+#smartCameraDiagnostics{min-width:0;max-width:100%}
+#smartCameraDiagnosticText{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;text-align:left;max-width:100%;font-family:inherit}
 .smartCameraFine{margin:11px 3px 0;color:var(--muted);font-size:9px;line-height:1.45;text-align:center}
 .smartCameraAnalysis{display:none;margin-top:14px;border:1px solid rgba(214,165,58,.34);border-radius:20px;background:linear-gradient(145deg,var(--surface2),rgba(214,165,58,.045));overflow:hidden;box-shadow:0 14px 34px rgba(0,0,0,.12)}
 .smartCameraAnalysis.show{display:block}
@@ -7272,7 +7274,7 @@ function renderSmartCameraDiagnostics(suggestion){
   // Counts and field-presence flags only. Never include images, OCR text, or serials.
   if(!panel.hidden)text.textContent=JSON.stringify({...smartCameraLastDiagnostic,
     photoCount:smartCameraPhotoCount,metalRead:!!suggestion.metal,weightRead:suggestion.weight>0,
-    productMatched:!!suggestion.product,conflictCount:suggestion.warnings?.length||0});
+    productMatched:!!suggestion.product,conflictCount:suggestion.warnings?.length||0},null,2);
 }
 function smartCameraConfidenceLabel(value){
   if(value>=.80)return ['Strong evidence','high'];
@@ -7475,7 +7477,20 @@ async function runSmartCameraScan(append=false,source='camera'){
       appBuild:typeof result.appBuild==='string'&&/^[0-9.]+$/.test(result.appBuild)?result.appBuild:'unknown',
       ocrPasses:Number(result.ocrPasses)||0,selectedPasses:Number(result.selectedPasses)||0,
       rejectedPasses:Number(result.rejectedPasses)||0,lineCount:Array.isArray(result.lines)?result.lines.length:0,
-      elapsedMs:Number(result.elapsedMs)||0};
+      elapsedMs:Number(result.elapsedMs)||0,
+      ocrElapsedMs:Number(result.ocrElapsedMs)||0,rimPasses:Number(result.rimPasses)||0,
+      weightPasses:(Array.isArray(result.passes)?result.passes:[]).flatMap(pass=>{
+        const observations=(Array.isArray(pass.observations)?pass.observations:[]).filter(o=>typeof o.text==='string'&&Number(o.confidence)>=.25);
+        const lines=observations.map(o=>o.text);
+        const metals=smartCameraMetalEvidence(normalizeSmartCameraText(lines.join(' ')));
+        const weights=smartCameraWeightCandidates(normalizeSmartCameraText(lines.join(' ')),metals.length===1?metals[0]:'');
+        if(!weights.length)return [];
+        return [{pass:pass.id,weightsOz:weights,confidence:Number(pass.confidence)||0,
+          direct:observations.flatMap(o=>{
+            const weights=smartCameraWeightCandidates(normalizeSmartCameraText(o.text),metals.length===1?metals[0]:'');
+            return weights.length?[{weightsOz:weights,confidence:Number(o.confidence)||0}]:[];
+          })}];
+      })};
     smartCameraPhotoCount++;
     const reading=interpretSmartCameraScan(result);
     // Count photos separately: blank OCR never stacks evidence or causes endless reverse prompts.
