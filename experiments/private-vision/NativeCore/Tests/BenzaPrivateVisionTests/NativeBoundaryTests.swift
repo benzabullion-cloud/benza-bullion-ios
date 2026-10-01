@@ -83,6 +83,10 @@ final class NativeBoundaryTests: XCTestCase {
         }
     }
 
+    func testGenericCoinIdentityParses() throws {
+        XCTAssertEqual(try BenzaDesignIdentity.parse(#"{"design_id":"generic_coin"}"#).design, .genericCoin)
+    }
+
     func testRuntimeUnloadIsSafeWhenIdle() {
         XCTAssertEqual(benza_runtime_unload(), 0)
     }
