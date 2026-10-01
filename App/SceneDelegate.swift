@@ -137,6 +137,7 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
     private var activeDesignScan: BenzaOfflineScan?
     private var offlineDesignEngine: BenzaOfflineDesignEngine?
     private var analysisInFlight = false
+    private var releaseModelsWhenIdle = false
 
     private let managedAssetPackID = "BenzaPrivateVisionModels"
 
@@ -232,6 +233,11 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
 
     private func finishResetWaiters() {
         guard !isAnalyzing() && !pickerDismissalInProgress else { return }
+        if releaseModelsWhenIdle {
+            offlineDesignEngine = nil
+            BenzaOfflineDesignEngine.releaseCachedRuntime()
+            releaseModelsWhenIdle = false
+        }
         let waiters = resetWaiters
         resetWaiters.removeAll()
         waiters.forEach { $0.resolve() }
@@ -248,6 +254,9 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
 
     @objc func reset(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
+            if call.getBool("releaseModels") == true {
+                self.releaseModelsWhenIdle = true
+            }
             _ = self.advanceGeneration()
             let previousCall = self.pendingCall
             self.pendingCall = nil
