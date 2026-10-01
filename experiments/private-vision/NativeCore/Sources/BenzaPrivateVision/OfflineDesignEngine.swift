@@ -45,6 +45,10 @@ public final class BenzaOfflineDesignEngine {
         self.directory = directory
     }
 
+    public static func releaseCachedRuntime() {
+        _ = benza_runtime_unload()
+    }
+
     private func verifyFiles(scan: BenzaOfflineScan) throws {
         if verified { return }
         for (name, size, expected) in files {
