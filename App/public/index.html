@@ -3631,6 +3631,28 @@ html.native-app select{
 .metalSwitch .metalOptionIcon.palladium{color:#9eabb4}
 .metalSwitch .metalOptionIcon.copper{color:#c67a45}
 
+
+/* Add Holding: shared rhythm and restrained orange accents. */
+#addScreen{--holding-accent:#f59a35}
+#addScreen .holdingSectionTitle{margin:22px 0 10px;color:var(--holding-accent);font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+#addScreen .holdingSectionTitle:first-child{margin-top:0}
+#addScreen input:not(#date),#addScreen select,#addScreen textarea,#addScreen .money,#addScreen .dateField{border-color:rgba(245,154,53,.20);background:var(--surface)}
+#addScreen input:not(#date):focus,#addScreen select:focus,#addScreen textarea:focus,#addScreen .money:focus-within,#addScreen .dateField:focus-within{border-color:var(--holding-accent);outline:2px solid rgba(245,154,53,.16);outline-offset:1px}
+#addScreen .metalSwitch button.selected{border-color:var(--holding-accent)!important;background:rgba(245,154,53,.14)!important;color:var(--text)}
+#addScreen .save{background:linear-gradient(135deg,#ffae4c,#ed8725);color:#211508}
+#addScreen .inventoryDetails{border-color:rgba(245,154,53,.20)}
+#addScreen .inventoryDetailsBody{min-width:0}
+#addScreen .holdingDetailHint{font-size:12px;line-height:1.5;color:var(--muted);margin:12px 0 0}
+#addScreen .row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#addScreen .row label{display:block;line-height:1.35;min-height:34px}
+#addScreen .row input,#addScreen select,#addScreen .money,#addScreen .dateField{min-height:48px}
+#addScreen .proRecordBadge{display:inline-block;margin-left:8px;padding:3px 7px;border-radius:6px;background:rgba(245,154,53,.16);color:var(--holding-accent);font-size:10px;vertical-align:middle}
+#addScreen #holdingScannerPhotoPreviews{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#addScreen #holdingScannerPhotoPreviews[hidden]{display:none}
+#addScreen #holdingScannerPhotoPreviews img{width:100%;height:100px;object-fit:contain}
+#addScreen #holdingScannerPhotoPreviews span{font-size:11px}
+@media(max-width:360px){#addScreen .form{padding-left:16px!important;padding-right:16px!important}#addScreen .row{gap:10px}}
+
 </style>
 
 <link rel="manifest" href="manifest.webmanifest">
@@ -6341,7 +6363,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
         <div class="settingsProFeatureList">
           <div><strong>Advanced analytics</strong><span>Profit/loss attribution, break-even distance, realized sales, acquisition history, and independent scenarios—beyond the Free performance snapshot.</span></div>
           <div><strong>Unlimited price alerts</strong><span>Track as many active price targets as you want.</span></div>
-          <div><strong>Smart Camera</strong><span>Scan supported bullion markings on iPhone to prefill metal, product, weight, and year for review.</span></div><div><strong>Inventory records</strong><span>Save serial numbers, private notes, item photos, and receipts.</span></div>
+          <div><strong>Smart Camera</strong><span>Scan supported bullion markings on iPhone to prefill metal, product, weight, and year for review.</span></div><div><strong>Inventory records</strong><span>Save private notes, item photos, and receipts.</span></div>
           <div><strong>Portfolio report</strong><span>Create a detailed inventory and performance report.</span></div>
           <div><strong>Future Pro releases</strong><span>Active subscriptions and Founder access automatically receive new features added to Benza Bullion Pro, including planned Future Potential tools.</span></div>
         </div>
@@ -6379,6 +6401,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
     <div class="sheetTop"><button class="close" onclick="closeAdd()">‹</button><h1 id="holdingSheetTitle">Add holding</h1><div style="width:34px"></div></div>
 
     <div class="form">
+      <div class="holdingSectionTitle">Your bullion</div>
       <label>Metal</label>
       <div class="metalSwitch">
         <button id="goldBtn" class="selected" onclick="selectMetal('gold')"><span class="metalOptionIcon gold">Au</span>Gold</button>
@@ -6418,20 +6441,30 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
         <div><label>Weight each (oz)</label><input id="weight" type="number" min="0" step=".001" value="1"></div>
       </div>
 
+      <div class="holdingSectionTitle">Purchase</div>
       <label>What did you pay?</label>
       <div class="money"><span>$</span><input id="cost" type="number" min="0" step=".01" value="3450"></div>
 
       <label>Purchase date</label>
       <div class="dateField"><span id="dateDisplay" aria-hidden="true"></span><input id="date" type="date" aria-label="Purchase date"></div>
+      <details id="bullionDetailsFields" class="inventoryDetails">
+        <summary><span><strong>Bullion details</strong><small>Optional · available to everyone</small></span><span class="inventoryChevron">›</span></summary>
+        <div class="inventoryDetailsBody">
+          <div class="row">
+            <div><label for="holdingYear">Year</label><input id="holdingYear" type="number" inputmode="numeric" min="1000" max="9999" step="1" placeholder="e.g. 2024"></div>
+            <div><label for="holdingPurity">Purity</label><input id="holdingPurity" type="text" maxlength="80" placeholder="e.g. .999 fine silver"></div>
+          </div>
+          <label for="holdingMint">Mint / refiner</label><input id="holdingMint" type="text" maxlength="120" placeholder="Optional">
+          <label for="holdingSerial">Serial / certificate number</label><input id="holdingSerial" type="text" maxlength="120" placeholder="Optional">
+          <p id="holdingDetailsHint" class="holdingDetailHint">Add the details stamped on your bullion. Leave anything unknown blank.</p>
+        </div>
+      </details>
       <details id="proInventoryFields" class="inventoryDetails" hidden>
         <summary>
-          <span><strong>Inventory &amp; records</strong><small>Optional Pro details</small></span>
+          <span><strong>Private inventory<span class="proRecordBadge">PRO</span></strong><small>Photos, receipts &amp; private notes</small></span>
           <span class="inventoryChevron">›</span>
         </summary>
         <div class="inventoryDetailsBody">
-          <label>Serial / certificate number</label>
-          <input id="holdingSerial" type="text" maxlength="120" placeholder="Optional">
-
           <label>Private notes</label>
           <textarea id="holdingNotes" maxlength="1000" placeholder="Dealer, condition, storage location, grading details…"></textarea>
 
@@ -6460,7 +6493,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
         </div>
       </details>
       <button id="proInventoryTeaser" class="inventoryLockedRow" type="button" onclick="openProUpgrade('inventory')">
-        <span><strong>Inventory &amp; records</strong><small>Serial numbers, private notes, photos &amp; receipts</small></span>
+        <span><strong>Inventory &amp; records</strong><small>Private notes, photos &amp; receipts</small></span>
         <span>PRO ›</span>
       </button>
 
@@ -6487,6 +6520,7 @@ const addScreen=document.getElementById('addScreen');
 const cost=document.getElementById('cost'), qty=document.getElementById('qty'), weight=document.getElementById('weight');
 const estimate=document.getElementById('estimate'), gain=document.getElementById('gain');
 let metal='gold';
+document.getElementById('product')?.addEventListener('change',suggestBullionDetails);
 document.getElementById('holdingPhoto')?.addEventListener('change',()=>handleInventoryFileSelected('photo'));
 document.getElementById('holdingReceipt')?.addEventListener('change',()=>handleInventoryFileSelected('receipt'));
 const GOLD_PRODUCTS=[
@@ -7298,20 +7332,11 @@ function applySmartCameraSuggestion(suggestion){
   document.getElementById('weight').value=suggestion.weight>0?Number(suggestion.weight.toFixed(4)):'';
   if(!suggestion.product)document.getElementById('product').selectedIndex=-1;
   document.getElementById('cost').value='';
-  if(isProActive()){
-    const serial=document.getElementById('holdingSerial');
-    if(serial&&suggestion.serial)serial.value=suggestion.serial;
-    const notes=document.getElementById('holdingNotes');
-    const detected=[];
-    if(suggestion.year)detected.push('Year: '+suggestion.year);
-    if(suggestion.mint)detected.push('Mint/Refiner: '+suggestion.mint);
-    if(suggestion.purity)detected.push('Purity: '+suggestion.purity+(suggestion.inferredPurity?' (standard spec; confirm)':''));
-    if(suggestion.inferredWeight)detected.push('Weight from standard spec; confirm');
-    if(suggestion.warnings?.length)detected.push(suggestion.warnings.join(' '));
-    if(suggestion.denomination)detected.push('Denomination: '+suggestion.denomination);
-    if(notes&&detected.length)notes.value='Smart Camera — '+detected.join(' · ');
-    const details=document.getElementById('proInventoryFields');
-    if(details)details.open=false;
+  fillBullionDetails({year:suggestion.year,purity:suggestion.purity,mint:suggestion.mint,serial:suggestion.serial});
+  document.getElementById('bullionDetailsFields').open=true;
+  document.getElementById('holdingDetailsHint').textContent='Details filled from your scan. Review every field before saving.';
+  if(isProActive()&&suggestion.denomination){
+    document.getElementById('holdingNotes').value='Denomination: '+suggestion.denomination;
   }
   update();
   return true;
@@ -7619,6 +7644,29 @@ function handleInventoryFileSelected(kind){
     setAttachmentPreview('receipt',holdingReceiptObjectUrl,file.name,isPdf);
   }
 }
+function fillBullionDetails(details={}){
+  [['holdingYear',details.year],['holdingPurity',details.purity],['holdingMint',details.mint],['holdingSerial',details.serial]].forEach(([id,value])=>{
+    const field=document.getElementById(id);if(field){field.value=value??'';field.dataset.suggested='';}
+  });
+}
+function resetBullionDetails(){
+  fillBullionDetails();
+  const panel=document.getElementById('bullionDetailsFields');if(panel)panel.open=false;
+  const hint=document.getElementById('holdingDetailsHint');if(hint)hint.textContent='Add the details stamped on your bullion. Leave anything unknown blank.';
+}
+function suggestBullionDetails(){
+  const product=document.getElementById('product')?.value;
+  const entry=SMART_CAMERA_CATALOG.find(x=>x.product===product&&x.metal===metal);
+  // Purity varies by year for several series. Only suggest stable specifications.
+  const stablePurities={'American Silver Eagle':'.999 fine silver','Canadian Silver Maple Leaf':'.9999 fine silver','American Gold Eagle':'22K gold','American Gold Buffalo':'.9999 fine gold','American Platinum Eagle':'.9995 platinum','American Palladium Eagle':'.9995 palladium'};
+  let suggested=false;
+  [['holdingPurity',stablePurities[product]],['holdingMint',entry?.mint]].forEach(([id,value])=>{
+    const field=document.getElementById(id);if(!field)return;
+    if(!field.value||field.value===field.dataset.suggested){field.value=value||'';field.dataset.suggested=value||'';if(value)suggested=true;}
+  });
+  const hint=document.getElementById('holdingDetailsHint');
+  if(hint)hint.textContent=suggested?'Product suggestions filled purity or mint. Confirm these match your bullion.':'Add the details stamped on your bullion. Leave anything unknown blank.';
+}
 function syncProInventoryVisibility(){
   const active=isProActive();
   const fields=document.getElementById('proInventoryFields');
@@ -7636,7 +7684,9 @@ function openAdd(){
   document.getElementById('cost').value=3450;
   document.getElementById('date').value=new Date().toISOString().slice(0,10);
   resetProInventoryForm();
+  resetBullionDetails();
   syncProInventoryVisibility();
+  suggestBullionDetails();
   update();
   addScreen.classList.add('show');
 }
@@ -7657,6 +7707,8 @@ function selectMetal(m, preserveValues=false){
     const defaults={gold:3450,silver:45,platinum:1500,palladium:1400,copper:5};
     weight.value=1;
     cost.value=defaults[m]||0;
+    resetBullionDetails();
+    suggestBullionDetails();
   }
   update();
 }
@@ -7673,8 +7725,9 @@ function editHolding(i){
   document.getElementById('date').value=h.date || new Date().toISOString().slice(0,10);
   resetProInventoryForm();
   syncProInventoryVisibility();
+  fillBullionDetails(h);
+  if(h.year||h.purity||h.mint||h.serial)document.getElementById('bullionDetailsFields').open=true;
   if(isProActive()){
-    document.getElementById('holdingSerial').value=h.serial||'';
     document.getElementById('holdingNotes').value=h.notes||'';
     pendingHoldingPhotoPath=h.photoPath||null;
     pendingHoldingReceiptPath=h.receiptPath||null;
@@ -8080,7 +8133,7 @@ async function loadHoldingsFromSupabase(){
   if(!supabaseClient||!currentUser){updateProIntegratedUI();return;}
   const {data,error}=await supabaseClient.from('holdings').select('*').order('created_at',{ascending:false});
   if(error){if(isAuthSessionError(error)){await handleExpiredSession();return} console.warn('Holdings unavailable:',error.message);setConnectionBanner(navigator.onLine?'Could not refresh holdings. Showing saved data.':'You’re offline. Showing saved data.');return}
-  holdings=(data||[]).map(h=>({id:h.id,metal:h.metal,product:h.product,qty:Number(h.quantity)||0,weight:Number(h.weight_oz)||0,oz:Number(h.total_oz)||0,cost:Number(h.cost_basis)||0,date:h.purchase_date,serial:h.serial_number||'',notes:h.notes||'',photoPath:h.photo_path||null,receiptPath:h.receipt_path||null,scannerPhotoPaths:Array.isArray(h.scanner_photo_paths)?h.scanner_photo_paths:[]}));
+  holdings=(data||[]).map(h=>({id:h.id,metal:h.metal,product:h.product,qty:Number(h.quantity)||0,weight:Number(h.weight_oz)||0,oz:Number(h.total_oz)||0,cost:Number(h.cost_basis)||0,date:h.purchase_date,year:h.bullion_year||null,purity:h.purity||'',mint:h.mint||'',serial:h.serial_number||'',notes:h.notes||'',photoPath:h.photo_path||null,receiptPath:h.receipt_path||null,scannerPhotoPaths:Array.isArray(h.scanner_photo_paths)?h.scanner_photo_paths:[]}));
   holdingsLoaded=true;
   renderHoldings();
 }
@@ -9009,9 +9062,12 @@ function proHoldingInsightHtml(h){
 
 
 function proInventoryMetaHtml(h){
-  if(!isProActive())return '';
   const chips=[];
+  if(h.year)chips.push(`<span class="inventoryChip">Year: ${escapeBullionHtml(String(h.year))}</span>`);
+  if(h.purity)chips.push(`<span class="inventoryChip">${escapeBullionHtml(h.purity)}</span>`);
+  if(h.mint)chips.push(`<span class="inventoryChip">${escapeBullionHtml(h.mint)}</span>`);
   if(h.serial)chips.push(`<span class="inventoryChip">Serial: ${escapeBullionHtml(h.serial)}</span>`);
+  if(!isProActive())return chips.length?`<div class="inventoryMeta">${chips.join('')}</div>`:'';
   if(h.notes)chips.push(`<span class="inventoryChip" title="${escapeBullionHtml(h.notes)}">Notes saved</span>`);
   if(h.photoPath)chips.push(`<button class="inventoryChip link" type="button" onclick="event.stopPropagation();openPrivateHoldingFile('${encodeURIComponent(h.photoPath)}'.split('%2F').join('/'))">View photo</button>`);
   (h.scannerPhotoPaths||[]).forEach((path,index)=>chips.push(`<button class="inventoryChip link" type="button" onclick="event.stopPropagation();openPrivateHoldingFile('${encodeURIComponent(path)}'.split('%2F').join('/'))">Scan photo ${index+1}</button>`));
@@ -9801,13 +9857,8 @@ async function finishScannerPhotoUploads(holdingId,files=[]){
       if(path){uploaded.push(path);}
     }
     if(!uploaded.length)return [];
-    const {data,error}=await supabaseClient
-      .from('holdings')
-      .update({scanner_photo_paths:uploaded})
-      .eq('id',holdingId)
-      .eq('user_id',currentUser.id)
-      .select('id,scanner_photo_paths')
-      .single();
+    const {data:response,error}=await supabaseClient.rpc('benza_update_scanner_photos',{p_holding_id:holdingId,p_paths:uploaded});
+    const data=Array.isArray(response)?response[0]:response;
     if(error)throw error;
     const local=holdings.find(h=>h.id===holdingId);
     if(local){
@@ -9841,7 +9892,11 @@ async function saveHolding(){
   const date=document.getElementById('date').value;
   const product=(document.getElementById('product').value||'').trim();
   const proActive=isProActive();
-  const serial=proActive?(document.getElementById('holdingSerial')?.value||'').trim():'';
+  const serial=(document.getElementById('holdingSerial')?.value||'').trim();
+  const yearText=(document.getElementById('holdingYear')?.value||'').trim();
+  const year=yearText?Number(yearText):null;
+  const purity=(document.getElementById('holdingPurity')?.value||'').trim();
+  const mint=(document.getElementById('holdingMint')?.value||'').trim();
   const notes=proActive?(document.getElementById('holdingNotes')?.value||'').trim():'';
   const photoFile=proActive?document.getElementById('holdingPhoto')?.files?.[0]:null;
   const receiptFile=proActive?document.getElementById('holdingReceipt')?.files?.[0]:null;
@@ -9853,8 +9908,9 @@ async function saveHolding(){
   if(!Number.isFinite(w)||w<=0||w>100000){alert('Enter a valid weight greater than 0.');return}
   if(!Number.isFinite(totalPaid)||totalPaid<0||totalPaid>1000000000){alert('Enter a valid purchase price.');return}
   if(!product){alert('Choose a bullion product.');return}
+  if(year!==null&&(!Number.isInteger(year)||year<1000||year>9999)){alert('Enter a four-digit bullion year, or leave it blank.');return}
   if(!supabaseClient||!currentUser){alert('Please log in before saving a holding.');return}
-  if(!proActive&&originalHolding&&(originalHolding.serial||originalHolding.notes||originalHolding.photoPath||originalHolding.receiptPath)){
+  if(!proActive&&originalHolding&&(originalHolding.notes||originalHolding.photoPath||originalHolding.receiptPath||(originalHolding.scannerPhotoPaths||[]).length)){
     alert('This holding contains Pro inventory records. Renew Pro to edit it while keeping those records.');
     return;
   }
@@ -9872,14 +9928,15 @@ async function saveHolding(){
       p_serial_number:serial||null,
       p_notes:notes||null,
       p_photo_path:pendingHoldingPhotoPath,
-      p_receipt_path:pendingHoldingReceiptPath
+      p_receipt_path:pendingHoldingReceiptPath,
+      p_year:year,p_purity:purity||null,p_mint:mint||null
     };
 
     if(editingHoldingIndex!==null){
       const existing=holdings[editingHoldingIndex];
       if(!existing?.id){alert('This holding is not ready to edit yet. Refresh and try again.');return}
 
-      const {data,error}=await supabaseClient.rpc('benza_update_holding_atomic',{
+      const {data,error}=await supabaseClient.rpc('benza_update_holding_details',{
         p_holding_id:existing.id,
         ...commonArgs
       });
@@ -9905,7 +9962,7 @@ async function saveHolding(){
         oz:Number(row.total_oz)||0,
         cost:Number(row.cost_basis)||0,
         date:row.purchase_date,
-        serial:row.serial_number||'',
+        year:row.bullion_year||null,purity:row.purity||'',mint:row.mint||'',serial:row.serial_number||'',
         notes:row.notes||'',
         photoPath:row.photo_path||null,
         receiptPath:row.receipt_path||null,
@@ -9931,7 +9988,7 @@ async function saveHolding(){
       return;
     }
 
-    const {data,error}=await supabaseClient.rpc('benza_add_holding_atomic',commonArgs);
+    const {data,error}=await supabaseClient.rpc('benza_add_holding_details',commonArgs);
 
     if(error){
       if(isAuthSessionError(error)){await handleExpiredSession();return}
@@ -9954,7 +10011,7 @@ async function saveHolding(){
       oz:Number(row.total_oz)||0,
       cost:Number(row.cost_basis)||0,
       date:row.purchase_date,
-      serial:row.serial_number||'',
+      year:row.bullion_year||null,purity:row.purity||'',mint:row.mint||'',serial:row.serial_number||'',
       notes:row.notes||'',
       photoPath:row.photo_path||null,
       receiptPath:row.receipt_path||null,
