@@ -19,6 +19,8 @@ const form=html.slice(html.indexOf('<div id="addScreen"'),html.indexOf('<!-- Loc
     document.getElementById('proInventoryTeaser').hidden=pro;
     document.getElementById('dateDisplay').textContent='October 1, 2026';
    },pro);
+   await page.evaluate(()=>document.getAnimations().forEach(animation=>animation.finish()));
+   await page.locator('#holdingSheetTitle').waitFor({state:'visible'});
    const metrics=await page.evaluate(()=>{
     const sheet=document.querySelector('#addScreen>.sheet');
     const form=document.querySelector('#addScreen .form');
@@ -31,11 +33,12 @@ const form=html.slice(html.indexOf('<div id="addScreen"'),html.indexOf('<!-- Loc
     sheet.scrollTop=sheet.scrollHeight;
     const save=document.getElementById('holdingSaveBtn').getBoundingClientRect();
     const s=sheet.getBoundingClientRect();
-    return {overflow,rowErrors,horizontal:sheet.scrollWidth>sheet.clientWidth+1||form.scrollWidth>form.clientWidth+1,dateCentered:Math.abs((date.left+date.right)-(dateWrap.left+dateWrap.right))<1,saveVisible:save.bottom<=s.bottom+1&&save.top>=s.top};
+    return {formWidth:bounds.width,sheetHeight:s.height,sheetTop:s.top,overflow,rowErrors,horizontal:sheet.scrollWidth>sheet.clientWidth+1||form.scrollWidth>form.clientWidth+1,dateCentered:Math.abs((date.left+date.right)-(dateWrap.left+dateWrap.right))<1,saveVisible:save.bottom<=s.bottom+1&&save.top>=s.top};
    });
+   assert.ok(metrics.formWidth>250&&metrics.sheetHeight>200&&metrics.sheetTop>=0,JSON.stringify(metrics));
    assert.deepEqual(metrics.overflow,[],JSON.stringify({width,theme,pro,metrics}));
    assert.equal(metrics.rowErrors,0);assert.equal(metrics.horizontal,false);assert.equal(metrics.dateCentered,true);assert.equal(metrics.saveVisible,true);
-   if(width===390){await page.locator('#addScreen>.sheet').evaluate(e=>e.scrollTop=0);await page.screenshot({path:'ui-artifacts/add-holding-'+engineName+'-'+theme+'-'+(pro?'pro':'free')+'.png'});await page.locator('#addScreen>.sheet').evaluate(e=>e.scrollTop=e.scrollHeight);await page.screenshot({path:'ui-artifacts/add-holding-'+engineName+'-'+theme+'-'+(pro?'pro':'free')+'-details.png'});}
+   if(width===390){await page.locator('#addScreen>.sheet').evaluate(e=>e.scrollTop=0);await page.screenshot({animations:'disabled',path:'ui-artifacts/add-holding-'+engineName+'-'+theme+'-'+(pro?'pro':'free')+'.png'});await page.locator('#addScreen>.sheet').evaluate(e=>e.scrollTop=e.scrollHeight);await page.screenshot({path:'ui-artifacts/add-holding-'+engineName+'-'+theme+'-'+(pro?'pro':'free')+'-details.png'});}
   }
  }
  await browser.close();
