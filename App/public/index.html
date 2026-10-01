@@ -5794,12 +5794,12 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
       </div>
       <div class="smartCameraActions">
         <button id="smartCameraProButton" class="smartCameraPrimary" type="button" onclick="handleSmartCameraProAction()">Scan Bullion</button>
-        <button class="smartCameraSecondary" data-scan-control type="button" onclick="runSmartCameraScan(smartCameraAwaitingReverse,'library')">Use a photo</button>
+        <button class="smartCameraSecondary" data-scan-control type="button" onclick="runSmartCameraScan(smartCameraAwaitingReverse,'library')">Choose bullion photo</button>
         <button class="smartCameraSecondary" type="button" onclick="closeSmartCamera();openManualAdd();">Enter manually</button>
       </div>
       <div id="smartCameraStatus" class="smartCameraFine" role="status"></div>
       <details id="smartCameraDiagnostics" class="smartCameraFine" hidden><summary>Scanner check · stays on this phone</summary><p id="smartCameraDiagnosticText"></p></details>
-      <div class="smartCameraFine">Scan photos stay on your iPhone. Scanning does not verify authenticity.</div>
+      <div class="smartCameraFine">Scan photos stay private. Photos are attached to the holding only after you save it. Scanning does not verify authenticity.</div>
     </div>
   </section>
 
@@ -6614,6 +6614,7 @@ function closeAddChoice(){
 })();
 function openManualAdd(){
   closeAddChoice();
+  pendingScannerPhotoFiles=[];
   openAdd();
 }
 function smartCameraPlugin(){
@@ -6622,6 +6623,8 @@ function smartCameraPlugin(){
 let pendingSmartCameraSuggestion=null;
 let smartCameraScans=[];
 let smartCameraPhotoCount=0;
+let smartCameraCapturedFiles=[];
+let pendingScannerPhotoFiles=[];
 let smartCameraLastDiagnostic=null;
 let smartCameraScanning=false;
 let smartCameraSession=0;
@@ -7245,6 +7248,7 @@ function applySmartCameraSuggestion(suggestion){
     if(status)status.textContent='A product, metal, and weight are needed before continuing. Try another scan or enter this item manually.';
     return false;
   }
+  pendingScannerPhotoFiles=smartCameraCapturedFiles.slice();
   closeSmartCamera();
   openAdd();
   selectMetal(suggestion.metal,true);
@@ -7281,9 +7285,22 @@ function useSmartCameraAnalysis(){
   }
   applySmartCameraSuggestion(pendingSmartCameraSuggestion);
 }
+function scannerPhotoFileFromResult(result,index){
+  const encoded=typeof result?.capturedPhotoBase64==='string'?result.capturedPhotoBase64:'';
+  if(!encoded)return null;
+  try{
+    const binary=atob(encoded);
+    const bytes=new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+    const mime=result?.capturedPhotoMime==='image/jpeg'?'image/jpeg':'image/jpeg';
+    return new File([bytes],`smart-camera-${index+1}.jpg`,{type:mime,lastModified:Date.now()});
+  }catch(_){return null;}
+}
+
 function clearSmartCameraEvidence(){
   smartCameraScans=[];
   smartCameraPhotoCount=0;
+  smartCameraCapturedFiles=[];
   smartCameraLastDiagnostic=null;
   const diagnostic=document.getElementById('smartCameraDiagnostics');
   if(diagnostic){diagnostic.hidden=true;diagnostic.open=false;}
@@ -7367,6 +7384,8 @@ async function runSmartCameraScan(append=false,source='camera'){
       return;
     }
     if(!result||typeof result!=='object')throw new Error('Invalid camera result');
+    const capturedFile=scannerPhotoFileFromResult(result,smartCameraPhotoCount);
+    if(capturedFile)smartCameraCapturedFiles.push(capturedFile);
     smartCameraLastDiagnostic={engineVersion:Number(result.engineVersion)||0,
       designStatus:['local-catalogue-v1','not-bundled','device-limited','unavailable'].includes(result.designStatus)?result.designStatus:'unknown',
       appBuild:typeof result.appBuild==='string'&&/^[0-9.]+$/.test(result.appBuild)?result.appBuild:'unknown',
@@ -7432,13 +7451,9 @@ async function openSmartCamera(){
     : 'Upgrade to Pro to use Smart Camera. Add Manually remains free.';
   screen.classList.add('show');
   screen.setAttribute('aria-hidden','false');
-  // Pro users go straight to capture when they choose Smart Camera.
-  if(active&&isBenzaNativeRuntime()){
-    const reset=resetSmartCameraScan(true);
-    const openingRun=smartCameraRunId;
-    const ready=await reset;
-    if(ready&&openingRun===smartCameraRunId&&screen.classList.contains('show'))await runSmartCameraScan();
-  }
+  // Opening Smart Camera now lands on the choice screen. The user explicitly
+  // chooses Scan Bullion or Choose bullion photo before native capture begins.
+  if(active&&isBenzaNativeRuntime())await resetSmartCameraScan(true);
 }
 function closeSmartCamera(){
   void resetSmartCameraScan(true,true);
@@ -7582,7 +7597,7 @@ function editHolding(i){
     pendingHoldingPhotoPath=h.photoPath||null;
     pendingHoldingReceiptPath=h.receiptPath||null;
     const details=document.getElementById('proInventoryFields');
-    if(details&&(h.serial||h.notes||h.photoPath||h.receiptPath))details.open=true;
+    if(details&&(h.serial||h.notes||h.photoPath||h.receiptPath||(h.scannerPhotoPaths||[]).length))details.open=true;
     hydrateExistingAttachmentPreviews(h).catch(e=>console.warn('Attachment preview unavailable',e));
   }
   update();
@@ -7983,7 +7998,7 @@ async function loadHoldingsFromSupabase(){
   if(!supabaseClient||!currentUser){updateProIntegratedUI();return;}
   const {data,error}=await supabaseClient.from('holdings').select('*').order('created_at',{ascending:false});
   if(error){if(isAuthSessionError(error)){await handleExpiredSession();return} console.warn('Holdings unavailable:',error.message);setConnectionBanner(navigator.onLine?'Could not refresh holdings. Showing saved data.':'You’re offline. Showing saved data.');return}
-  holdings=(data||[]).map(h=>({id:h.id,metal:h.metal,product:h.product,qty:Number(h.quantity)||0,weight:Number(h.weight_oz)||0,oz:Number(h.total_oz)||0,cost:Number(h.cost_basis)||0,date:h.purchase_date,serial:h.serial_number||'',notes:h.notes||'',photoPath:h.photo_path||null,receiptPath:h.receipt_path||null}));
+  holdings=(data||[]).map(h=>({id:h.id,metal:h.metal,product:h.product,qty:Number(h.quantity)||0,weight:Number(h.weight_oz)||0,oz:Number(h.total_oz)||0,cost:Number(h.cost_basis)||0,date:h.purchase_date,serial:h.serial_number||'',notes:h.notes||'',photoPath:h.photo_path||null,receiptPath:h.receipt_path||null,scannerPhotoPaths:Array.isArray(h.scanner_photo_paths)?h.scanner_photo_paths:[]}));
   holdingsLoaded=true;
   renderHoldings();
 }
@@ -8917,6 +8932,7 @@ function proInventoryMetaHtml(h){
   if(h.serial)chips.push(`<span class="inventoryChip">Serial: ${escapeBullionHtml(h.serial)}</span>`);
   if(h.notes)chips.push(`<span class="inventoryChip" title="${escapeBullionHtml(h.notes)}">Notes saved</span>`);
   if(h.photoPath)chips.push(`<button class="inventoryChip link" type="button" onclick="event.stopPropagation();openPrivateHoldingFile('${encodeURIComponent(h.photoPath)}'.split('%2F').join('/'))">View photo</button>`);
+  (h.scannerPhotoPaths||[]).forEach((path,index)=>chips.push(`<button class="inventoryChip link" type="button" onclick="event.stopPropagation();openPrivateHoldingFile('${encodeURIComponent(path)}'.split('%2F').join('/'))">Scan photo ${index+1}</button>`));
   if(h.receiptPath)chips.push(`<button class="inventoryChip link" type="button" onclick="event.stopPropagation();openPrivateHoldingFile('${encodeURIComponent(h.receiptPath)}'.split('%2F').join('/'))">View receipt</button>`);
   return chips.length?`<div class="inventoryMeta">${chips.join('')}</div>`:'';
 }
@@ -9473,7 +9489,7 @@ async function deleteHolding(i){
     return;
   }
 
-  await removePrivateHoldingFiles([h.photoPath,h.receiptPath]);
+  await removePrivateHoldingFiles([h.photoPath,h.receiptPath,...(h.scannerPhotoPaths||[])]);
   holdings.splice(i,1);
   rebaseLiveChartForPortfolioFlow(portfolioValueBeforeMutation,currentPortfolioMarketValue());
   renderHoldings();
@@ -9693,6 +9709,38 @@ async function finishHoldingAttachmentUploads({holdingId,photoFile,receiptFile,o
   }
 }
 
+async function finishScannerPhotoUploads(holdingId,files=[]){
+  if(!holdingId||!files.length)return [];
+  const uploaded=[];
+  try{
+    for(let index=0;index<files.length;index++){
+      const file=files[index];
+      const path=await uploadPrivateHoldingFile(file,`scan-${index+1}`);
+      if(path){uploaded.push(path);}
+    }
+    if(!uploaded.length)return [];
+    const {data,error}=await supabaseClient
+      .from('holdings')
+      .update({scanner_photo_paths:uploaded})
+      .eq('id',holdingId)
+      .eq('user_id',currentUser.id)
+      .select('id,scanner_photo_paths')
+      .single();
+    if(error)throw error;
+    const local=holdings.find(h=>h.id===holdingId);
+    if(local){
+      local.scannerPhotoPaths=Array.isArray(data?.scanner_photo_paths)?data.scanner_photo_paths:uploaded;
+      renderHoldings();
+    }
+    return uploaded;
+  }catch(error){
+    await removePrivateHoldingFiles(uploaded);
+    console.warn('Smart Camera photo upload failed:',error);
+    alert('Your holding was saved, but the Smart Camera photos could not be attached. You can add photos from Edit Holding.');
+    return [];
+  }
+}
+
 async function openPrivateHoldingFile(path){
   if(!path||!supabaseClient)return;
   const popup=window.open('about:blank','_blank');
@@ -9777,7 +9825,8 @@ async function saveHolding(){
         serial:row.serial_number||'',
         notes:row.notes||'',
         photoPath:row.photo_path||null,
-        receiptPath:row.receipt_path||null
+        receiptPath:row.receipt_path||null,
+        scannerPhotoPaths:Array.isArray(row.scanner_photo_paths)?row.scanner_photo_paths:[]
       };
 
       rebaseLiveChartForPortfolioFlow(portfolioValueBeforeMutation,currentPortfolioMarketValue());
@@ -9789,6 +9838,11 @@ async function saveHolding(){
         oldPhotoPath:originalHolding?.photoPath||null,
         oldReceiptPath:originalHolding?.receiptPath||null
       });
+      if(pendingScannerPhotoFiles.length){
+        const files=pendingScannerPhotoFiles.slice();
+        pendingScannerPhotoFiles=[];
+        finishScannerPhotoUploads(row.id,files);
+      }
       Promise.resolve()
         .then(()=>loadActivityFromSupabase())
         .then(()=>recordPortfolioSnapshot(true))
@@ -9831,6 +9885,11 @@ async function saveHolding(){
     closeAdd();
     setButtonBusy(button,false);
     if(photoFile||receiptFile)finishHoldingAttachmentUploads({holdingId:row.id,photoFile,receiptFile});
+    if(pendingScannerPhotoFiles.length){
+      const files=pendingScannerPhotoFiles.slice();
+      pendingScannerPhotoFiles=[];
+      finishScannerPhotoUploads(row.id,files);
+    }
     Promise.resolve()
       .then(()=>loadActivityFromSupabase())
       .then(()=>recordPortfolioSnapshot(true))
