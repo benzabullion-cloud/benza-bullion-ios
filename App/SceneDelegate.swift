@@ -430,7 +430,7 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
                                width: bandWidth, height: extent.height)
 
             var passes: [(CGImage, CGImagePropertyOrientation, Bool)] = [(cgImage, .up, true)]
-            let rimImages = BenzaCoinRim.readingImages(cgImage) { !self.isCurrent(generation) }
+            let rimImages = BenzaCoinRim.readingImages(cgImage, maximumCandidates: fast ? 1 : 3) { !self.isCurrent(generation) }
             passes.append(contentsOf: rimImages.map { ($0, .up, false) })
             func appendPasses(rect: CGRect,
                               orientations: [CGImagePropertyOrientation],
