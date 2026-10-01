@@ -44,7 +44,7 @@ await test('All five holding groups have complete title coverage',()=>{
   for(const metal of ['gold','silver','platinum','palladium','copper']){
     assert.ok((map[metal]||[]).length>0,metal+' group is empty');
     const missing=(map[metal]||[]).filter(product=>!catalog.some(item=>item.product===product&&item.metal===metal));
-    assert.deepEqual(missing,[],metal+' missing scanner titles: '+missing.join(', '));
+    assert.equal(missing.length,0,metal+' missing scanner titles: '+missing.join(', '));
   }
 });
 await test('Representative pre-1933 and U.S. silver titles resolve by denomination plus year',()=>{
