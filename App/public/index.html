@@ -5794,7 +5794,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
       </div>
       <div class="smartCameraActions">
         <button id="smartCameraProButton" class="smartCameraPrimary" type="button" onclick="handleSmartCameraProAction()">Scan Bullion</button>
-        <button class="smartCameraSecondary" data-scan-control type="button" onclick="runSmartCameraScan(smartCameraAwaitingReverse,'library')">Choose bullion photo</button>
+        <button class="smartCameraSecondary" data-scan-control type="button" onclick="runSmartCameraScan(smartCameraAwaitingReverse,'library')">Choose Bullion Photo</button>
         <button class="smartCameraSecondary" type="button" onclick="closeSmartCamera();openManualAdd();">Enter manually</button>
       </div>
       <div id="smartCameraStatus" class="smartCameraFine" role="status"></div>
@@ -7325,6 +7325,7 @@ function setSmartCameraBusy(busy){
 async function resetSmartCameraScan(silent=false,releaseModels=false){
   const run=++smartCameraRunId;
   smartCameraSession++;
+  pendingScannerPhotoFiles=[];
   clearSmartCameraEvidence();
   setSmartCameraBusy(true);
   const resetButton=document.getElementById('smartCameraResetButton');
@@ -7441,7 +7442,7 @@ async function openSmartCamera(){
     promise.innerHTML=founder
       ? '<strong>Included permanently with Founder access</strong>Smart Camera is active as part of your Founder Lifetime Pro access.'
       : active
-        ? '<strong>Included with your Pro plan</strong>Your scan photos stay on your iPhone.'
+        ? '<strong>Included with your Pro plan</strong>Scan photos stay private and are saved with the holding after you add it.'
         : '<strong>Smart Camera is a Pro feature</strong>Upgrade to Benza Bullion Pro to scan supported bullion and prefill holding details.';
   }
   smartCameraSession++;
@@ -9877,7 +9878,8 @@ async function saveHolding(){
       serial:row.serial_number||'',
       notes:row.notes||'',
       photoPath:row.photo_path||null,
-      receiptPath:row.receipt_path||null
+      receiptPath:row.receipt_path||null,
+      scannerPhotoPaths:Array.isArray(row.scanner_photo_paths)?row.scanner_photo_paths:[]
     });
 
     rebaseLiveChartForPortfolioFlow(portfolioValueBeforeMutation,currentPortfolioMarketValue());
