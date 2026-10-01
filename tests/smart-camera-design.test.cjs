@@ -29,9 +29,12 @@ await test('Actual two-photo flow retains artwork with no front text',async()=>{
 await test('Fresh scan never inherits artwork from prior item',async()=>{queued.push({text:'fine silver 1 oz',confidence:.95});await context.runSmartCameraScan();assert.equal(context.last.designID,'');assert.equal(context.last.product,'');assert.equal(context.last.sides,1)});
 await test('Actual conflicting photo flow retains failure state',async()=>{queued.push({lines:[],designSuggestion:design('american_eagle')},{text:'CANADA fine gold 1 oz',confidence:.95,designSuggestion:design('canadian_maple_leaf')});await context.runSmartCameraScan();await context.runSmartCameraScan(true);assert.equal(context.canUseSmartCameraSuggestion(context.last),false);assert.match(context.last.warnings.join(' '),/different designs/)});
 await test('Every selectable bullion product has scanner catalogue coverage',()=>{
-  for(const metal of context.METALS||[]){
-    for(const product of context.PRODUCT_MAP?.[metal]||[]){
-      assert.ok(context.SMART_CAMERA_CATALOG.some(item=>item.product===product&&item.metal===metal),metal+': '+product);
+  const metals=vm.runInContext('METALS',context);
+  const map=vm.runInContext('PRODUCT_MAP',context);
+  const catalog=vm.runInContext('SMART_CAMERA_CATALOG',context);
+  for(const metal of metals){
+    for(const product of map[metal]||[]){
+      assert.ok(catalog.some(item=>item.product===product&&item.metal===metal),metal+': '+product);
     }
   }
 });
