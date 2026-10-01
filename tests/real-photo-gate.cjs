@@ -3,7 +3,7 @@ const path='/tmp/benza-real-photo-readings.json';
 if(!fs.existsSync(path)){console.log('SKIP actual-photo accuracy gate: no authorized real-photo fixtures');process.exit(0);}
 const html=fs.readFileSync('App/public/index.html','utf8');
 const context=vm.createContext({console,Date,Number});
-vm.runInContext(html.slice(html.indexOf('const GOLD_PRODUCTS='),html.indexOf('const METAL_SYMBOLS='))+html.slice(html.indexOf('const SMART_CAMERA_CATALOG='),html.indexOf('function smartCameraResultRows')),context);
+vm.runInContext(html.slice(html.indexOf('const GOLD_PRODUCTS='),html.indexOf('const METAL_SYMBOLS='))+html.slice(html.indexOf('let pendingSmartCameraSuggestion='),html.indexOf('function smartCameraConfidenceLabel')),context);
 const report=JSON.parse(fs.readFileSync(path,'utf8'));
 const photos=report.map(photo=>context.selectSmartCameraPhotoEvidence({passes:photo.passes,confidence:.9}));
 const scan=context.interpretSmartCameraScan({
