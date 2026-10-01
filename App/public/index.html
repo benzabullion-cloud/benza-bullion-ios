@@ -5794,7 +5794,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
       </div>
       <div class="smartCameraActions">
         <button id="smartCameraProButton" class="smartCameraPrimary" type="button" onclick="handleSmartCameraProAction()">Scan Bullion</button>
-        <button class="smartCameraSecondary" data-scan-control type="button" onclick="runSmartCameraScan(smartCameraAwaitingReverse,'library')">Choose Bullion Photo</button>
+        <button id="smartCameraLibraryButton" class="smartCameraSecondary" data-scan-control type="button" onclick="runSmartCameraScan(smartCameraAwaitingReverse,'library')">Choose Bullion Photo</button>
         <button class="smartCameraSecondary" type="button" onclick="closeSmartCamera();openManualAdd();">Enter manually</button>
       </div>
       <div id="smartCameraStatus" class="smartCameraFine" role="status"></div>
@@ -6440,6 +6440,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
               <div><strong>Item photo</strong><span id="holdingPhotoStatus">No photo attached</span></div>
               <button type="button" class="attachmentAddButton" onclick="document.getElementById('holdingPhoto').click()">Add photo</button>
               <input id="holdingPhoto" type="file" accept="image/*" hidden>
+              <div id="holdingScannerPhotoPreviews" class="attachmentPreview" hidden></div>
               <div id="holdingPhotoPreview" class="attachmentPreview" hidden>
                 <img id="holdingPhotoThumb" alt="Item photo preview">
                 <button type="button" onclick="viewHoldingAttachment('photo')">View</button>
@@ -7267,7 +7268,7 @@ function renderSmartCameraAnalysis(suggestion){
   document.getElementById('smartAnalysisSub').textContent=ready
     ? 'Review the details below, then continue to your holding.'
     : smartCameraAwaitingReverse
-      ? 'Flip the same item over so I can read its markings.'
+      ? 'First photo received. Photograph or choose a photo of the opposite side of the same item.'
       : smartCameraFailureReason(suggestion);
   document.getElementById('smartScanProduct').textContent=suggestion.product||'Not identified';
   document.getElementById('smartScanMetal').textContent=METAL_NAMES[suggestion.metal]||'Not identified';
@@ -7277,6 +7278,7 @@ function renderSmartCameraAnalysis(suggestion){
   if(use){use.hidden=!ready;use.disabled=!ready;}
   panel.classList.add('show');
   renderSmartCameraDiagnostics(suggestion);
+  setSmartCameraBusy(smartCameraScanning);
 }
 function applySmartCameraSuggestion(suggestion){
   if(!canUseSmartCameraSuggestion(suggestion)||!isProActive()){
@@ -7288,6 +7290,7 @@ function applySmartCameraSuggestion(suggestion){
   closeSmartCamera();
   openAdd();
   selectMetal(suggestion.metal,true);
+  previewPendingScannerPhotos();
   if(suggestion.product && [...document.getElementById('product').options].some(o=>o.value===suggestion.product)){
     document.getElementById('product').value=suggestion.product;
   }
@@ -7354,7 +7357,9 @@ function setSmartCameraBusy(busy){
   smartCameraScanning=busy;
   document.querySelectorAll('[data-scan-control]').forEach(el=>el.disabled=busy);
   const button=document.getElementById('smartCameraProButton');
-  if(button){button.disabled=busy;button.textContent=busy?'Reading your bullion…':isProActive()?(smartCameraAwaitingReverse?'Photograph the other side':pendingSmartCameraSuggestion?'Scan again':'Scan Bullion'):'Unlock Smart Camera with Pro';}
+  if(button){button.disabled=busy;button.textContent=busy?'Reading your bullion…':isProActive()?(smartCameraAwaitingReverse?'Scan Opposite Side':pendingSmartCameraSuggestion?'Scan again':'Scan Bullion'):'Unlock Smart Camera with Pro';}
+  const libraryButton=document.getElementById('smartCameraLibraryButton');
+  if(libraryButton){libraryButton.disabled=busy;libraryButton.textContent=smartCameraAwaitingReverse?'Choose Opposite Side Photo':'Choose Bullion Photo';}
   const useButton=document.getElementById('smartAnalysisUseButton');
   if(useButton)useButton.disabled=busy||!canUseSmartCameraSuggestion(pendingSmartCameraSuggestion);
 }
@@ -7505,7 +7510,38 @@ function handleSmartCameraProAction(){
   openProUpgrade('smart-camera');
 }
 
+let scannerPreviewObjectUrls=[];
+let scannerPreviewGeneration=0;
+function renderScannerPhotoPreviews(urls=[]){
+  const wrap=document.getElementById('holdingScannerPhotoPreviews');
+  if(!wrap)return;
+  wrap.replaceChildren();
+  wrap.hidden=!urls.length;
+  urls.forEach((url,index)=>{
+    const figure=document.createElement('div');
+    const label=document.createElement('span');
+    label.textContent=index===0?'First side':'Opposite side';
+    const image=document.createElement('img');
+    image.alt=label.textContent+' scanner photo';
+    image.src=url;
+    figure.append(label,image);
+    wrap.append(figure);
+  });
+}
+function previewPendingScannerPhotos(){
+  if(!pendingScannerPhotoFiles.length)return;
+  // Only construct previews when the actual holding UI is available.
+  if(typeof document.createElement!=='function')return;
+  scannerPreviewObjectUrls=pendingScannerPhotoFiles.map(file=>URL.createObjectURL(file));
+  renderScannerPhotoPreviews(scannerPreviewObjectUrls);
+  const details=document.getElementById('proInventoryFields');
+  if(details)details.open=true;
+}
 function clearAttachmentObjectUrls(){
+  scannerPreviewGeneration++;
+  scannerPreviewObjectUrls.forEach(url=>URL.revokeObjectURL(url));
+  scannerPreviewObjectUrls=[];
+  renderScannerPhotoPreviews();
   if(holdingPhotoObjectUrl){URL.revokeObjectURL(holdingPhotoObjectUrl);holdingPhotoObjectUrl=null;}
   if(holdingReceiptObjectUrl){URL.revokeObjectURL(holdingReceiptObjectUrl);holdingReceiptObjectUrl=null;}
   holdingPhotoViewUrl=null;
@@ -7547,6 +7583,13 @@ async function signedHoldingFileUrl(path){
   return data?.signedUrl||null;
 }
 async function hydrateExistingAttachmentPreviews(h){
+  const generation=scannerPreviewGeneration;
+  const paths=(h?.scannerPhotoPaths||[]).slice(0,2);
+  if(paths.length){
+    const urls=await Promise.all(paths.map(signedHoldingFileUrl));
+    if(generation!==scannerPreviewGeneration)return;
+    renderScannerPhotoPreviews(urls.filter(Boolean));
+  }
   if(h?.photoPath){
     const url=await signedHoldingFileUrl(h.photoPath);
     if(url)setAttachmentPreview('photo',url,'Photo attached');
