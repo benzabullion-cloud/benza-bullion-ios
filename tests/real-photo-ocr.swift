@@ -47,6 +47,7 @@ import Vision
                 request.usesLanguageCorrection=index==0
                 let supported=(try? request.supportedRecognitionLanguages()) ?? ["en-US"]
                 request.recognitionLanguages=["en-US","fr-FR","es-ES","de-DE"].filter { supported.contains($0) }
+                if #available(macOS 13.0, *) { request.automaticallyDetectsLanguage = true }
                 request.minimumTextHeight=0.002
                 request.customWords=vocabulary
                 let passStarted=Date()
@@ -64,3 +65,4 @@ import Vision
         print(String(decoding:json,as:UTF8.self))
     }
 }
+
