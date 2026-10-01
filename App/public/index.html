@@ -8310,7 +8310,7 @@ async function onSignedIn(){
   await loadNotificationPreferences();
   await updateNotificationUI();
 }
-async const SUPABASE_PAGE_SIZE=1000;
+const SUPABASE_PAGE_SIZE=1000;
 const AVOIR_OZ_TO_TROY_OZ=28.349523125/31.1034768;
 
 function holdingHasCostBasis(h){
@@ -8549,10 +8549,11 @@ function renderHoldings(){
 
     const metalOz=metalRows.reduce((s,x)=>s+x.h.oz,0);
     const metalPieces=metalRows.reduce((s,x)=>s+x.h.qty,0);
-    const metalCost=metalRows.reduce((s,x)=>s+x.h.cost,0);
+    const metalCostKnown=metalRows.every(x=>holdingHasCostBasis(x.h));
+    const metalCost=metalRows.reduce((s,x)=>s+(holdingHasCostBasis(x.h)?Number(x.h.cost):0),0);
     const metalValue=metalRows.reduce((s,x)=>s+x.h.oz*(livePrices[metal]||0),0);
-    const metalGain=metalValue-metalCost;
-    const metalReturn=metalCost>0?(metalGain/metalCost)*100:0;
+    const metalGain=metalCostKnown?metalValue-metalCost:null;
+    const metalReturn=metalCostKnown&&metalCost>0?(metalGain/metalCost)*100:null;
 
     const group=document.createElement('div');
     group.className='bullionMetalGroup'+(bullionOpenMetals.has(metal)?' open':'');
@@ -8567,7 +8568,7 @@ function renderHoldings(){
         </div>
         <div class="bullionMetalValue">
           <strong>${money(metalValue)}</strong>
-          <div class="bullionMetalReturn ${metalGain>=0?'pos':'neg'}">${metalGain>=0?'+':''}${pct(metalReturn)}</div>
+          <div class="bullionMetalReturn ${metalReturn===null?'':(metalReturn>=0?'pos':'neg')}">${metalReturn===null?'Return —':`${metalReturn>=0?'+':''}${pct(metalReturn)}`}</div>
         </div>
         <svg class="bullionChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
       </button>
@@ -8593,10 +8594,11 @@ function renderHoldings(){
         const rows=product.rows;
         const pieces=rows.reduce((s,x)=>s+x.h.qty,0);
         const oz=rows.reduce((s,x)=>s+x.h.oz,0);
-        const cost=rows.reduce((s,x)=>s+x.h.cost,0);
+        const costKnown=rows.every(x=>holdingHasCostBasis(x.h));
+        const cost=rows.reduce((s,x)=>s+(holdingHasCostBasis(x.h)?Number(x.h.cost):0),0);
         const value=oz*(livePrices[metal]||0);
-        const gain=value-cost;
-        const ret=cost>0?(gain/cost)*100:0;
+        const gain=costKnown?value-cost:null;
+        const ret=costKnown&&cost>0?(gain/cost)*100:null;
         const safeKey=encodeURIComponent(product.key);
 
         const productEl=document.createElement('div');
@@ -8609,7 +8611,7 @@ function renderHoldings(){
             </div>
             <div class="bullionProductRight">
               <strong>${money(value)}</strong>
-              <span class="${gain>=0?'pos':'neg'}">${gain>=0?'+':''}${pct(ret)}</span>
+              <span class="${ret===null?'':(ret>=0?'pos':'neg')}">${ret===null?'Return —':`${ret>=0?'+':''}${pct(ret)}`}</span>
             </div>
             <svg class="bullionProductChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
           </button>
@@ -8625,7 +8627,7 @@ function renderHoldings(){
           lot.innerHTML=`
             <div class="bullionLotInfo">
               <div class="bullionLotTitle">${Number(h.qty.toFixed(2)).toLocaleString()} × ${Number(h.weight.toFixed(4)).toLocaleString()} oz</div>
-              <div class="bullionLotSub">${dateText} · Cost ${money(h.cost)}</div>
+              <div class="bullionLotSub">${dateText} · Cost ${holdingHasCostBasis(h)?money(h.cost):'—'}</div>
               ${proHoldingInsightHtml(h)}
               ${proInventoryMetaHtml(h)}
             </div>
@@ -8688,11 +8690,12 @@ function calculateStackScore(stats,totalValue,totalCost,pieces,uniqueProducts){
   const metalsOwned=METALS.filter(m=>stats[m].oz>0).length;
   const metalShares=METALS.map(m=>totalValue?stats[m].value/totalValue:0);
   const largestMetalShare=Math.max(0,...metalShares);
-  const totalRet=totalCost?((totalValue-totalCost)/totalCost*100):0;
+  const totalCostKnown=holdings.length===0||holdings.every(holdingHasCostBasis);
+  const totalRet=totalCostKnown&&totalCost>0?((totalValue-totalCost)/totalCost*100):null;
 
   const diversification=holdings.length?Math.round((metalsOwned/5)*25):0;
   const balance=holdings.length?Math.round(clamp((1-largestMetalShare)/0.8,0,1)*25):0;
-  const costHealth=holdings.length?Math.round(clamp((totalRet+25)/25,0,1)*20):0;
+  const costHealth=holdings.length&&totalRet!==null?Math.round(clamp((totalRet+25)/25,0,1)*20):0;
   const variety=Math.round(clamp(uniqueProducts/6,0,1)*15);
   const tracking=Math.round(clamp(holdings.length/8,0,1)*15);
 
@@ -8708,7 +8711,8 @@ function calculateStackScore(stats,totalValue,totalCost,pieces,uniqueProducts){
     ],
     metalsOwned,
     largestMetalShare,
-    totalRet
+    totalRet,
+    totalCostKnown
   };
 }
 
@@ -9496,12 +9500,13 @@ function exportProReport(){
   const stats=Object.fromEntries(METALS.map(m=>[m,metalStats(m)]));
   const totalValue=METALS.reduce((s,m)=>s+stats[m].value,0);
   const totalCost=METALS.reduce((s,m)=>s+stats[m].cost,0);
+  const totalCostKnown=holdings.length===0||holdings.every(holdingHasCostBasis);
   const rows=holdings.map(h=>[
     METAL_NAMES[h.metal]||h.metal,
     h.product,
     Number(h.qty)||0,
     Number(h.oz)||0,
-    Number(h.cost)||0,
+    holdingHasCostBasis(h)?Number(h.cost):'',
     (Number(h.oz)||0)*(livePrices[h.metal]||0),
     h.date||'',
     h.serial||'',
@@ -9513,8 +9518,8 @@ function exportProReport(){
     ['Benza Bullion Pro Portfolio Report'],
     ['Generated',new Date().toISOString()],
     ['Current Value',totalValue.toFixed(2)],
-    ['Cost Basis',totalCost.toFixed(2)],
-    ['Unrealized Gain/Loss',(totalValue-totalCost).toFixed(2)],
+    ['Cost Basis',totalCostKnown?totalCost.toFixed(2):'Unavailable'],
+    ['Unrealized Gain/Loss',totalCostKnown?(totalValue-totalCost).toFixed(2):'Unavailable'],
     [],
     ['Metal','Product','Pieces','Ounces','Cost Basis','Current Metal Value','Purchase Date','Serial / Certificate','Notes','Photo Attached','Receipt Attached'],
     ...rows
@@ -9866,17 +9871,18 @@ async function deleteHolding(i){
 }
 function updatePortfolio(){
   let total=0,totalCost=0;
+  const totalCostKnown=holdings.length===0||holdings.every(holdingHasCostBasis);
   const metalValues=Object.fromEntries(METALS.map(m=>[m,0]));
   holdings.forEach(h=>{
     const value=h.oz*(livePrices[h.metal]||0);
     total+=value;
-    totalCost+=h.cost;
+    if(holdingHasCostBasis(h))totalCost+=Number(h.cost);
     if(metalValues[h.metal]!==undefined) metalValues[h.metal]+=value;
   });
   document.getElementById('portfolioValue').textContent=money(total);
-  const gain=total-totalCost;
-  document.getElementById('portfolioChange').textContent=(gain>=0?'+':'-')+money(Math.abs(gain))+' ('+(totalCost?((gain/totalCost)*100).toFixed(2):'0.00')+'%) total';
-  document.getElementById('totalCost').textContent=money(totalCost);
+  const gain=totalCostKnown?total-totalCost:null;
+  document.getElementById('portfolioChange').textContent=gain===null?'Return unavailable':(gain>=0?'+':'-')+money(Math.abs(gain))+' ('+(totalCost?((gain/totalCost)*100).toFixed(2):'—')+'%) total';
+  document.getElementById('totalCost').textContent=totalCostKnown?money(totalCost):'—';
   const largest=METALS.map(m=>({m,v:metalValues[m]})).sort((a,b)=>b.v-a.v)[0];
   document.getElementById('largestMetal').textContent=largest&&largest.v>0?METAL_NAMES[largest.m]:'—';
   document.getElementById('metalsOwned').textContent=METALS.filter(m=>metalValues[m]>0).length+' / 5';
@@ -10199,6 +10205,7 @@ async function saveHolding(){
         weight:Number(row.weight_oz)||0,
         oz:Number(row.total_oz)||0,
         cost:Number(row.cost_basis)||0,
+        costKnown:row.cost_basis!==null&&row.cost_basis!==undefined&&row.cost_basis!=='',
         date:row.purchase_date,
         year:row.bullion_year||null,purity:row.purity||'',mint:row.mint||'',serial:row.serial_number||'',
         notes:row.notes||'',
