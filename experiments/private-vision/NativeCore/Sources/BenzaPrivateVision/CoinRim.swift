@@ -106,10 +106,25 @@ public enum BenzaCoinRim {
                 output[y*outWidth+x]=UInt8(max(0,min(255,top*(1-fy)+bottom*fy)))
             }
         }
-        let data = Data(output) as CFData
+        // Very wide strips shrink lettering in OCR's internal image pyramid.
+        // Three overlapping rows retain the same inscription pixels at a useful scale.
+        let panelWidth = Int(Double(outWidth)*0.45)
+        let padding = max(16,outHeight/5)
+        let pageWidth = panelWidth+padding*2
+        let pageHeight = (outHeight+padding)*3+padding
+        var page = [UInt8](repeating:255,count:pageWidth*pageHeight)
+        for row in 0..<3 {
+            let startX = Int(Double(outWidth-panelWidth)*Double(row)/2)
+            for y in 0..<outHeight {
+                let destination = (padding+row*(outHeight+padding)+y)*pageWidth+padding
+                let source = y*outWidth+startX
+                page.replaceSubrange(destination..<(destination+panelWidth),with:output[source..<(source+panelWidth)])
+            }
+        }
+        let data = Data(page) as CFData
         guard let provider = CGDataProvider(data: data) else { return nil }
-        return CGImage(width: outWidth, height: outHeight, bitsPerComponent: 8, bitsPerPixel: 8,
-            bytesPerRow: outWidth, space: CGColorSpaceCreateDeviceGray(),
+        return CGImage(width: pageWidth, height: pageHeight, bitsPerComponent: 8, bitsPerPixel: 8,
+            bytesPerRow: pageWidth, space: CGColorSpaceCreateDeviceGray(),
             bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
             provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
     }
