@@ -7175,7 +7175,14 @@ function interpretSmartCameraScan(result){
   }
   // Only non-fractional, fixed fine-weight products have safe profile defaults.
   const fixedWeights={'American Silver Eagle':1,'American Palladium Eagle':1};
-  const expected=fixedWeights[product];
+  // Maple is a family with multiple sizes: constrain only the readable $5 silver
+  // variant, never every Maple or every silver coin. Mint specification: 1 oz.
+  // https://www.mint.ca/en/shop/coins/2025/2026-treasured-silver-maple-leaf-celebration-privy-mark-1-oz-9999-pure-silver-coin-premium-bullion
+  const mapleDollarReadings=[...text.matchAll(/\b(\d+(?:\.\d+)?|five|ten|twenty|fifty)\s+dollars?\b/g)]
+    .map(match=>({five:5,ten:10,twenty:20,fifty:50}[match[1]]||Number(match[1])));
+  const standardSilverMaple=product==='Canadian Silver Maple Leaf'&&/\b(?:canada|can)\b/.test(text)&&
+    mapleDollarReadings.length>0&&mapleDollarReadings.every(value=>value===5);
+  const expected=standardSilverMaple?1:fixedWeights[product];
   if(expected&&weight&&Math.abs(weight-expected)>.003){warnings.push('Weight disagrees with the matched product. Confirm product and weight.');weight=0;}
   if(expected&&!weight&&weights.length===0&&!plated){
     // A fixed catalogue weight is safe only after independent product evidence:
