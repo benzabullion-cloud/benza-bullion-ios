@@ -8310,13 +8310,37 @@ async function onSignedIn(){
   await loadNotificationPreferences();
   await updateNotificationUI();
 }
+async const SUPABASE_PAGE_SIZE=1000;
+const AVOIR_OZ_TO_TROY_OZ=28.349523125/31.1034768;
+
+function holdingHasCostBasis(h){
+  if(!h)return false;
+  if(h.costKnown===false)return false;
+  return h.cost!==null&&h.cost!==undefined&&h.cost!==''&&Number.isFinite(Number(h.cost));
+}
+
+async function fetchAllSupabaseRows(table,{select='*',orderColumn='created_at',ascending=false,expectedUserId=currentUser?.id}={}){
+  const rows=[];
+  for(let from=0;;from+=SUPABASE_PAGE_SIZE){
+    let query=supabaseClient.from(table).select(select);
+    if(orderColumn)query=query.order(orderColumn,{ascending});
+    query=query.range(from,from+SUPABASE_PAGE_SIZE-1);
+    const {data,error}=await query;
+    if(expectedUserId&&currentUser?.id!==expectedUserId)return {data:null,error:null,aborted:true};
+    if(error)return {data:null,error,aborted:false};
+    const page=data||[];
+    rows.push(...page);
+    if(page.length<SUPABASE_PAGE_SIZE)return {data:rows,error:null,aborted:false};
+  }
+}
+
 async function loadHoldingsFromSupabase(){
   if(!supabaseClient||!currentUser){updateProIntegratedUI();return;}
   const userId=currentUser.id;
-  const {data,error}=await supabaseClient.from('holdings').select('*').order('created_at',{ascending:false});
-  if(currentUser?.id!==userId)return;
+  const {data,error,aborted}=await fetchAllSupabaseRows('holdings',{orderColumn:'created_at',ascending:false,expectedUserId:userId});
+  if(aborted||currentUser?.id!==userId)return;
   if(error){if(isAuthSessionError(error)){await handleExpiredSession();return} console.warn('Holdings unavailable:',error.message);setConnectionBanner(navigator.onLine?'Could not refresh holdings. Showing saved data.':'You’re offline. Showing saved data.');return}
-  holdings=(data||[]).map(h=>({id:h.id,metal:h.metal,product:h.product,qty:Number(h.quantity)||0,weight:Number(h.weight_oz)||0,oz:Number(h.total_oz)||0,cost:Number(h.cost_basis)||0,date:h.purchase_date,year:h.bullion_year||null,purity:h.purity||'',mint:h.mint||'',serial:h.serial_number||'',notes:h.notes||'',photoPath:h.photo_path||null,receiptPath:h.receipt_path||null,scannerPhotoPaths:Array.isArray(h.scanner_photo_paths)?h.scanner_photo_paths:[]}));
+  holdings=(data||[]).map(h=>({id:h.id,metal:h.metal,product:h.product,qty:Number(h.quantity)||0,weight:Number(h.weight_oz)||0,oz:Number(h.total_oz)||0,cost:Number(h.cost_basis)||0,costKnown:h.cost_basis!==null&&h.cost_basis!==undefined&&h.cost_basis!=='',date:h.purchase_date,year:h.bullion_year||null,purity:h.purity||'',mint:h.mint||'',serial:h.serial_number||'',notes:h.notes||'',photoPath:h.photo_path||null,receiptPath:h.receipt_path||null,scannerPhotoPaths:Array.isArray(h.scanner_photo_paths)?h.scanner_photo_paths:[]}));
   holdingsLoaded=true;
   renderHoldings();
 }
@@ -8325,8 +8349,8 @@ async function loadActivityFromSupabase(){
   const userId=currentUser.id;
   const state=document.getElementById('activityLoadState');
   if(state)state.classList.remove('show');
-  const {data,error}=await supabaseClient.from('transactions').select('*').order('created_at',{ascending:false});
-  if(currentUser?.id!==userId)return;
+  const {data,error,aborted}=await fetchAllSupabaseRows('transactions',{orderColumn:'created_at',ascending:false,expectedUserId:userId});
+  if(aborted||currentUser?.id!==userId)return;
   if(error){
     if(isAuthSessionError(error)){await handleExpiredSession();return}
     console.warn('Activity unavailable:',error.message);
@@ -8633,12 +8657,15 @@ function setReturnClass(el,value){
 }
 function metalStats(which){
   const rows=holdings.filter(h=>h.metal===which);
-  const oz=rows.reduce((s,h)=>s+h.oz,0);
-  const cost=rows.reduce((s,h)=>s+h.cost,0);
+  const oz=rows.reduce((sum,h)=>sum+(Number(h.oz)||0),0);
+  const costKnown=rows.length>0&&rows.every(holdingHasCostBasis);
+  const cost=rows.reduce((sum,h)=>sum+(holdingHasCostBasis(h)?Number(h.cost):0),0);
   const spot=livePrices[which]||0;
   const value=oz*spot;
-  const gain=value-cost;
-  return {rows,oz,cost,spot,value,gain,avg:oz?cost/oz:0,ret:cost?(gain/cost*100):0};
+  const gain=costKnown?value-cost:null;
+  const avg=costKnown&&oz>0?cost/oz:null;
+  const ret=costKnown&&cost>0?(gain/cost*100):null;
+  return {rows,oz,cost,costKnown,spot,value,gain,avg,ret};
 }
 
 
@@ -8962,7 +8989,7 @@ function updateBullionCalculator(){
   const premium=total-melt;
   const premiumOz=totalOz?premium/totalOz:0;
   const premiumPct=melt?premium/melt*100:0;
-  const breakEven=totalOz?total/totalOz:0;
+  const breakEven=qty>0&&weight>0?total/totalOz:null;
 
   document.getElementById('calcSpot').value=money(spot);
   document.getElementById('calcTotalOz').textContent=totalOz.toLocaleString(undefined,{maximumFractionDigits:4})+' oz';
@@ -8970,7 +8997,7 @@ function updateBullionCalculator(){
   document.getElementById('calcTotal').textContent=priceEach?money(total):'$0.00';
   document.getElementById('calcPremiumOz').textContent=priceEach?(premium>=0?'+':'')+money(premiumOz):'—';
   document.getElementById('calcPremiumPct').textContent=priceEach?(premiumPct>=0?'+':'')+premiumPct.toFixed(2)+'%':'—';
-  document.getElementById('calcBreakEven').textContent=priceEach?money(breakEven):'—';
+  document.getElementById('calcBreakEven').textContent=priceEach&&breakEven!==null?money(breakEven):'—';
 
   const note=document.getElementById('calcUnitNote');
   if(note){
@@ -9371,14 +9398,18 @@ function renderProAnalytics(){
   const stats=Object.fromEntries(METALS.map(m=>[m,metalStats(m)]));
   const totalValue=METALS.reduce((s,m)=>s+stats[m].value,0);
   const totalCost=METALS.reduce((s,m)=>s+stats[m].cost,0);
-  const totalGain=totalValue-totalCost;
+  const totalCostKnown=holdings.length===0||holdings.every(holdingHasCostBasis);
+  const totalGain=totalCostKnown?totalValue-totalCost:null;
 
   const contribution=document.getElementById('proContribution');
   if(contribution){
     const rows=METALS.filter(m=>stats[m].oz>0).map(m=>{
       const s=stats[m];
-      const gainShare=Math.abs(totalGain)>0.0001?(s.gain/Math.abs(totalGain)*100):0;
-      return `<div class="proMetricRow"><div><strong>${METAL_NAMES[m]}</strong><span>${money(s.cost)} invested → ${money(s.value)}</span></div><div class="proMetricRight ${s.gain>=0?'pos':'neg'}"><strong>${signedMoney(s.gain)}</strong><span>${s.cost?((s.ret>=0?'+':'')+pct(s.ret)):'—'} · ${gainShare>=0?'+':''}${gainShare.toFixed(1)}% of net P/L</span></div></div>`;
+      const gainShare=totalGain!==null&&Math.abs(totalGain)>0.0001&&s.gain!==null?(s.gain/Math.abs(totalGain)*100):null;
+      const gainText=s.gain===null?'—':signedMoney(s.gain);
+      const returnText=s.ret===null?'—':((s.ret>=0?'+':'')+pct(s.ret));
+      const contributionText=gainShare===null?'— of net P/L':`${gainShare>=0?'+':''}${gainShare.toFixed(1)}% of net P/L`;
+      return `<div class="proMetricRow"><div><strong>${METAL_NAMES[m]}</strong><span>${s.costKnown?money(s.cost):'—'} invested → ${money(s.value)}</span></div><div class="proMetricRight ${s.gain===null?'':(s.gain>=0?'pos':'neg')}"><strong>${gainText}</strong><span>${returnText} · ${contributionText}</span></div></div>`;
     });
     contribution.innerHTML=rows.length?rows.join(''):'<div class="proEmpty">Add holdings to see contribution analytics.</div>';
   }
@@ -9387,9 +9418,10 @@ function renderProAnalytics(){
   if(breakEven){
     const rows=METALS.filter(m=>stats[m].oz>0).map(m=>{
       const s=stats[m];
-      const distance=s.avg?((s.spot-s.avg)/s.avg*100):0;
-      const needed=s.spot?((s.avg-s.spot)/s.spot*100):0;
-      return `<div class="proMetricRow"><div><strong>${METAL_NAMES[m]}</strong><span>Average cost ${money(s.avg)}/oz · spot ${money(s.spot)}/oz</span></div><div class="proMetricRight ${distance>=0?'pos':'neg'}"><strong>${distance>=0?'+':''}${distance.toFixed(2)}%</strong><span>${distance>=0?'Above break-even':`${Math.max(0,needed).toFixed(2)}% spot rise to break-even`}</span></div></div>`;
+      if(s.avg===null)return `<div class="proMetricRow"><div><strong>${METAL_NAMES[m]}</strong><span>Cost basis unavailable · spot ${money(s.spot)}/oz</span></div><div class="proMetricRight"><strong>—</strong><span>Break-even unavailable</span></div></div>`;
+      const distance=(s.spot-s.avg)/s.avg*100;
+      const needed=s.spot?((s.avg-s.spot)/s.spot*100):null;
+      return `<div class="proMetricRow"><div><strong>${METAL_NAMES[m]}</strong><span>Average cost ${money(s.avg)}/oz · spot ${money(s.spot)}/oz</span></div><div class="proMetricRight ${distance>=0?'pos':'neg'}"><strong>${distance>=0?'+':''}${distance.toFixed(2)}%</strong><span>${distance>=0?'Above break-even':needed===null?'Spot unavailable':`${Math.max(0,needed).toFixed(2)}% spot rise to break-even`}</span></div></div>`;
     });
     breakEven.innerHTML=rows.length?rows.join(''):'<div class="proEmpty">Add holdings with cost basis to see break-even analytics.</div>';
   }
@@ -9504,17 +9536,18 @@ function renderAnalytics(){
   const stats=Object.fromEntries(METALS.map(m=>[m,metalStats(m)]));
   const totalValue=METALS.reduce((s,m)=>s+stats[m].value,0);
   const totalCost=METALS.reduce((s,m)=>s+stats[m].cost,0);
-  const totalGain=totalValue-totalCost;
-  const totalRet=totalCost?(totalGain/totalCost*100):0;
-  const totalOz=METALS.reduce((s,m)=>s+stats[m].oz,0);
+  const totalCostKnown=holdings.length===0||holdings.every(holdingHasCostBasis);
+  const totalGain=totalCostKnown?totalValue-totalCost:null;
+  const totalRet=totalCostKnown&&totalCost>0?(totalGain/totalCost*100):null;
+  const totalOz=METALS.reduce((sum,m)=>sum+stats[m].oz*(m==='copper'?AVOIR_OZ_TO_TROY_OZ:1),0);
   const pieces=holdings.reduce((s,h)=>s+(Number(h.qty)||0),0);
 
   document.getElementById('anTotalValue').textContent=money(totalValue);
   const gainEl=document.getElementById('anTotalGain');
-  gainEl.textContent=signedMoney(totalGain)+' ('+(totalRet>=0?'+':'')+pct(totalRet)+')';
-  setReturnClass(gainEl,totalGain);
+  gainEl.textContent=totalGain===null?'—':signedMoney(totalGain)+' ('+(totalRet===null?'—':(totalRet>=0?'+':'')+pct(totalRet))+')';
+  if(totalGain!==null)setReturnClass(gainEl,totalGain);
   document.getElementById('anCost').textContent=money(totalCost);
-  document.getElementById('anOunces').textContent=totalOz.toFixed(2)+' oz';
+  document.getElementById('anOunces').textContent=totalOz.toFixed(2)+' troy oz eq.';
   document.getElementById('anPositions').textContent=holdings.length.toLocaleString();
   document.getElementById('anPieces').textContent=pieces.toLocaleString(undefined,{maximumFractionDigits:2});
 
@@ -9538,20 +9571,20 @@ function renderAnalytics(){
     row.className='stackMetalRow';
     row.innerHTML=`<div class="holdingMetalEmblem ${m}" style="width:36px;height:36px;border-radius:10px"><span class="holdingEmblemSymbol"><span class="metalBadge"><i></i><i></i><i></i></span></span></div>
       <div><div class="stackMetalName">${METAL_NAMES[m]}</div><div class="stackMetalSub">${metalPieces.toLocaleString(undefined,{maximumFractionDigits:2})} pieces</div></div>
-      <div class="stackMetalValue">${s.oz.toLocaleString(undefined,{maximumFractionDigits:2})} oz<br><span class="stackMetalSub">${money(s.value)}</span></div>`;
+      <div class="stackMetalValue">${s.oz.toLocaleString(undefined,{maximumFractionDigits:2})} ${m==='copper'?'av oz':'t oz'}<br><span class="stackMetalSub">${money(s.value)}</span></div>`;
     stackRows.appendChild(row);
   });
 
   METALS.forEach(m=>{
     const s=stats[m], prefix='an'+m.charAt(0).toUpperCase()+m.slice(1);
-    document.getElementById(prefix+'Oz').textContent=s.oz.toFixed(2)+' oz';
+    document.getElementById(prefix+'Oz').textContent=s.oz.toFixed(2)+(m==='copper'?' av oz':' t oz');
     document.getElementById(prefix+'Value').textContent=money(s.value)+' market value';
-    document.getElementById(prefix+'Avg').textContent=s.oz?money(s.avg):'—';
+    document.getElementById(prefix+'Avg').textContent=s.avg===null?'—':money(s.avg);
     document.getElementById(prefix+'Spot').textContent=s.spot?money(s.spot):'—';
-    document.getElementById(prefix+'Break').textContent=s.oz?money(s.avg):'—';
+    document.getElementById(prefix+'Break').textContent=s.avg===null?'—':money(s.avg);
     const r=document.getElementById(prefix+'Return');
-    r.textContent=s.cost?((s.ret>=0?'+':'')+pct(s.ret)):'—';
-    setReturnClass(r,s.ret);
+    r.textContent=s.ret===null?'—':((s.ret>=0?'+':'')+pct(s.ret));
+    if(s.ret!==null)setReturnClass(r,s.ret);
   });
 
   const allocBars=document.getElementById('anAllocBars');
@@ -9604,15 +9637,16 @@ function renderAnalytics(){
     leaderboard.innerHTML='<div style="text-align:center;color:var(--muted);font-size:12px;padding:8px">Add a holding to see performance rankings.</div>';
   }else{
     values.sort((a,b)=>{
-      const ar=a.h.cost?((a.value-a.h.cost)/a.h.cost):0;
-      const br=b.h.cost?((b.value-b.h.cost)/b.h.cost):0;
+      const ar=holdingHasCostBasis(a.h)&&Number(a.h.cost)>0?((a.value-Number(a.h.cost))/Number(a.h.cost)):-Infinity;
+      const br=holdingHasCostBasis(b.h)&&Number(b.h.cost)>0?((b.value-Number(b.h.cost))/Number(b.h.cost)):-Infinity;
       return br-ar;
     }).forEach(({h,value})=>{
-      const ret=h.cost?((value-h.cost)/h.cost*100):0;
-      const gain=value-h.cost;
+      const hasCost=holdingHasCostBasis(h);
+      const ret=hasCost&&Number(h.cost)>0?((value-Number(h.cost))/Number(h.cost)*100):null;
+      const gain=hasCost?value-Number(h.cost):null;
       const row=document.createElement('div');row.className='leaderItem';
-      row.innerHTML=`<div><div class="leaderName">${escapeBullionHtml(h.product||'Bullion holding')}</div><div class="leaderMeta">${h.oz.toFixed(2)} oz · ${(METAL_NAMES[h.metal]||h.metal).toUpperCase()} · cost ${money(h.cost)}</div></div>
-        <div class="leaderRight"><div class="leaderValue">${money(value)}</div><div class="holdingReturn ${ret>=0?'pos':'neg'}">${ret>=0?'+':''}${pct(ret)} · ${signedMoney(gain)}</div></div>`;
+      row.innerHTML=`<div><div class="leaderName">${escapeBullionHtml(h.product||'Bullion holding')}</div><div class="leaderMeta">${h.oz.toFixed(2)} oz · ${(METAL_NAMES[h.metal]||h.metal).toUpperCase()} · cost ${hasCost?money(h.cost):'—'}</div></div>
+        <div class="leaderRight"><div class="leaderValue">${money(value)}</div><div class="holdingReturn ${ret===null?'':(ret>=0?'pos':'neg')}">${ret===null?'Return —':`${ret>=0?'+':''}${pct(ret)} · ${signedMoney(gain)}`}</div></div>`;
       leaderboard.appendChild(row);
     });
   }
@@ -9624,7 +9658,7 @@ function renderAnalytics(){
     if(largest) insightList.push(`${largest.h.product} is your largest position at ${largestShare.toFixed(1)}% of portfolio value.`);
     METALS.forEach(m=>{
       const s=stats[m];
-      if(!s.oz||!s.avg)return;
+      if(!s.oz||s.avg===null)return;
       const distance=(s.spot-s.avg)/s.avg*100;
       insightList.push(`${METAL_NAMES[m]} spot is ${Math.abs(distance).toFixed(1)}% ${distance>=0?'above':'below'} your average ${METAL_NAMES[m].toLowerCase()} cost basis of ${money(s.avg)}/oz.`);
     });
@@ -9730,7 +9764,7 @@ function updateSalePreview(){
   }
   const q=Number(document.getElementById('saleQuantity').value)||0;
   const proceeds=Number(document.getElementById('saleProceeds').value)||0;
-  const costRemoved=base.baseQty>0?base.baseCost*(q/base.baseQty):0;
+  const costRemoved=base.baseQty>0?Math.round(base.baseCost*(q/base.baseQty)*100)/100:0;
   const gain=proceeds-costRemoved;
   document.getElementById('saleCostPreview').textContent=money(costRemoved);
   const el=document.getElementById('saleGainPreview');
@@ -10213,7 +10247,7 @@ async function saveHolding(){
       qty:Number(row.quantity)||0,
       weight:Number(row.weight_oz)||0,
       oz:Number(row.total_oz)||0,
-      cost:Number(row.cost_basis)||0,
+      cost:Number(row.cost_basis)||0,costKnown:row.cost_basis!==null&&row.cost_basis!==undefined&&row.cost_basis!=='',
       date:row.purchase_date,
       year:row.bullion_year||null,purity:row.purity||'',mint:row.mint||'',serial:row.serial_number||'',
       notes:row.notes||'',
@@ -11110,13 +11144,15 @@ async function exportBenzaData(){
   setAccountSettingsStatus('Preparing your data export…');
 
   try{
+    const exportUserId=currentUser.id;
     const results=await Promise.all([
-      supabaseClient.from('holdings').select('*').order('created_at',{ascending:true}),
-      supabaseClient.from('transactions').select('*').order('created_at',{ascending:true}),
-      supabaseClient.from('portfolio_snapshots').select('*').order('captured_at',{ascending:true}),
-      supabaseClient.from('price_alerts').select('*').order('created_at',{ascending:true}),
+      fetchAllSupabaseRows('holdings',{orderColumn:'created_at',ascending:true,expectedUserId:exportUserId}),
+      fetchAllSupabaseRows('transactions',{orderColumn:'created_at',ascending:true,expectedUserId:exportUserId}),
+      fetchAllSupabaseRows('portfolio_snapshots',{orderColumn:'captured_at',ascending:true,expectedUserId:exportUserId}),
+      fetchAllSupabaseRows('price_alerts',{orderColumn:'created_at',ascending:true,expectedUserId:exportUserId}),
       supabaseClient.from('notification_preferences').select('*').maybeSingle()
     ]);
+    if(currentUser?.id!==exportUserId||results.some(result=>result.aborted))return;
 
     const failed=results.find(result=>result.error);
     if(failed?.error)throw failed.error;
