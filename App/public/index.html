@@ -6665,6 +6665,11 @@ let smartCameraRunId=0;
 const SMART_CAMERA_MAX_VIEWS=2;
 let smartCameraAwaitingReverse=false;
 let smartCameraSource='camera';
+// Vocabulary repairs split rim lettering; it does not restrict what OCR may read.
+const SMART_CAMERA_WORDS=[...new Set(Object.values(PRODUCT_MAP).flat().join(' ').toLowerCase()
+  .match(/[a-z]{4,}/g).concat(['canada','australia','united','states','america','argent','plata','oro','fine','dollar','dollars','dime','quarter','half','philharmoniker','liberty']))];
+const SMART_CAMERA_WORD_REPAIRS=SMART_CAMERA_WORDS.map(word=>[new RegExp('\\b'+word.split('').join('\\s*')+'\\b','g'),word]);
+const SMART_CAMERA_TERM_CACHE=new Map();
 const SMART_CAMERA_CATALOG=[
   {product:'American Silver Eagle',metal:'silver',strong:['american silver eagle','silver eagle'],support:['walking liberty','one dollar','united states of america'],mint:'United States Mint',purity:'.999 fine silver',weight:1,yearMin:1986},
   {product:'American Gold Eagle',metal:'gold',strong:['american gold eagle','gold eagle'],support:['50 dollars','united states of america'],mint:'United States Mint',purity:'22K gold',weight:1,yearMin:1986},
@@ -6774,7 +6779,12 @@ const SMART_CAMERA_CATALOG=[
   };
   for(const metal of METALS){
     for(const product of PRODUCT_MAP[metal]||[]){
-      if(existing.has(product))continue;
+      if(existing.has(product)){
+        const entry=SMART_CAMERA_CATALOG.find(item=>item.product===product&&item.metal===metal);
+        // Every holding title is readable, including profiles with inscription aliases.
+        entry.strong=[...new Set([...entry.strong,normalizeSmartCameraText(product)])];
+        continue;
+      }
       SMART_CAMERA_CATALOG.push({product,metal,strong:aliases(product),support:[],baseline:true});
       existing.add(product);
     }
@@ -6783,10 +6793,10 @@ const SMART_CAMERA_CATALOG=[
 function normalizeSmartCameraText(value){
   let text=String(value||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
     .replace(/[’‘]/g,"'").replace(/[½¼]/g,c=>c==='½'?'1/2':'1/4')
-    .replace(/⁄/g,'/').replace(/[^a-z0-9.$%/#:\-\s]/g,' ').replace(/\s+/g,' ').trim();
+    .replace(/⁄/g,'/').replace(/[^\p{L}0-9.$%/#:\-\s]/gu,' ').replace(/\s+/g,' ').trim();
   // Rim lettering is often split into individual characters by OCR.
-  for(const word of ['canada','silver','gold','liberty','platinum','palladium']){
-    text=text.replace(new RegExp('\\b'+word.split('').join('\\s*')+'\\b','g'),word);
+  for(const [pattern,word] of SMART_CAMERA_WORD_REPAIRS){
+    text=text.replace(pattern,word);
   }
   return text.replace(/\b(?:silv|silvr|stlver|stlvern|silvern|s1lver)\b/g,'silver')
     .replace(/\b(?:sine|f1ne)\s+(silver|gold)\b/g,'fine $1')
@@ -6818,18 +6828,20 @@ function smartCameraCatalogMatch(text,metal){
       // but only when a readable year places the coin in that exact series.
       const plausibleYears=years.filter(y=>(!item.yearMin||y>=item.yearMin)&&(!item.yearMax||y<=item.yearMax));
       const strongHits=(item.strong||[]).filter(term=>{
-        if(!text.includes(term))return false;
+        if(!smartCameraHasTerm(text,term))return false;
         if(['1 oz fine silver','1 oz fine gold','.9999 fine gold'].includes(term))return false;
         // "Half sovereign" contains "sovereign"; do not let the broader title tie
         // the exact Half Sovereign match and force an ambiguous result.
         if(item.product==='British Gold Sovereign'&&term==='sovereign'&&/\bhalf sovereign\b/.test(text))return false;
         // Historic denomination-only matches (half dollar, quarter dollar, etc.)
         // must have both a plausible year and an independently identified metal.
-        if(item.requiresYear&&(!plausibleYears.length||!metal))return false;
+        if(item.requiresYear&&(!plausibleYears.length||(!metal&&!smartCameraHasTerm(text,item.product))))return false;
         return true;
       });
-      const supportHits=(item.support||[]).filter(term=>text.includes(term));
+      const supportHits=(item.support||[]).filter(term=>smartCameraHasTerm(text,term));
       let score=strongHits.length*7+supportHits.length;
+      // A full readable title outranks its shorter overlapping family names.
+      if(smartCameraHasTerm(text,item.product))score+=20;
       if(item.product.includes('Maple Leaf') && metal===item.metal && /\b(?:canada|can)\b/.test(text) && /9999|999\.9/.test(text) && !/\bbar\b/.test(text)){
         strongHits.push('Canadian metal + .9999 markings');score+=8;
       }
@@ -6851,6 +6863,35 @@ function smartCameraCatalogMatch(text,metal){
   // Ambiguous families and variants need another side instead of first-match wins.
   if(!ranked.length || (ranked[1]&&ranked[0].score-ranked[1].score<3))return null;
   return ranked[0];
+}
+function smartCameraHasTerm(text,term){
+  if(!SMART_CAMERA_TERM_CACHE.has(term)){
+    const normalized=normalizeSmartCameraText(term);
+    const escaped=normalized.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    SMART_CAMERA_TERM_CACHE.set(term,normalized?new RegExp('(?:^|[^\\p{L}0-9])'+escaped+'(?:$|[^\\p{L}0-9])','u'):null);
+  }
+  return SMART_CAMERA_TERM_CACHE.get(term)?.test(text)||false;
+}
+function smartCameraHistoricalSilverSpec(text,metal){
+  // Standard circulating U.S. 90% issues only. A date, country and denomination
+  // are all required: neither a silver-looking portrait nor "quarter" is enough.
+  // Mint 1945 annual report: 2.5/6.25/12.5 g gross mass, .900 fineness.
+  // https://fraser.stlouisfed.org/title/9404/item/700711
+  // 1965 composition transition: https://www.usmint.gov/learn/history/historical-documents/first-striking-of-half-dollars-from-new-coinage-material
+  if(metal&&metal!=='silver')return null;
+  if(/\b(?:plated|clad|filled|replica|copy|tribute|layered)\b/.test(text))return null;
+  const years=smartCameraYearCandidates(text);
+  if(years.length!==1||years[0]<1892||years[0]>1964)return null;
+  if(!/\bunited states(?: of america)?\b|\bu s a\b|\busa\b/.test(text))return null;
+  const denominations=[
+    {kind:'dime',rx:/\b(?:one|1) dime\b/,grossGrams:2.5},
+    {kind:'quarter',rx:/\bquarter[ -]dollar\b/,grossGrams:6.25},
+    {kind:'half',rx:/\bhalf[ -]dollar\b/,grossGrams:12.5}
+  ].filter(entry=>entry.rx.test(text));
+  if(denominations.length!==1)return null;
+  if(denominations[0].kind==='quarter'&&[1931,1933].includes(years[0]))return null;
+  const grossGrams=denominations[0].grossGrams;
+  return {kind:denominations[0].kind,year:years[0],grossWeight:grossGrams/31.1034768,weight:grossGrams*.9/31.1034768,purity:'.900 silver'};
 }
 function smartCameraProductGuess(text,metal){
   const match=smartCameraCatalogMatch(text,metal);
@@ -7078,6 +7119,9 @@ function interpretSmartCameraScan(result){
   if(metals.length>1)warnings.push('Conflicting metal markings. Scan the other side and confirm the metal manually.');
   const plated=/\b(?:plated|clad|filled|replica|copy|tribute|layered)\b/.test(text);
   if(plated)warnings.push('Plated, replica, or layered marking detected. Fine-metal content needs manual verification.');
+  const historicalSpec=metals.length<=1?smartCameraHistoricalSilverSpec(text,metal):null;
+  const inferredMetal=!metal&&!!historicalSpec;
+  if(inferredMetal)metal='silver';
   let design=smartCameraDesignEvidence(result);
   if(design.invalid)warnings.push('The artwork result was invalid. Scan again.');
   let visualMetal=!metal&&!design.invalid&&!design.conflict?smartCameraDesignUniqueMetal(design.id):'';
@@ -7111,15 +7155,28 @@ function interpretSmartCameraScan(result){
     warnings.push('Artwork and inscriptions disagree. Confirm the product.');
   }
   if(!metal&&catalogMatch)metal=catalogMatch.item.metal;
-  const product=catalogMatch?.item.product||(metal?smartCameraProductGuess(text,metal):'');
+  // A historic half-dollar date can also belong to a commemorative design. Its
+  // standard content is useful, but the date alone must not invent a named family.
+  const ambiguousHistoricalHalf=inferredMetal&&historicalSpec?.kind==='half'&&historicalSpec.year!==1964&&
+    !/\b(?:franklin|walking liberty|barber)\b/.test(text)&&design.id!=='walking_liberty_half_dollar';
+  const product=ambiguousHistoricalHalf?'U.S. 90% Silver Coinage':
+    catalogMatch?.item.product||(historicalSpec?'U.S. 90% Silver Coinage':metal?smartCameraProductGuess(text,metal):'');
   const weights=smartCameraWeightCandidates(text,metal);
   let weight=weights.length===1?weights[0]:0;
   if(weights.length>1)warnings.push('Different weights were read. Confirm the weight manually.');
+  let inferredWeight=false;
+  if(historicalSpec&&weights.length<=1){
+    // Holdings value fine silver, not the copper included in the gross coin mass.
+    if(!weight||Math.abs(weight-historicalSpec.grossWeight)<historicalSpec.grossWeight*.003){
+      weight=historicalSpec.weight;inferredWeight=true;
+    }else if(Math.abs(weight-historicalSpec.weight)>historicalSpec.weight*.003){
+      warnings.push('Weight disagrees with the historical silver specification. Confirm the weight manually.');weight=0;
+    }
+  }
   // Only non-fractional, fixed fine-weight products have safe profile defaults.
   const fixedWeights={'American Silver Eagle':1,'American Palladium Eagle':1};
   const expected=fixedWeights[product];
   if(expected&&weight&&Math.abs(weight-expected)>.003){warnings.push('Weight disagrees with the matched product. Confirm product and weight.');weight=0;}
-  let inferredWeight=false;
   if(expected&&!weight&&weights.length===0&&!plated){
     // A fixed catalogue weight is safe only after independent product evidence:
     // either readable identifying inscriptions, or two photos of the same item.
@@ -7140,12 +7197,12 @@ function interpretSmartCameraScan(result){
   const observedPurity=smartCameraPurityGuess(text,metal,'');
   // Historical/fractional variants are not assigned modern fineness by default.
   const safePurity=['American Silver Eagle','American Gold Eagle','American Gold Buffalo','American Platinum Eagle','American Palladium Eagle','Austrian Gold Philharmonic','Austrian Silver Philharmonic','Austrian Platinum Philharmonic'];
-  const purity=observedPurity||(safePurity.includes(product)?catalogMatch?.item.purity||'':'');
+  const purity=observedPurity||historicalSpec?.purity||(safePurity.includes(product)?catalogMatch?.item.purity||'':'');
   const fineness=value=>{const m=String(value).match(/\.(\d{3,4})/);return m?Number('0.'+m[1]):/22K/.test(value)?22/24:/24K/.test(value)?1:0;};
   const purityReadings=[...text.matchAll(/(?:^|\s)\.?(9999|9995|999|925|900|9167|958)\b/g)].map(m=>Number('0.'+m[1]));
   if(purityReadings.some(n=>Math.abs(n-purityReadings[0])>.002))warnings.push('Conflicting purity markings. Confirm the fine-metal content.');
   const observed=fineness(observedPurity);
-  const standard=safePurity.includes(product)?fineness(catalogMatch?.item.purity):0;
+  const standard=historicalSpec? .9 :safePurity.includes(product)?fineness(catalogMatch?.item.purity):0;
   if(observed&&standard&&Math.abs(observed-standard)>.002)warnings.push('Purity disagrees with the product profile. Confirm the product and metal content.');
   const denomination=smartCameraDenominationGuess(text);
   const ocrConfidence=Math.max(0,Math.min(1,Number(result?.confidence)||0));
@@ -7160,9 +7217,10 @@ function interpretSmartCameraScan(result){
   if(warnings.length)confidence=Math.min(confidence,.40);
   const matchedTerms=[...(catalogMatch?.strongHits||[]),...(catalogMatch?.supportHits||[])];
   if(metals.length===1)matchedTerms.unshift('metal inscription: '+METAL_NAMES[metal]);
+  if(inferredMetal)matchedTerms.unshift('silver from U.S. denomination and date — confirm');
   if(inferredWeight)matchedTerms.push('weight from standard product specification — confirm');
   return {metal,product,weight,year,mint,serial,purity,denomination,text,raw,confidence,warnings,
-    matchedTerms,designID:design.id,inferredWeight,inferredMint:!!mint&&!detectedMint,inferredPurity:!!purity&&!observedPurity,
+    matchedTerms,designID:design.id,inferredWeight,inferredMetal,inferredMint:!!mint&&!detectedMint,inferredPurity:!!purity&&!observedPurity,
     sides:result?.sides||1,usable:!!metal&&!plated&&metals.length<=1&&confidence>=.42};
 }
 // OCR passes are alternative readings of ONE photo, not additional inscriptions.
@@ -7218,7 +7276,13 @@ function selectSmartCameraPhotoEvidence(result){
   // accept the union only when it adds no conflict. This generalizes to sovereign
   // coins and bars instead of special-casing one product at a time.
   const bullionEvidenceRx=/\b(?:canada|britannia|krugerrand|philharmoniker|australia|kangaroo|kookaburra|koala|panda|libertad|sovereign|buffalo|eagle|noah|elephant|pamp|valcambi|engelhard|johnson matthey|scottsdale|sunshine|asahi|geiger|heraeus|fine\s+(?:gold|silver|platinum|palladium|copper)|argent pur|or pur|plata pura|oro puro|feinsilber|feingold|\d+(?:\.\d+)?\s*(?:troy\s*)?(?:oz|ounce|ounces|g|gram|grams|kg|lb|lbs)|9999|9995|999\.9|\.999|\.9995|\.9999)\b/i;
-  const evidenceLines=[...new Set(candidates.flatMap(c=>c.photo.lines).filter(line=>bullionEvidenceRx.test(line)))];
+  const evidenceLines=[...new Set(candidates.flatMap(c=>c.photo.lines).filter(line=>{
+    if(bullionEvidenceRx.test(line))return true;
+    const normalized=normalizeSmartCameraText(line);
+    // New catalogue entries participate automatically; this is not a closed list
+    // of only the better-known sovereign families.
+    return SMART_CAMERA_CATALOG.some(item=>(item.strong||[]).some(term=>smartCameraHasTerm(normalized,term)));
+  }))];
   if(evidenceLines.length){
     const unionLines=[...new Set(accepted.flatMap(c=>c.photo.lines).concat(evidenceLines,cautionLines))];
     const union=interpretSmartCameraScan({...result,lines:unionLines,confidence:primary.photo.confidence});
