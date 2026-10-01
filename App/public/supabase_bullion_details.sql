@@ -16,6 +16,7 @@ begin
   v_has_pro := public.benza_is_pro(v_user_id);
 
   if not v_has_pro and (
+    nullif(trim(coalesce(p_serial_number,'')),'') is not null or
     nullif(trim(coalesce(p_notes,'')),'') is not null or
     p_photo_path is not null or
     p_receipt_path is not null
@@ -60,6 +61,7 @@ begin
   v_has_pro := public.benza_is_pro(v_user_id);
 
   if not v_has_pro and (
+    nullif(trim(coalesce(p_serial_number,'')),'') is not null or
     nullif(trim(coalesce(p_notes,'')),'') is not null or
     p_photo_path is not null or
     p_receipt_path is not null
@@ -67,6 +69,9 @@ begin
     raise exception 'Benza Bullion Pro is required for advanced inventory records';
   end if;
 
+  if not v_has_pro and exists(select 1 from public.holdings where id=p_holding_id and user_id=v_user_id and (bullion_year is not null or purity is not null or mint is not null or serial_number is not null or notes is not null or photo_path is not null or receipt_path is not null or cardinality(scanner_photo_paths)>0)) then
+    raise exception 'Renew Pro to edit this holding while keeping inventory records';
+  end if;
   update public.holdings
   set metal=p_metal,
       product=p_product,
@@ -113,6 +118,8 @@ begin
   if length(coalesce(p_purity,''))>80 or length(coalesce(p_mint,''))>120 or length(coalesce(p_serial_number,''))>120 then raise exception 'Bullion details are too long'; end if;
 
   if not v_has_pro and (
+    p_year is not null or nullif(trim(coalesce(p_purity,'')),'') is not null or nullif(trim(coalesce(p_mint,'')),'') is not null or
+    nullif(trim(coalesce(p_serial_number,'')),'') is not null or
     nullif(trim(coalesce(p_notes,'')),'') is not null or
     p_photo_path is not null or
     p_receipt_path is not null
@@ -160,6 +167,8 @@ begin
   if length(coalesce(p_purity,''))>80 or length(coalesce(p_mint,''))>120 or length(coalesce(p_serial_number,''))>120 then raise exception 'Bullion details are too long'; end if;
 
   if not v_has_pro and (
+    p_year is not null or nullif(trim(coalesce(p_purity,'')),'') is not null or nullif(trim(coalesce(p_mint,'')),'') is not null or
+    nullif(trim(coalesce(p_serial_number,'')),'') is not null or
     nullif(trim(coalesce(p_notes,'')),'') is not null or
     p_photo_path is not null or
     p_receipt_path is not null
@@ -167,6 +176,9 @@ begin
     raise exception 'Benza Bullion Pro is required for advanced inventory records';
   end if;
 
+  if not v_has_pro and exists(select 1 from public.holdings where id=p_holding_id and user_id=v_user_id and (bullion_year is not null or purity is not null or mint is not null or serial_number is not null or notes is not null or photo_path is not null or receipt_path is not null or cardinality(scanner_photo_paths)>0)) then
+    raise exception 'Renew Pro to edit this holding while keeping inventory records';
+  end if;
   update public.holdings
   set metal=p_metal,
       product=p_product,
