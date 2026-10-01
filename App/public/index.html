@@ -6787,10 +6787,11 @@ function smartCameraCatalogMatch(text,metal){
       const strongHits=(item.strong||[]).filter(term=>{
         if(!text.includes(term))return false;
         if(['1 oz fine silver','1 oz fine gold','.9999 fine gold'].includes(term))return false;
+        // "Half sovereign" contains "sovereign"; do not let the broader title tie
+        // the exact Half Sovereign match and force an ambiguous result.
+        if(item.product==='British Gold Sovereign'&&term==='sovereign'&&/\bhalf sovereign\b/.test(text))return false;
         // Historic denomination-only matches (half dollar, quarter dollar, etc.)
         // must have both a plausible year and an independently identified metal.
-        // This prevents text such as "Half dollar 1964" from silently becoming
-        // a specific silver holding when the photo never established silver.
         if(item.requiresYear&&(!plausibleYears.length||!metal))return false;
         return true;
       });
