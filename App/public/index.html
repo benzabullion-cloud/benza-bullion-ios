@@ -6489,19 +6489,19 @@ let metal='gold';
 document.getElementById('holdingPhoto')?.addEventListener('change',()=>handleInventoryFileSelected('photo'));
 document.getElementById('holdingReceipt')?.addEventListener('change',()=>handleInventoryFileSelected('receipt'));
 const GOLD_PRODUCTS=[
-  'American Gold Eagle','American Gold Buffalo','Canadian Gold Maple Leaf','South African Gold Krugerrand','British Gold Britannia','Austrian Gold Philharmonic','Australian Gold Kangaroo','Australian Gold Lunar','Chinese Gold Panda','Mexican Gold Libertad','Mexican 50 Peso Gold','Mexican 20 Peso Gold','Mexican 10 Peso Gold','Mexican 5 Peso Gold','Mexican 2.5 Peso Gold','British Gold Sovereign','British Gold Half Sovereign','Swiss 20 Franc Gold','French 20 Franc Rooster','Austrian 100 Corona Gold','Austrian 20 Corona Gold','U.S. $20 Saint-Gaudens Double Eagle','U.S. $20 Liberty Head Double Eagle','U.S. $10 Indian Head Eagle','U.S. $10 Liberty Head Eagle','U.S. $5 Indian Head Half Eagle','U.S. $5 Liberty Head Half Eagle','U.S. $2.50 Indian Head Quarter Eagle','U.S. $2.50 Liberty Head Quarter Eagle','Gold Bar','Gold Round'
+  'American Gold Eagle','American Gold Buffalo','Canadian Gold Maple Leaf','South African Gold Krugerrand','British Gold Britannia','Austrian Gold Philharmonic','Australian Gold Kangaroo','Australian Gold Lunar','Chinese Gold Panda','Mexican Gold Libertad','Mexican 50 Peso Gold','Mexican 20 Peso Gold','Mexican 10 Peso Gold','Mexican 5 Peso Gold','Mexican 2.5 Peso Gold','British Gold Sovereign','British Gold Half Sovereign','Swiss 20 Franc Gold','French 20 Franc Rooster','Austrian 100 Corona Gold','Austrian 20 Corona Gold','U.S. $20 Saint-Gaudens Double Eagle','U.S. $20 Liberty Head Double Eagle','U.S. $10 Indian Head Eagle','U.S. $10 Liberty Head Eagle','U.S. $5 Indian Head Half Eagle','U.S. $5 Liberty Head Half Eagle','U.S. $2.50 Indian Head Quarter Eagle','U.S. $2.50 Liberty Head Quarter Eagle','Gold Bullion Coin','Gold Bar','Gold Round'
 ];
 const SILVER_PRODUCTS=[
-  'American Silver Eagle','Canadian Silver Maple Leaf','British Silver Britannia','British Silver Queen’s Beasts','Austrian Silver Philharmonic','Australian Silver Kangaroo','Australian Silver Kookaburra','Australian Silver Koala','Australian Silver Lunar','Chinese Silver Panda','Mexican Silver Libertad','South African Silver Krugerrand','Armenian Silver Noah’s Ark','Somali Silver Elephant','Morgan Silver Dollar','Peace Silver Dollar','Walking Liberty Half Dollar','Franklin Half Dollar','1964 Kennedy Half Dollar','Washington Silver Quarter','Standing Liberty Quarter','Barber Quarter','Mercury Dime','Roosevelt Silver Dime','Barber Dime','Barber Half Dollar','U.S. 90% Silver Coinage','Silver Bar','Silver Round'
+  'American Silver Eagle','Canadian Silver Maple Leaf','British Silver Britannia','British Silver Queen’s Beasts','Austrian Silver Philharmonic','Australian Silver Kangaroo','Australian Silver Kookaburra','Australian Silver Koala','Australian Silver Lunar','Chinese Silver Panda','Mexican Silver Libertad','South African Silver Krugerrand','Armenian Silver Noah’s Ark','Somali Silver Elephant','Morgan Silver Dollar','Peace Silver Dollar','Walking Liberty Half Dollar','Franklin Half Dollar','1964 Kennedy Half Dollar','Washington Silver Quarter','Standing Liberty Quarter','Barber Quarter','Mercury Dime','Roosevelt Silver Dime','Barber Dime','Barber Half Dollar','U.S. 90% Silver Coinage','Silver Bullion Coin','Silver Bar','Silver Round'
 ];
 const PLATINUM_PRODUCTS=[
-  'American Platinum Eagle','Canadian Platinum Maple Leaf','British Platinum Britannia','Australian Platinum Kangaroo','Austrian Platinum Philharmonic','Isle of Man Platinum Noble','Platinum Bar','Platinum Round'
+  'American Platinum Eagle','Canadian Platinum Maple Leaf','British Platinum Britannia','Australian Platinum Kangaroo','Austrian Platinum Philharmonic','Isle of Man Platinum Noble','Platinum Bullion Coin','Platinum Bar','Platinum Round'
 ];
 const PALLADIUM_PRODUCTS=[
-  'American Palladium Eagle','Canadian Palladium Maple Leaf','Russian Palladium Ballerina','Chinese Palladium Panda','Palladium Bar','Palladium Round'
+  'American Palladium Eagle','Canadian Palladium Maple Leaf','Russian Palladium Ballerina','Chinese Palladium Panda','Palladium Bullion Coin','Palladium Bar','Palladium Round'
 ];
 const COPPER_PRODUCTS=[
-  '1 oz Copper Round','Copper Bullion Round','Copper Bullion Bar','1 lb Copper Bar','5 lb Copper Bar','10 lb Copper Bar','Copper Coin Collection','U.S. Copper Cents'
+  '1 oz Copper Round','Copper Bullion Round','Copper Bullion Bar','1 lb Copper Bar','5 lb Copper Bar','10 lb Copper Bar','Copper Bullion Coin','Copper Coin Collection','U.S. Copper Cents'
 ];
 const PRODUCT_MAP={gold:GOLD_PRODUCTS,silver:SILVER_PRODUCTS,platinum:PLATINUM_PRODUCTS,palladium:PALLADIUM_PRODUCTS,copper:COPPER_PRODUCTS};
 const METALS=['gold','silver','platinum','palladium','copper'];
@@ -6776,9 +6776,14 @@ function smartCameraCatalogMatch(text,metal){
 function smartCameraProductGuess(text,metal){
   const match=smartCameraCatalogMatch(text,metal);
   if(match)return match.item.product;
-  const suffix=/\bbar\b/.test(text)?'Bar':/\bround\b/.test(text)?'Round':'';
-  const name=metal==='copper'?'Copper Bullion '+suffix:METAL_NAMES[metal]+' '+suffix;
-  return suffix&&(PRODUCT_MAP[metal]||[]).includes(name)?name:'';
+  const kind=/\bbar\b/.test(text)?'bar':/\bround\b/.test(text)?'round':/\bcoin\b/.test(text)?'coin':'';
+  if(!kind)return '';
+  const name=kind==='coin'
+    ? METAL_NAMES[metal]+' Bullion Coin'
+    : metal==='copper'
+      ? 'Copper Bullion '+(kind==='bar'?'Bar':'Round')
+      : METAL_NAMES[metal]+' '+(kind==='bar'?'Bar':'Round');
+  return (PRODUCT_MAP[metal]||[]).includes(name)?name:'';
 }
 function smartCameraWeightCandidates(text,metal){
   const ozPerGram=metal==='copper'?28.349523125:31.1034768;
@@ -6862,7 +6867,7 @@ function smartCameraDenominationGuess(text){
 function smartCameraDesignEvidence(result){
   const entries=Array.isArray(result?.designSuggestions)?result.designSuggestions:
     result?.designSuggestion?[result.designSuggestion]:[];
-  const allowed=['american_eagle','american_silver_eagle','american_gold_eagle','american_platinum_eagle','american_palladium_eagle','american_buffalo','canadian_maple_leaf','britannia','philharmonic','kangaroo','lunar','panda','libertad','krugerrand','kookaburra','koala','noahs_ark','somali_elephant','platinum_noble','palladium_ballerina','morgan_dollar','peace_dollar','walking_liberty_half_dollar','generic_bar','generic_round','unknown'];
+  const allowed=['american_eagle','american_silver_eagle','american_gold_eagle','american_platinum_eagle','american_palladium_eagle','american_buffalo','canadian_maple_leaf','britannia','philharmonic','kangaroo','lunar','panda','libertad','krugerrand','kookaburra','koala','noahs_ark','somali_elephant','platinum_noble','palladium_ballerina','morgan_dollar','peace_dollar','walking_liberty_half_dollar','generic_coin','generic_bar','generic_round','unknown'];
   let invalid=false;
   const ids=[];
   for(const entry of entries){
@@ -6911,6 +6916,9 @@ function smartCameraDesignCatalogMatch(design,text,metal){
     morgan_dollar:{silver:'Morgan Silver Dollar'},
     peace_dollar:{silver:'Peace Silver Dollar'},
     walking_liberty_half_dollar:{silver:'Walking Liberty Half Dollar'},
+    generic_coin:{
+      gold:'Gold Bullion Coin',silver:'Silver Bullion Coin',platinum:'Platinum Bullion Coin',palladium:'Palladium Bullion Coin',copper:'Copper Bullion Coin'
+    },
     generic_bar:{
       gold:'Gold Bar',silver:'Silver Bar',platinum:'Platinum Bar',palladium:'Palladium Bar',copper:'Copper Bullion Bar'
     },
@@ -6959,6 +6967,7 @@ function smartCameraDesignCompatibleProduct(design,product){
     kangaroo:'Kangaroo',lunar:'Lunar',panda:'Panda',libertad:'Libertad',krugerrand:'Krugerrand'
   };
   if(contains[design])return product.includes(contains[design]);
+  if(design==='generic_coin')return /Bullion Coin$/.test(product);
   if(design==='generic_bar')return /Bar$/.test(product);
   if(design==='generic_round')return /Round$/.test(product);
   return design==='unknown';
