@@ -237,7 +237,8 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
     private func finishResetWaiters() {
         guard !isAnalyzing() && !pickerDismissalInProgress else { return }
         if releaseModelsWhenIdle {
-            offlineDesignEngine = nil
+            // Engine retains verified paths only. Unload model memory while keeping
+            // file verification cached for subsequent scans in this app session.
             BenzaOfflineDesignEngine.releaseCachedRuntime()
             releaseModelsWhenIdle = false
         }
