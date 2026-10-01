@@ -28,5 +28,26 @@ await test('OCR pass selection preserves separate design channel',()=>{const sel
 await test('Actual two-photo flow retains artwork with no front text',async()=>{queued.push({lines:[],designSuggestion:design('canadian_maple_leaf')},{text:'CANADA fine gold 1/10 oz',confidence:.95,designSuggestion:design('unknown')});await context.runSmartCameraScan();assert.equal(context.last.designID,'canadian_maple_leaf');assert.equal(context.last.weight,0);await context.runSmartCameraScan(true);assert.equal(context.last.product,'Canadian Gold Maple Leaf');assert.equal(context.last.weight,.1);assert.equal(context.last.sides,2);assert.equal(context.canUseSmartCameraSuggestion(context.last),true)});
 await test('Fresh scan never inherits artwork from prior item',async()=>{queued.push({text:'fine silver 1 oz',confidence:.95});await context.runSmartCameraScan();assert.equal(context.last.designID,'');assert.equal(context.last.product,'');assert.equal(context.last.sides,1)});
 await test('Actual conflicting photo flow retains failure state',async()=>{queued.push({lines:[],designSuggestion:design('american_eagle')},{text:'CANADA fine gold 1 oz',confidence:.95,designSuggestion:design('canadian_maple_leaf')});await context.runSmartCameraScan();await context.runSmartCameraScan(true);assert.equal(context.canUseSmartCameraSuggestion(context.last),false);assert.match(context.last.warnings.join(' '),/different designs/)});
+await test('Every selectable bullion product has scanner catalogue coverage',()=>{
+  for(const metal of context.METALS||[]){
+    for(const product of context.PRODUCT_MAP?.[metal]||[]){
+      assert.ok(context.SMART_CAMERA_CATALOG.some(item=>item.product===product&&item.metal===metal),metal+': '+product);
+    }
+  }
+});
+await test('Fragmented Maple rim OCR recombines product metal and weight',()=>{
+  const result=context.selectSmartCameraPhotoEvidence({
+    passes:[
+      {id:0,observations:[{text:'CANADA 9999',confidence:.86}],confidence:.86},
+      {id:1,observations:[{text:'FINE SILVER',confidence:.91}],confidence:.91},
+      {id:2,observations:[{text:'1 OZ ARGENT PUR',confidence:.64}],confidence:.64}
+    ],
+    designSuggestion:design('canadian_maple_leaf')
+  });
+  const r=context.interpretSmartCameraScan(result);
+  assert.equal(r.product,'Canadian Silver Maple Leaf');
+  assert.equal(r.metal,'silver');
+  assert.equal(r.weight,1);
+});
 console.log(count+' design integration checks passed');
 })().catch(e=>{console.error(e);process.exitCode=1});
