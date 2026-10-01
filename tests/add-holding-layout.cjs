@@ -1,15 +1,16 @@
 const fs=require('node:fs'),assert=require('node:assert/strict');
-const {chromium}=require('playwright');
+const {chromium,webkit}=require('playwright');
 const html=fs.readFileSync('App/public/index.html','utf8');
 const styles=[...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m=>m[1]).join('\n');
 const form=html.slice(html.indexOf('<div id="addScreen"'),html.indexOf('<!-- Locally bundled Supabase client'));
 (async()=>{
- const browser=await chromium.launch({headless:true});
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+ const browser=await engine.launch({headless:true});
  const page=await browser.newPage();fs.mkdirSync('ui-artifacts',{recursive:true});
  for(const width of [320,375,390,430,768,1280]){
   for(const theme of ['dark','light'])for(const pro of [false,true]){
    await page.setViewportSize({width,height:844});
-   await page.setContent('<!doctype html><html data-theme="'+theme+'"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+styles+'</style></head><body>'+form+'</body></html>');
+   await page.setContent('<!doctype html><html class="native-app" data-theme="'+theme+'"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+styles+'</style></head><body>'+form+'</body></html>');
    await page.evaluate(pro=>{
     document.getElementById('addScreen').classList.add('show');
     document.getElementById('bullionDetailsFields').open=true;
@@ -34,8 +35,10 @@ const form=html.slice(html.indexOf('<div id="addScreen"'),html.indexOf('<!-- Loc
    });
    assert.deepEqual(metrics.overflow,[],JSON.stringify({width,theme,pro,metrics}));
    assert.equal(metrics.rowErrors,0);assert.equal(metrics.horizontal,false);assert.equal(metrics.dateCentered,true);assert.equal(metrics.saveVisible,true);
-   if(width===390){await page.locator('#addScreen>.sheet').evaluate(e=>e.scrollTop=0);await page.screenshot({path:'ui-artifacts/add-holding-'+theme+'-'+(pro?'pro':'free')+'.png'});}
+   if(width===390){await page.locator('#addScreen>.sheet').evaluate(e=>e.scrollTop=0);await page.screenshot({path:'ui-artifacts/add-holding-'+engineName+'-'+theme+'-'+(pro?'pro':'free')+'.png'});await page.locator('#addScreen>.sheet').evaluate(e=>e.scrollTop=e.scrollHeight);await page.screenshot({path:'ui-artifacts/add-holding-'+engineName+'-'+theme+'-'+(pro?'pro':'free')+'-details.png'});}
   }
  }
- await browser.close();console.log('PASS 24 responsive form states: aligned fields, centered date, no horizontal overflow, save reachable');
+ await browser.close();
+ }
+ console.log('PASS 48 responsive form states: aligned fields, centered date, no horizontal overflow, save reachable');
 })().catch(e=>{console.error(e);process.exitCode=1});
