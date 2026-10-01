@@ -33,11 +33,12 @@ const form=html.slice(html.indexOf('<div id="addScreen"'),html.indexOf('<!-- Loc
     sheet.scrollTop=sheet.scrollHeight;
     const save=document.getElementById('holdingSaveBtn').getBoundingClientRect();
     const s=sheet.getBoundingClientRect();
-    return {formWidth:bounds.width,sheetHeight:s.height,sheetTop:s.top,overflow,rowErrors,horizontal:sheet.scrollWidth>sheet.clientWidth+1||form.scrollWidth>form.clientWidth+1,dateCentered:Math.abs((date.left+date.right)-(dateWrap.left+dateWrap.right))<1,saveVisible:save.bottom<=s.bottom+1&&save.top>=s.top};
+    const header=document.querySelector('#addScreen .sheetTop');const hr=header.getBoundingClientRect();const topElement=document.elementFromPoint(hr.left+hr.width/2,hr.top+hr.height/2);const headerOnTop=header.contains(topElement);
+    return {headerOnTop,formWidth:bounds.width,sheetHeight:s.height,sheetTop:s.top,overflow,rowErrors,horizontal:sheet.scrollWidth>sheet.clientWidth+1||form.scrollWidth>form.clientWidth+1,dateCentered:Math.abs((date.left+date.right)-(dateWrap.left+dateWrap.right))<1,saveVisible:save.bottom<=s.bottom+1&&save.top>=s.top};
    });
    assert.ok(metrics.formWidth>250&&metrics.sheetHeight>200&&metrics.sheetTop>=0,JSON.stringify(metrics));
    assert.deepEqual(metrics.overflow,[],JSON.stringify({width,theme,pro,metrics}));
-   assert.equal(metrics.rowErrors,0);assert.equal(metrics.horizontal,false);assert.equal(metrics.dateCentered,true);assert.equal(metrics.saveVisible,true);
+   assert.equal(metrics.headerOnTop,true,'Sticky header must remain above scrolled date and fields');assert.equal(metrics.rowErrors,0);assert.equal(metrics.horizontal,false);assert.equal(metrics.dateCentered,true);assert.equal(metrics.saveVisible,true);
    if(width===390){await page.locator('#addScreen>.sheet').evaluate(e=>e.scrollTop=0);await page.screenshot({animations:'disabled',path:'ui-artifacts/add-holding-'+engineName+'-'+theme+'-'+(pro?'pro':'free')+'.png'});await page.locator('#addScreen>.sheet').evaluate(e=>e.scrollTop=e.scrollHeight);await page.screenshot({path:'ui-artifacts/add-holding-'+engineName+'-'+theme+'-'+(pro?'pro':'free')+'-details.png'});}
   }
  }
