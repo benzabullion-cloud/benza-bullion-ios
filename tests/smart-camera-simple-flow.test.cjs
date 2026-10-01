@@ -46,10 +46,9 @@ test('Smart Camera menu uses explicit capture choices',()=>{
  assert.doesNotMatch(open,/runSmartCameraScan\s*\(/);
 });
 test('Two-side metal-only result opens partial review with weight blank',()=>{
- const partial=scan('Fine silver');context.renderSmartCameraAnalysis(partial);context.useSmartCameraAnalysis();
+ const partial=scan('Fine silver');context.renderSmartCameraAnalysis(partial);assert.equal(get('smartAnalysisUseButton').hidden,false);assert.equal(get('smartAnalysisUseButton').disabled,false);assert.equal(get('smartAnalysisUseButton').textContent,'Review and complete holding');context.useSmartCameraAnalysis();
  assert.equal(get('addScreen').classList.contains('show'),true);assert.equal(get('weight').value,'');assert.equal(get('product').selectedIndex,-1);assert.equal(get('smartScanMetal').textContent,'Silver');
  assert.equal(get('smartScanProduct').textContent,'Not identified');assert.equal(get('smartScanWeight').textContent,'Not read');
- assert.equal(get('smartAnalysisUseButton').hidden,false);assert.equal(get('smartAnalysisUseButton').disabled,false);assert.equal(get('smartAnalysisUseButton').textContent,'Review and complete holding');
  assert.equal(get('smartAnalysisTitle').textContent,'More details needed');
 });
 test('Product without weight proceeds with the weight blank',()=>{const s=scan('American Gold Eagle');context.renderSmartCameraAnalysis(s);assert.equal(context.applySmartCameraSuggestion(s),true);assert.equal(get('addScreen').classList.contains('show'),true);assert.equal(get('weight').value,'');assert.equal(get('product').value,'American Gold Eagle')});
