@@ -83,6 +83,10 @@ final class NativeBoundaryTests: XCTestCase {
         }
     }
 
+    func testRuntimeUnloadIsSafeWhenIdle() {
+        XCTAssertEqual(benza_runtime_unload(), 0)
+    }
+
     func testRemoteAssetDirectoryIsRejected() {
         XCTAssertThrowsError(try BenzaOfflineDesignEngine(directory: URL(string: "https://example.invalid/models")!))
     }
