@@ -266,3 +266,32 @@ test('Actual previously logged Apple Vision split reverse preserves one ounce wi
  assert.equal(r.weight,1);assert.equal(r.year,2022);assert.equal(r.product,'Canadian Silver Maple Leaf');
 });
 console.log(count+' scanner regression checks passed after weight-source coverage');
+
+test('Build 87 direct low-confidence gram observation cannot inherit its pass average',()=>{
+ const r=interpreted([{id:3,confidence:.7666667302449545,observations:[
+  {text:'CANADA',confidence:1},{text:'9999',confidence:1},{text:'FINE SILVER',confidence:1},
+  {text:'666 G ARGENT PUR',confidence:.30000001192092896}
+ ]}]);
+ assert.equal(r.product,'Canadian Silver Maple Leaf');assert.equal(r.metal,'silver');assert.equal(r.weight,0);
+ assert.equal(context.canUseSmartCameraSuggestion(r),false);assert.equal(context.canReviewSmartCameraSuggestion(r),true);
+});
+test('Reliable weight line is retained despite a lower pass average',()=>{
+ const r=interpreted([{id:3,confidence:.35,observations:[
+  {text:'CANADA 9999 FINE SILVER',confidence:.95},{text:'1 OZ ARGENT PUR',confidence:.95}
+ ]}]);assert.equal(r.weight,1);
+});
+test('A weak alternate gram reading cannot conflict with a reliable ounce reading',()=>{
+ const r=interpreted([{id:0,confidence:.95,observations:[{text:'CANADA 9999 FINE SILVER 1 OZ ARGENT PUR',confidence:.95}]},
+  {id:3,confidence:.9,observations:[{text:'CANADA 9999 FINE SILVER',confidence:1},{text:'666 G',confidence:.3}]}]);
+ assert.equal(r.weight,1);assert.equal(r.warnings.length,0);
+});
+test('Unlocalized split single-letter gram units do not attach to other OCR lines',()=>{
+ const r=interpreted([pass('CANADA 9999 FINE SILVER 666\nG ARGENT PUR')]);assert.equal(r.weight,0);
+ const bar=interpreted([pass('FINE GOLD 100\nG')]);assert.equal(bar.weight,0);
+ assert.equal(interpreted([pass('FINE GOLD 100 G')]).weight,100/31.1034768);
+});
+test('Confidence gating leaves partial identity inscriptions available for combination',()=>{
+ const r=interpreted([pass('CANADA 9999'),pass('FINE SILVER'),pass('1 OZ ARGENT PUR',.64)]);
+ assert.equal(r.product,'Canadian Silver Maple Leaf');assert.equal(r.weight,1);
+});
+console.log(count+' scanner checks passed after observation-confidence coverage');
