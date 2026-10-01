@@ -43,12 +43,14 @@ final class CoinRimPhotoTests: XCTestCase {
             for (index, photo) in ([image]+rims).enumerated() {
                 let request = VNRecognizeTextRequest()
                 request.recognitionLevel = .accurate
+                request.usesCPUOnly = true // Cloud runner has no physical iPhone GPU.
                 request.usesLanguageCorrection = index == 0
                 request.recognitionLanguages = ["en-US", "fr-FR"]
                 request.minimumTextHeight = 0.002
                 request.customWords = ["CANADA", "FINE SILVER", "ARGENT PUR", "1 OZ", "9999"]
                 let passStarted = Date()
-                try VNImageRequestHandler(cgImage: photo).perform([request])
+                do { try VNImageRequestHandler(cgImage: photo).perform([request]) }
+                catch { let error = error as NSError; print("OCR ERROR side=\(side) pass=\(index) domain=\(error.domain) code=\(error.code) info=\(error.userInfo)"); throw error }
                 let observations = (request.results ?? []).compactMap { observation -> [String: Any]? in
                     guard let text = observation.topCandidates(1).first, text.confidence >= 0.25 else { return nil }
                     return ["text": text.string, "confidence": Double(text.confidence)]
