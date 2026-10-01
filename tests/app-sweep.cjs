@@ -50,7 +50,7 @@ window.supabase={createClient:()=>({
   assert.equal(await page.evaluate(()=>holdings[0].cost),0,'An optional purchase price may remain zero');
   await page.evaluate(()=>{openManualAdd();sweep.failRpc=true;});await page.evaluate(()=>saveHolding());
   assert.equal(await page.locator('#holdingSaveBtn').isEnabled(),true,'Retry must remain available after a failed save');
-  assert.ok(await page.evaluate(()=>sweep.alerts.some(message=>/network|save|connection/i.test(message))),'A thrown network error must be visible');
+  assert.ok(await page.evaluate(()=>sweep.alerts.includes('You appear to be offline. Reconnect and try again.')),'A thrown network error must show the offline recovery message');
   assert.equal(await page.evaluate(()=>holdings.length),1,'Failed save cannot invent a holding');
   await page.evaluate(()=>{sweep.failRpc=false;});
   const uploadFailure=await page.evaluate(async()=>{
