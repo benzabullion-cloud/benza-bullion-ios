@@ -385,44 +385,68 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
             let context = CIContext(options: nil)
             let input = CIImage(cgImage: cgImage)
             let extent = input.extent
-            let contrast = input.applyingFilter("CIColorControls", parameters: [
-                kCIInputSaturationKey: 0, kCIInputContrastKey: 1.35
-            ])
-            let center = extent.insetBy(dx: extent.width * 0.12, dy: extent.height * 0.12)
+            // Bullion inscriptions are often tiny, curved around the rim, and low-contrast
+            // against reflective metal. Use a bounded set of full-frame and rim-focused
+            // views rather than repeatedly OCRing only the center of the coin.
+            let enhanced = input
+                .applyingFilter("CIColorControls", parameters: [
+                    kCIInputSaturationKey: 0,
+                    kCIInputContrastKey: 1.7,
+                    kCIInputBrightnessKey: 0.04
+                ])
+                .applyingFilter("CISharpenLuminance", parameters: [
+                    kCIInputSharpnessKey: 0.65
+                ])
+            let center = extent.insetBy(dx: extent.width * 0.08, dy: extent.height * 0.08)
+            let bandHeight = extent.height * 0.42
+            let bandWidth = extent.width * 0.42
+            let top = CGRect(x: extent.minX, y: extent.maxY - bandHeight,
+                             width: extent.width, height: bandHeight)
             let bottom = CGRect(x: extent.minX, y: extent.minY,
-                                width: extent.width, height: extent.height * 0.42)
+                                width: extent.width, height: bandHeight)
+            let left = CGRect(x: extent.minX, y: extent.minY,
+                              width: bandWidth, height: extent.height)
+            let right = CGRect(x: extent.maxX - bandWidth, y: extent.minY,
+                               width: bandWidth, height: extent.height)
+
             var passes: [(CGImage, CGImagePropertyOrientation, Bool)] = [
                 (cgImage, .up, true), (cgImage, .right, true),
                 (cgImage, .left, true), (cgImage, .down, true)
             ]
-            if let enhanced = context.createCGImage(contrast, from: extent) {
-                passes.append((enhanced, .up, false))
+            func appendPasses(rect: CGRect,
+                              orientations: [CGImagePropertyOrientation],
+                              correction: Bool = false) {
+                guard let crop = context.createCGImage(enhanced, from: rect.intersection(extent)) else { return }
+                for orientation in orientations {
+                    passes.append((crop, orientation, correction))
+                }
             }
-            if let crop = context.createCGImage(contrast, from: center) {
-                passes.append(contentsOf: [(crop, .up, true), (crop, .right, true),
-                                           (crop, .left, true), (crop, .down, true)])
-            }
-            if let dateCrop = context.createCGImage(contrast, from: bottom) {
-                passes.insert((dateCrop, .up, false), at: 1)
-            }
+            appendPasses(rect: extent, orientations: [.up])
+            appendPasses(rect: center, orientations: [.up])
+            appendPasses(rect: top, orientations: [.up, .down])
+            appendPasses(rect: bottom, orientations: [.up, .down])
+            appendPasses(rect: left, orientations: [.right])
+            appendPasses(rect: right, orientations: [.left])
             var found: [String: (String, Float)] = [:]
             var completed = 0
             var passReadings: [[String: Any]] = []
             var lastError: Error?
             for (passIndex, pass) in passes.enumerated() {
                 let (photo, orientation, correction) = pass
-                if !self.isCurrent(generation) || (completed > 0 && Date().timeIntervalSince(started) > 18) { break }
+                if !self.isCurrent(generation) || (completed >= 4 && Date().timeIntervalSince(started) > 12) { break }
                 autoreleasepool {
                     let request = VNRecognizeTextRequest()
                     request.recognitionLevel = .accurate
                     request.usesLanguageCorrection = correction
                     let supported = (try? request.supportedRecognitionLanguages()) ?? ["en-US"]
                     request.recognitionLanguages = ["en-US", "fr-FR", "es-ES", "de-DE"].filter { supported.contains($0) }
-                    request.minimumTextHeight = 0.004
+                    request.minimumTextHeight = 0.002
                     request.customWords = [
                         "FINE SILVER", "ARGENT PUR", "FINE GOLD", "OR PUR", "PLATA PURA",
                         "ORO PURO", "FEINSILBER", "FEINGOLD", "PLATINUM", "PALLADIUM",
-                        "CANADA", "LIBERTY", "IN GOD WE TRUST", "ONE DOLLAR", "ONE OUNCE",
+                        "CANADA", "LIBERTY", "IN GOD WE TRUST", "E PLURIBUS UNUM",
+                        "UNITED STATES OF AMERICA", "ONE DOLLAR", "ONE OUNCE", "ONE TROY OUNCE",
+                        "FINE SILVER", "FINE GOLD", "FINE PLATINUM", "FINE PALLADIUM", "FINE COPPER",
                         "American Eagle", "Maple Leaf", "Britannia", "Krugerrand",
                         "Philharmoniker", "Kangaroo", "Kookaburra", "Koala", "Panda",
                         "Libertad", "PAMP", "Valcambi", "Engelhard", "Johnson Matthey",
