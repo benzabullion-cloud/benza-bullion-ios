@@ -52,5 +52,38 @@ await test('Fragmented Maple rim OCR recombines product metal and weight',()=>{
   assert.equal(r.metal,'silver');
   assert.equal(r.weight,1);
 });
+await test('Representative sovereign families resolve across metals',()=>{
+  const cases=[
+    ['FINE GOLD 1 OZ BRITANNIA','britannia','British Gold Britannia','gold',1],
+    ['FINE SILVER 1 OZ BRITANNIA','britannia','British Silver Britannia','silver',1],
+    ['PLATINUM 1 OZ BRITANNIA','britannia','British Platinum Britannia','platinum',1],
+    ['FINE GOLD 1 OZ KRUGERRAND','krugerrand','South African Gold Krugerrand','gold',1],
+    ['FINE SILVER 1 OZ KRUGERRAND','krugerrand','South African Silver Krugerrand','silver',1],
+    ['PLATINUM 1 OZ PHILHARMONIKER','philharmonic','Austrian Platinum Philharmonic','platinum',1],
+    ['FINE SILVER 1 OZ PANDA','panda','Chinese Silver Panda','silver',1],
+    ['FINE GOLD 1 OZ LIBERTAD','libertad','Mexican Gold Libertad','gold',1]
+  ];
+  for(const [text,id,product,metal,weight] of cases){
+    const r=read(text,id);
+    assert.equal(r.product,product,text);
+    assert.equal(r.metal,metal,text);
+    assert.equal(r.weight,weight,text);
+  }
+});
+await test('Generic bars and rounds resolve for all five metals',()=>{
+  const cases=[
+    ['FINE GOLD 10 OZ','generic_bar','Gold Bar','gold',10],
+    ['FINE SILVER 10 OZ','generic_bar','Silver Bar','silver',10],
+    ['FINE PLATINUM 1 OZ','generic_bar','Platinum Bar','platinum',1],
+    ['FINE PALLADIUM 1 OZ','generic_round','Palladium Round','palladium',1],
+    ['FINE COPPER 1 OZ','generic_round','Copper Bullion Round','copper',1]
+  ];
+  for(const [text,id,product,metal,weight] of cases){
+    const r=read(text,id);
+    assert.equal(r.product,product,text);
+    assert.equal(r.metal,metal,text);
+    assert.equal(r.weight,weight,text);
+  }
+});
 console.log(count+' design integration checks passed');
 })().catch(e=>{console.error(e);process.exitCode=1});
