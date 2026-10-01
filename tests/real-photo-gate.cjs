@@ -11,8 +11,9 @@ const scan=context.interpretSmartCameraScan({
   photoEvidence:photos.map(photo=>({lines:photo.lines,confidence:photo.confidence})),
   confidence:Math.max(...photos.map(photo=>photo.confidence)),sides:2
 });
-console.log(JSON.stringify({product:scan.product,metal:scan.metal,weight:scan.weight,year:scan.year,purity:scan.purity,usable:scan.usable,timing:report.map(p=>({side:p.side,elapsedMs:p.elapsedMs}))}));
+console.log(JSON.stringify({product:scan.product,metal:scan.metal,weight:scan.weight,year:scan.year,purity:scan.purity,usable:scan.usable,timing:report.map(p=>({side:p.side,elapsedMs:p.elapsedMs,rimElapsedMs:p.rimElapsedMs}))}));
 assert.equal(scan.product,'Canadian Silver Maple Leaf');
 assert.equal(scan.metal,'silver');assert.equal(scan.weight,1);assert.equal(scan.year,2022);
+assert.match(scan.purity,/\.9999/);
 assert.equal(scan.usable,true);assert.equal(scan.warnings.length,0);
 console.log('PASS actual coin-photo OCR -> catalogue -> usable holding fields');
