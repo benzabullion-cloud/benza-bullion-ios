@@ -7290,6 +7290,11 @@ function canUseSmartCameraSuggestion(suggestion){
     Number.isFinite(suggestion.weight)&&suggestion.weight>0&&
     Array.isArray(suggestion.warnings)&&!suggestion.warnings.length);
 }
+function canReviewSmartCameraSuggestion(suggestion){
+  return !!(suggestion&&Object.hasOwn(PRODUCT_MAP,suggestion.metal)&&
+    (!suggestion.product||(PRODUCT_MAP[suggestion.metal]||[]).includes(suggestion.product))&&
+    Array.isArray(suggestion.warnings));
+}
 function renderSmartCameraAnalysis(suggestion){
   pendingSmartCameraSuggestion=suggestion;
   const ready=canUseSmartCameraSuggestion(suggestion);
@@ -7307,15 +7312,15 @@ function renderSmartCameraAnalysis(suggestion){
   document.getElementById('smartScanWeight').textContent=suggestion.weight>0
     ? Number(suggestion.weight.toFixed(4))+' oz'+(suggestion.inferredWeight?' · standard specification':''):'Not read';
   const use=document.getElementById('smartAnalysisUseButton');
-  if(use){use.hidden=!ready;use.disabled=!ready;}
+  if(use){const review=canReviewSmartCameraSuggestion(suggestion);use.hidden=!review;use.disabled=!review;use.textContent=ready?'Use scan details':'Review and complete holding';}
   panel.classList.add('show');
   renderSmartCameraDiagnostics(suggestion);
   setSmartCameraBusy(smartCameraScanning);
 }
 function applySmartCameraSuggestion(suggestion){
-  if(!canUseSmartCameraSuggestion(suggestion)||!isProActive()){
+  if(!canReviewSmartCameraSuggestion(suggestion)||!isProActive()){
     const status=document.getElementById('smartCameraStatus');
-    if(status)status.textContent='A product, metal, and weight are needed before continuing. Try another scan or enter this item manually.';
+    if(status)status.textContent='Choose a metal manually or try another scan before continuing.';
     return false;
   }
   pendingScannerPhotoFiles=smartCameraCapturedFiles.slice();
@@ -7327,12 +7332,12 @@ function applySmartCameraSuggestion(suggestion){
     document.getElementById('product').value=suggestion.product;
   }
   document.getElementById('qty').value=1;
-  document.getElementById('weight').value=suggestion.weight>0?Number(suggestion.weight.toFixed(4)):'';
+  document.getElementById('weight').value=suggestion.weight>0&&!suggestion.warnings.some(w=>/weight/i.test(w))?Number(suggestion.weight.toFixed(4)):'';
   if(!suggestion.product)document.getElementById('product').selectedIndex=-1;
   document.getElementById('cost').value='';
   fillBullionDetails({year:suggestion.year,purity:suggestion.purity,mint:suggestion.mint,serial:suggestion.serial});
   document.getElementById('proInventoryFields').open=true;
-  document.getElementById('holdingDetailsHint').textContent='Details filled from your scan. Review every field before saving.';
+  document.getElementById('holdingDetailsHint').textContent=canUseSmartCameraSuggestion(suggestion)?'Details filled from your scan. Review every field before saving.':'Partial scan. Complete missing fields and review every field before saving.'+(suggestion.warnings.length?' '+suggestion.warnings.join(' '):'');
   if(isProActive()&&suggestion.denomination){
     document.getElementById('holdingNotes').value='Denomination: '+suggestion.denomination;
   }
@@ -7340,9 +7345,9 @@ function applySmartCameraSuggestion(suggestion){
   return true;
 }
 function useSmartCameraAnalysis(){
-  if(!canUseSmartCameraSuggestion(pendingSmartCameraSuggestion)){
+  if(!canReviewSmartCameraSuggestion(pendingSmartCameraSuggestion)){
     const status=document.getElementById('smartCameraStatus');
-    if(status)status.textContent='A product, metal, and weight are needed before continuing.';
+    if(status)status.textContent='Choose a metal manually or try another scan before continuing.';
     return;
   }
   applySmartCameraSuggestion(pendingSmartCameraSuggestion);
@@ -7384,7 +7389,7 @@ function setSmartCameraBusy(busy){
   const libraryButton=document.getElementById('smartCameraLibraryButton');
   if(libraryButton){libraryButton.disabled=busy;libraryButton.textContent=smartCameraAwaitingReverse?'Choose Opposite Side Photo':'Choose Bullion Photo';}
   const useButton=document.getElementById('smartAnalysisUseButton');
-  if(useButton)useButton.disabled=busy||!canUseSmartCameraSuggestion(pendingSmartCameraSuggestion);
+  if(useButton)useButton.disabled=busy||!canReviewSmartCameraSuggestion(pendingSmartCameraSuggestion);
 }
 async function resetSmartCameraScan(silent=false,releaseModels=false){
   const run=++smartCameraRunId;
