@@ -20,7 +20,7 @@ import Vision
             context.draw(raw,in:CGRect(x:0,y:0,width:raw.width,height:raw.height))
             guard let image=context.makeImage() else { throw NSError(domain:"PhotoFixture",code:2) }
             let started=Date()
-            let rims=BenzaCoinRim.readingImages(image)
+            let rims=BenzaCoinRim.readingImages(image,maximumCandidates:1)
             guard !rims.isEmpty else { throw NSError(domain:"RimLocalization",code:3,userInfo:[NSLocalizedDescriptionKey:side+" found no coin outline"]) }
             // Small image diagnostics from approved coin-only fixtures.
             for (index,rim) in rims.prefix(2).enumerated() {
