@@ -295,3 +295,19 @@ test('Confidence gating leaves partial identity inscriptions available for combi
  assert.equal(r.product,'Canadian Silver Maple Leaf');assert.equal(r.weight,1);
 });
 console.log(count+' scanner checks passed after observation-confidence coverage');
+test('Mixed vulgar fractions never concatenate into a larger weight',()=>{
+ for(const [mark,expected] of [['1½',1.5],['2¼',2.25],['1¾',1.75],['⅛',.125],['1⅜',1.375]]){
+  const r=scan('Fine gold '+mark+' oz');assert.equal(r.weight,expected,mark);
+ }
+});
+test('Explicit mixed fractions and equivalent decimals agree',()=>{
+ assert.equal(scan('Fine gold 1 1/2 oz 1.5 oz').weight,1.5);
+ assert.equal(scan('Fine gold 2 3/4 oz').weight,2.75);
+ for(const text of ['Fine gold 1 2/2 oz','Fine gold 1 1/0 oz','Fine gold 2 0 2 6 oz'])assert.equal(scan(text).weight,0,text);
+});
+test('Fraction repair retains native confidence and date protections',()=>{
+ assert.equal(interpreted([pass('Fine gold 1½ oz',.3)]).weight,0);
+ assert.equal(interpreted([pass('Fine gold 1½ oz',.95)]).weight,1.5);
+ assert.equal(scan('Fine gold 2026 oz').weight,0);
+});
+console.log(count+' scanner checks passed including mixed-fraction coverage');
