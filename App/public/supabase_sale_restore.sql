@@ -1,4 +1,73 @@
--- Preserve optional bullion details and scan-photo references when undoing a full sale.
+-- Keep realized-sale basis math cent-accurate and preserve optional bullion details on undo.
+CREATE OR REPLACE FUNCTION public.benza_sell_holding_atomic(p_holding_id uuid, p_quantity numeric, p_sale_proceeds numeric, p_transaction_date date DEFAULT CURRENT_DATE)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_user_id uuid := auth.uid();
+  v_holding public.holdings;
+  v_cost_removed numeric;
+  v_oz_removed numeric;
+  v_realized numeric;
+  v_remaining_qty numeric;
+  v_sale_id uuid;
+begin
+  if v_user_id is null then raise exception 'Authentication required'; end if;
+  if not public.benza_is_pro(v_user_id) then raise exception 'Benza Bullion Pro is required for realized sale tracking'; end if;
+  if p_quantity is null or p_quantity <= 0 then raise exception 'Sale quantity must be greater than 0'; end if;
+  if p_sale_proceeds is null or p_sale_proceeds < 0 then raise exception 'Sale proceeds cannot be negative'; end if;
+
+  select * into v_holding
+  from public.holdings
+  where id=p_holding_id and user_id=v_user_id
+  for update;
+
+  if v_holding.id is null then raise exception 'Holding not found'; end if;
+  if p_quantity > v_holding.quantity then raise exception 'Sale quantity exceeds holding quantity'; end if;
+
+  v_cost_removed := case when v_holding.quantity>0 then round(v_holding.cost_basis*(p_quantity/v_holding.quantity),2) else 0 end;
+  v_oz_removed := p_quantity*v_holding.weight_oz;
+  v_realized := p_sale_proceeds-v_cost_removed;
+  v_remaining_qty := v_holding.quantity-p_quantity;
+
+  insert into public.transactions(
+    user_id,type,holding_id,metal,product,quantity,weight_oz,total_oz,amount,transaction_date,
+    sale_proceeds,realized_gain,cost_basis_removed,holding_snapshot
+  )
+  values(
+    v_user_id,'sell',v_holding.id,v_holding.metal,v_holding.product,p_quantity,v_holding.weight_oz,
+    v_oz_removed,p_sale_proceeds,coalesce(p_transaction_date,current_date),
+    p_sale_proceeds,v_realized,v_cost_removed,to_jsonb(v_holding)
+  )
+  returning id into v_sale_id;
+
+  if v_remaining_qty <= 0 then
+    delete from public.holdings
+    where id=v_holding.id and user_id=v_user_id;
+  else
+    update public.holdings
+    set quantity=v_remaining_qty,
+        total_oz=v_remaining_qty*v_holding.weight_oz,
+        cost_basis=greatest(0,v_holding.cost_basis-v_cost_removed)
+    where id=v_holding.id and user_id=v_user_id;
+  end if;
+
+  return jsonb_build_object(
+    'sale_id',v_sale_id,
+    'holding_id',v_holding.id,
+    'sold_quantity',p_quantity,
+    'sold_oz',v_oz_removed,
+    'sale_proceeds',p_sale_proceeds,
+    'cost_basis_removed',v_cost_removed,
+    'realized_gain',v_realized,
+    'remaining_quantity',greatest(v_remaining_qty,0)
+  );
+end;
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.benza_undo_sale_atomic(p_sale_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
