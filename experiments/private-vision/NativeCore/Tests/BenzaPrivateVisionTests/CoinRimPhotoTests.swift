@@ -24,45 +24,4 @@ final class CoinRimPhotoTests: XCTestCase {
         XCTAssertEqual(strips.count, 2)
         XCTAssertTrue(strips.allSatisfy { $0.width > $0.height && $0.height >= 80 })
     }
-    func testActualMapleInscriptionsAndTiming() throws {
-        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures")
-        guard FileManager.default.fileExists(atPath: root.appendingPathComponent("maple-obverse.b64").path),
-              FileManager.default.fileExists(atPath: root.appendingPathComponent("maple-reverse.b64").path) else {
-            throw XCTSkip("Real-photo fixtures require explicit publication authorization; no accuracy claim from this CI run.")
-        }
-        var report: [[String: Any]] = []
-        for side in ["obverse", "reverse"] {
-            let encoded = try String(contentsOf: root.appendingPathComponent("maple-\(side).b64"))
-            let data = try XCTUnwrap(Data(base64Encoded: encoded.trimmingCharacters(in: .whitespacesAndNewlines)))
-            let source = try XCTUnwrap(CGImageSourceCreateWithData(data as CFData, nil))
-            let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
-            let started = Date()
-            let rims = BenzaCoinRim.readingImages(image)
-            XCTAssertFalse(rims.isEmpty, "Coin rim localization must find this photo")
-            var readings: [[String: Any]] = []
-            for (index, photo) in ([image]+rims).enumerated() {
-                let request = VNRecognizeTextRequest()
-                request.recognitionLevel = .accurate
-                request.usesCPUOnly = true // Cloud runner has no physical iPhone GPU.
-                request.usesLanguageCorrection = index == 0
-                request.recognitionLanguages = ["en-US", "fr-FR"]
-                request.minimumTextHeight = 0.002
-                request.customWords = ["CANADA", "FINE SILVER", "ARGENT PUR", "1 OZ", "9999"]
-                let passStarted = Date()
-                do { try VNImageRequestHandler(cgImage: photo).perform([request]) }
-                catch { let error = error as NSError; print("OCR ERROR side=\(side) pass=\(index) domain=\(error.domain) code=\(error.code) info=\(error.userInfo)"); throw error }
-                let observations = (request.results ?? []).compactMap { observation -> [String: Any]? in
-                    guard let text = observation.topCandidates(1).first, text.confidence >= 0.25 else { return nil }
-                    return ["text": text.string, "confidence": Double(text.confidence)]
-                }
-                readings.append(["id": index, "observations": observations,
-                    "elapsedMs": Int(Date().timeIntervalSince(passStarted)*1000)])
-            }
-            report.append(["side": side, "passes": readings, "rimImages": rims.count,
-                "elapsedMs": Int(Date().timeIntervalSince(started)*1000)])
-        }
-        let json = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted,.sortedKeys])
-        try json.write(to: URL(fileURLWithPath: "/tmp/benza-real-photo-readings.json"))
-        print("REAL PHOTO OCR: "+String(decoding: json, as: UTF8.self))
-    }
 }
