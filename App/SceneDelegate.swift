@@ -419,8 +419,7 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
                                width: bandWidth, height: extent.height)
 
             var passes: [(CGImage, CGImagePropertyOrientation, Bool)] = [
-                (cgImage, .up, true), (cgImage, .right, true),
-                (cgImage, .left, true), (cgImage, .down, true)
+                (cgImage, .up, true)
             ]
             func appendPasses(rect: CGRect,
                               orientations: [CGImagePropertyOrientation],
@@ -430,12 +429,19 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
                     passes.append((crop, orientation, correction))
                 }
             }
+            // UIImage orientation is already normalized. Spend the guaranteed
+            // first four passes on upright text and both inscription bands;
+            // full-frame rotations must not consume the budget before rim OCR.
             appendPasses(rect: extent, orientations: [.up])
+            appendPasses(rect: top, orientations: [.up])
+            appendPasses(rect: bottom, orientations: [.up])
             appendPasses(rect: center, orientations: [.up])
-            appendPasses(rect: top, orientations: [.up, .down])
-            appendPasses(rect: bottom, orientations: [.up, .down])
             appendPasses(rect: left, orientations: [.right])
             appendPasses(rect: right, orientations: [.left])
+            passes.append(contentsOf: [(cgImage, .right, true),
+                                       (cgImage, .left, true), (cgImage, .down, true)])
+            appendPasses(rect: top, orientations: [.down])
+            appendPasses(rect: bottom, orientations: [.down])
             var found: [String: (String, Float)] = [:]
             var completed = 0
             var passReadings: [[String: Any]] = []
