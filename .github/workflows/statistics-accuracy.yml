@@ -1,0 +1,20 @@
+name: Statistics accuracy audit
+on:
+  pull_request:
+    paths:
+      - 'App/public/index.html'
+      - 'App/public/supabase_sale_restore.sql'
+      - 'tests/statistics-accuracy.test.cjs'
+      - '.github/workflows/statistics-accuracy.yml'
+permissions:
+  contents: read
+jobs:
+  statistics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Run statistics regression suite
+        run: node --test tests/statistics-accuracy.test.cjs
