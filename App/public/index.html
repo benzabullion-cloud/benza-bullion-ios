@@ -7438,7 +7438,6 @@ async function runSmartCameraScan(append=false,source='camera'){
     if(!append&&typeof plugin.reset==='function')await plugin.reset();
     if(run!==smartCameraRunId||session!==smartCameraSession)return;
     if(status)status.textContent='Reading your bullion…';
-    const scanStarted=performance.now();
     let captured=await plugin.scan({source});
     if(run!==smartCameraRunId||session!==smartCameraSession)return;
     let result=selectSmartCameraPhotoEvidence(captured);
@@ -7458,11 +7457,11 @@ async function runSmartCameraScan(append=false,source='camera'){
         const refined=await plugin.refine();
         if(run!==smartCameraRunId||session!==smartCameraSession)return;
         if(refined?.cancelled)return;
-        captured={...captured,...refined};
+        const totalProcessingMs=(Number(captured.elapsedMs)||0)+(Number(refined.elapsedMs)||0);
+        captured={...captured,...refined,elapsedMs:totalProcessingMs};
         result=selectSmartCameraPhotoEvidence(captured);
       }
     }
-    if(result)result.elapsedMs=Math.round(performance.now()-scanStarted);
     if(run!==smartCameraRunId||session!==smartCameraSession)return;
     if(result?.cancelled){
       if(status)status.textContent=append?'Ready when you are. Photograph the other side.':'Ready when you are.';
