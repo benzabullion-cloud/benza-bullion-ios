@@ -6817,7 +6817,7 @@ function smartCameraDenominationGuess(text){
 function smartCameraDesignEvidence(result){
   const entries=Array.isArray(result?.designSuggestions)?result.designSuggestions:
     result?.designSuggestion?[result.designSuggestion]:[];
-  const allowed=['american_eagle','walking_liberty_half_dollar','canadian_maple_leaf','unknown'];
+  const allowed=['american_eagle','american_buffalo','canadian_maple_leaf','britannia','philharmonic','kangaroo','lunar','panda','libertad','krugerrand','kookaburra','koala','noahs_ark','somali_elephant','platinum_noble','palladium_ballerina','morgan_dollar','peace_dollar','walking_liberty_half_dollar','generic_bar','generic_round','unknown'];
   let invalid=false;
   const ids=[];
   for(const entry of entries){
@@ -6829,16 +6829,42 @@ function smartCameraDesignEvidence(result){
   return {id:ids.length===1?ids[0]:'',conflict:ids.length>1,invalid};
 }
 function smartCameraDesignCatalogMatch(design,text,metal){
-  if(!metal||/\b(?:bar|half dollar|plated|replica|copy|tribute)\b/.test(text))return null;
-  let product='';
-  const modernYear=smartCameraYearCandidates(text).some(year=>year>=1986);
-  if(design==='american_eagle'&&metal==='silver'&&(modernYear||/\b(?:one|1) dollar\b/.test(text)))product='American Silver Eagle';
-  if(design==='canadian_maple_leaf'&&/\b(?:canada|can)\b/.test(text)){
-    product='Canadian '+METAL_NAMES[metal]+' Maple Leaf';
-  }
+  if(!metal||/\b(?:plated|replica|copy|tribute)\b/.test(text))return null;
+  const familyProducts={
+    american_eagle:{gold:'American Gold Eagle',silver:'American Silver Eagle',platinum:'American Platinum Eagle',palladium:'American Palladium Eagle'},
+    american_buffalo:{gold:'American Gold Buffalo'},
+    canadian_maple_leaf:{gold:'Canadian Gold Maple Leaf',silver:'Canadian Silver Maple Leaf',platinum:'Canadian Platinum Maple Leaf',palladium:'Canadian Palladium Maple Leaf'},
+    britannia:{gold:'British Gold Britannia',silver:'British Silver Britannia',platinum:'British Platinum Britannia'},
+    philharmonic:{gold:'Austrian Gold Philharmonic',silver:'Austrian Silver Philharmonic',platinum:'Austrian Platinum Philharmonic'},
+    kangaroo:{gold:'Australian Gold Kangaroo',silver:'Australian Silver Kangaroo',platinum:'Australian Platinum Kangaroo'},
+    lunar:{gold:'Australian Gold Lunar',silver:'Australian Silver Lunar'},
+    panda:{gold:'Chinese Gold Panda',silver:'Chinese Silver Panda',palladium:'Chinese Palladium Panda'},
+    libertad:{gold:'Mexican Gold Libertad',silver:'Mexican Silver Libertad'},
+    krugerrand:{gold:'South African Gold Krugerrand',silver:'South African Silver Krugerrand'},
+    kookaburra:{silver:'Australian Silver Kookaburra'},
+    koala:{silver:'Australian Silver Koala'},
+    noahs_ark:{silver:'Armenian Silver Noah’s Ark'},
+    somali_elephant:{silver:'Somali Silver Elephant'},
+    platinum_noble:{platinum:'Isle of Man Platinum Noble'},
+    palladium_ballerina:{palladium:'Russian Palladium Ballerina'},
+    morgan_dollar:{silver:'Morgan Silver Dollar'},
+    peace_dollar:{silver:'Peace Silver Dollar'},
+    walking_liberty_half_dollar:{silver:'Walking Liberty Half Dollar'},
+    generic_bar:{
+      gold:'Gold Bar',silver:'Silver Bar',platinum:'Platinum Bar',palladium:'Palladium Bar',copper:'Copper Bullion Bar'
+    },
+    generic_round:{
+      gold:'Gold Round',silver:'Silver Round',platinum:'Platinum Round',palladium:'Palladium Round',copper:'Copper Bullion Round'
+    }
+  };
+  const product=familyProducts[design]?.[metal]||'';
+  if(!product||(PRODUCT_MAP[metal]||[]).includes(product)===false)return null;
   const item=SMART_CAMERA_CATALOG.find(item=>item.product===product&&item.metal===metal);
   if(!item)return null;
-  return {item,strongHits:['on-device artwork suggestion + metal inscription'],supportHits:[],score:7};
+  if(design==='walking_liberty_half_dollar'&&!/\b(?:half dollar|50 cents?|liberty)\b/.test(text))return null;
+  if(design==='morgan_dollar'&&!/\b(?:morgan|one dollar|dollar)\b/.test(text))return null;
+  if(design==='peace_dollar'&&!/\b(?:peace|one dollar|dollar)\b/.test(text))return null;
+  return {item,strongHits:['on-device artwork family + metal inscription'],supportHits:[],score:7};
 }
 function interpretSmartCameraScan(result){
   const raw=Array.isArray(result?.lines)?result.lines.join(' '):(result?.text||'');
@@ -6860,10 +6886,8 @@ function interpretSmartCameraScan(result){
   if(design.id==='walking_liberty_half_dollar'&&catalogMatch?.item.product==='American Silver Eagle'){
     warnings.push('Artwork and inscriptions disagree. Confirm the product.');
   }
-  const familyFits=!catalogMatch||!design.id||
-    (design.id==='american_eagle'&&catalogMatch.item.product==='American Silver Eagle')||
-    (design.id==='canadian_maple_leaf'&&catalogMatch.item.product.includes('Maple Leaf'))||
-    (design.id==='walking_liberty_half_dollar'&&catalogMatch.item.product==='Walking Liberty Half Dollar');
+  const designMatch=design.id?smartCameraDesignCatalogMatch(design.id,text,metal):null;
+  const familyFits=!catalogMatch||!design.id||!designMatch||designMatch.item.product===catalogMatch.item.product;
   if(!familyFits&&!warnings.includes('Artwork and inscriptions disagree. Confirm the product.')){
     warnings.push('Artwork and inscriptions disagree. Confirm the product.');
   }
