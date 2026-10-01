@@ -24,6 +24,15 @@ struct benza_scan {
 };
 static std::mutex worker_mutex;
 static std::once_flag backend_once;
+
+// The 1.5 GB language model and vision projector are immutable after loading.
+// Keep them alive for the app process so a second side / subsequent scan does
+// not reload both files from storage. All access stays behind worker_mutex.
+static std::unique_ptr<llama_model, decltype(&llama_model_free)> cached_model(nullptr, llama_model_free);
+static std::unique_ptr<mtmd_context, decltype(&mtmd_free)> cached_vision(nullptr, mtmd_free);
+static std::string cached_model_path;
+static std::string cached_projector_path;
+static bool cached_use_gpu = false;
 static bool stopped(benza_scan *scan) {
     return scan->canceled.load() || std::chrono::steady_clock::now() >= scan->deadline;
 }
@@ -47,6 +56,17 @@ extern "C" int benza_scan_destroy(benza_scan *scan) {
     if (!scan) return 0;
     if (scan->running.load()) return 3;
     delete scan;
+    return 0;
+}
+
+extern "C" int benza_runtime_unload(void) {
+    std::unique_lock<std::mutex> worker(worker_mutex, std::try_to_lock);
+    if (!worker.owns_lock()) return 3;
+    cached_vision.reset();
+    cached_model.reset();
+    cached_model_path.clear();
+    cached_projector_path.clear();
+    cached_use_gpu = false;
     return 0;
 }
 
@@ -79,26 +99,48 @@ extern "C" int benza_scan_rgb(benza_scan *scan, const char *model_path,
             ggml_backend_load_all();
             llama_backend_init();
         });
-        auto mp = llama_model_default_params();
-        scan->stage.store(1);
-        mp.n_gpu_layers = use_gpu ? -1 : 0;
-        mp.progress_callback = load_progress;
-        mp.progress_callback_user_data = scan;
-        std::unique_ptr<llama_model, decltype(&llama_model_free)> model(
-            llama_model_load_from_file(model_path, mp), llama_model_free);
-        if (!model || stopped(scan)) return stopped(scan) ? 2 : 1;
-        auto vp = mtmd_context_params_default();
-        scan->stage.store(2);
-        vp.use_gpu = use_gpu != 0;
-        vp.n_threads = 4;
-        vp.warmup = false;
-        vp.image_min_tokens = 256;
-        vp.image_max_tokens = 256;
-        vp.progress_callback = load_progress;
-        vp.progress_callback_user_data = scan;
-        std::unique_ptr<mtmd_context, decltype(&mtmd_free)> vision(
-            mtmd_init_from_file(projector_path, model.get(), vp), mtmd_free);
-        if (!vision || !mtmd_support_vision(vision.get()) || stopped(scan)) return stopped(scan) ? 2 : 1;
+        const bool requested_gpu = use_gpu != 0;
+        const bool cache_matches = cached_model && cached_vision &&
+            cached_model_path == model_path &&
+            cached_projector_path == projector_path &&
+            cached_use_gpu == requested_gpu;
+        if (!cache_matches) {
+            // Never publish a partially loaded runtime.
+            cached_vision.reset();
+            cached_model.reset();
+            cached_model_path.clear();
+            cached_projector_path.clear();
+
+            auto mp = llama_model_default_params();
+            scan->stage.store(1);
+            mp.n_gpu_layers = requested_gpu ? -1 : 0;
+            mp.progress_callback = load_progress;
+            mp.progress_callback_user_data = scan;
+            std::unique_ptr<llama_model, decltype(&llama_model_free)> model(
+                llama_model_load_from_file(model_path, mp), llama_model_free);
+            if (!model || stopped(scan)) return stopped(scan) ? 2 : 1;
+
+            auto vp = mtmd_context_params_default();
+            scan->stage.store(2);
+            vp.use_gpu = requested_gpu;
+            vp.n_threads = 4;
+            vp.warmup = false;
+            vp.image_min_tokens = 256;
+            vp.image_max_tokens = 256;
+            vp.progress_callback = load_progress;
+            vp.progress_callback_user_data = scan;
+            std::unique_ptr<mtmd_context, decltype(&mtmd_free)> vision(
+                mtmd_init_from_file(projector_path, model.get(), vp), mtmd_free);
+            if (!vision || !mtmd_support_vision(vision.get()) || stopped(scan)) {
+                return stopped(scan) ? 2 : 1;
+            }
+
+            cached_model = std::move(model);
+            cached_vision = std::move(vision);
+            cached_model_path = model_path;
+            cached_projector_path = projector_path;
+            cached_use_gpu = requested_gpu;
+        }
         auto cp = llama_context_default_params();
         scan->stage.store(3);
         cp.n_ctx = 1024;
@@ -109,7 +151,7 @@ extern "C" int benza_scan_rgb(benza_scan *scan, const char *model_path,
         cp.abort_callback = abort_work;
         cp.abort_callback_data = scan;
         std::unique_ptr<llama_context, decltype(&llama_free)> context(
-            llama_init_from_model(model.get(), cp), llama_free);
+            llama_init_from_model(cached_model.get(), cp), llama_free);
         if (!context || stopped(scan)) return stopped(scan) ? 2 : 1;
         std::unique_ptr<mtmd_bitmap, decltype(&mtmd_bitmap_free)> bitmap(
             mtmd_bitmap_init(width, height, rgb), mtmd_bitmap_free);
@@ -126,17 +168,17 @@ extern "C" int benza_scan_rgb(benza_scan *scan, const char *model_path,
         mtmd_input_text text{prompt.data(), prompt.size(), true, true};
         scan->stage.store(4);
         const mtmd_bitmap *images[] = {bitmap.get()};
-        if (mtmd_tokenize(vision.get(), chunks.get(), &text, images, 1)) return 1;
+        if (mtmd_tokenize(cached_vision.get(), chunks.get(), &text, images, 1)) return 1;
         if (stopped(scan)) return 2;
         llama_pos past = 0;
         scan->stage.store(5);
-        if (mtmd_helper_eval_chunks(vision.get(), context.get(), chunks.get(),
+        if (mtmd_helper_eval_chunks(cached_vision.get(), context.get(), chunks.get(),
                                     0, 0, 512, true, &past)) return stopped(scan) ? 2 : 1;
         if (stopped(scan)) return 2;
         std::unique_ptr<llama_sampler, decltype(&llama_sampler_free)> sampler(
             llama_sampler_init_greedy(), llama_sampler_free);
         if (!sampler) return 1;
-        const llama_vocab *vocab = llama_model_get_vocab(model.get());
+        const llama_vocab *vocab = llama_model_get_vocab(cached_model.get());
         std::string reply;
         scan->stage.store(6);
         bool finished = false;

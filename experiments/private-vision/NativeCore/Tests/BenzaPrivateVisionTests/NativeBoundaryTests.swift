@@ -36,6 +36,13 @@ final class NativeBoundaryTests: XCTestCase {
         XCTAssertEqual(try BenzaDesignIdentity.parse("```json\n{\"design_id\":\"canadian_maple_leaf\"}\n```").design, .canadianMapleLeaf)
     }
 
+    func testExactAmericanEagleDesignIDsParse() throws {
+        XCTAssertEqual(try BenzaDesignIdentity.parse(#"{"design_id":"american_silver_eagle"}"#).design, .americanSilverEagle)
+        XCTAssertEqual(try BenzaDesignIdentity.parse(#"{"design_id":"american_gold_eagle"}"#).design, .americanGoldEagle)
+        XCTAssertEqual(try BenzaDesignIdentity.parse(#"{"design_id":"american_platinum_eagle"}"#).design, .americanPlatinumEagle)
+        XCTAssertEqual(try BenzaDesignIdentity.parse(#"{"design_id":"american_palladium_eagle"}"#).design, .americanPalladiumEagle)
+    }
+
     func testCanceledHandleCannotStartOrBeReused() throws {
         let handle = try XCTUnwrap(benza_scan_create())
         defer { XCTAssertEqual(benza_scan_destroy(handle), 0) }
@@ -74,6 +81,10 @@ final class NativeBoundaryTests: XCTestCase {
                 return XCTFail("Canceled wrapper attempted asset loading")
             }
         }
+    }
+
+    func testRuntimeUnloadIsSafeWhenIdle() {
+        XCTAssertEqual(benza_runtime_unload(), 0)
     }
 
     func testRemoteAssetDirectoryIsRejected() {

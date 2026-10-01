@@ -15,6 +15,9 @@ int benza_scan_is_running(benza_scan *scan);
 int benza_scan_stage(benza_scan *scan);
 // Returns 0 if destroyed, 3 if still running. Never destroy a running handle.
 int benza_scan_destroy(benza_scan *scan);
+// Releases cached model/projector state when no worker is active.
+// Returns 0 on success, 3 while a worker is active.
+int benza_runtime_unload(void);
 // Synchronous worker API. Call off the UI thread with verified local assets.
 // 0=reply ready (requires strict validation), 1=error, 2=canceled/timeout,
 // 3=another worker active, 4=handle already used. Output is empty on failure.
