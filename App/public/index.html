@@ -7367,7 +7367,6 @@ function setSmartCameraBusy(busy){
 async function resetSmartCameraScan(silent=false,releaseModels=false){
   const run=++smartCameraRunId;
   smartCameraSession++;
-  pendingScannerPhotoFiles=[];
   clearSmartCameraEvidence();
   setSmartCameraBusy(true);
   const resetButton=document.getElementById('smartCameraResetButton');
