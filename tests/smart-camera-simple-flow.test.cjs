@@ -4,7 +4,7 @@ const nodes=new Map();
 const get=id=>{
  if(!nodes.has(id)){
   const classes=new Set();
-  const node={value:'',hidden:false,disabled:false,textContent:'',options:[],selectedIndex:0,
+  const node={value:'',dataset:{},hidden:false,disabled:false,textContent:'',options:[],selectedIndex:0,
    classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x),toggle(x,on){on?classes.add(x):classes.delete(x)}},setAttribute(){}};
   Object.defineProperty(node,'innerHTML',{set(value){this.options=[...value.matchAll(/<option>(.*?)<\/option>/g)].map(m=>({value:m[1]}));this.value=this.options[0]?.value||''}});
   nodes.set(id,node);
@@ -18,7 +18,7 @@ const context=vm.createContext({Date,Number,console,document:{getElementById:get
  addScreen:get('addScreen'),weight:get('weight'),cost:get('cost')});
 vm.runInContext(html.slice(html.indexOf('const GOLD_PRODUCTS='),html.indexOf('function ensureGlobalAddPortals(')),context);
 vm.runInContext(html.slice(html.indexOf('let pendingSmartCameraSuggestion='),html.indexOf('function clearAttachmentObjectUrls')),context);
-vm.runInContext(html.slice(html.indexOf('function syncProInventoryVisibility('),html.indexOf('function editHolding(')),context);
+vm.runInContext(html.slice(html.indexOf('function fillBullionDetails('),html.indexOf('function editHolding(')),context);
 let count=0;const test=(name,fn)=>{get('addScreen').classList.remove('show');fn();count++;console.log('PASS',name)};
 const scan=text=>context.interpretSmartCameraScan({text,confidence:.95,sides:2});
 const complete=scan('American Silver Eagle 1 oz Fine silver .999 2011');
@@ -31,7 +31,7 @@ test('Review transfers real product, metal and weight through the real holding s
  context.renderSmartCameraAnalysis(complete);context.useSmartCameraAnalysis();
  assert.equal(get('addScreen').classList.contains('show'),true);assert.equal(get('product').value,'American Silver Eagle');
  assert.equal(get('weight').value,1);assert.equal(get('qty').value,1);assert.equal(get('cost').value,'');
- assert.equal(vm.runInContext('metal',context),'silver');assert.match(get('holdingNotes').value,/2011/);
+ assert.equal(vm.runInContext('metal',context),'silver');assert.equal(get('holdingYear').value,2011);assert.equal(get('holdingNotes').value,'');
  assert.equal(get('proInventoryFields').hidden,false);assert.equal(get('proInventoryTeaser').hidden,true);
 });
 test('Successful scan stages both captured photos for the holding save',()=>{
@@ -84,3 +84,8 @@ console.log(count+' scanner review checks passed');
 
 test('First photo is acknowledged and both sources request opposite side',()=>{context.renderSmartCameraAnalysis({...scan('Fine silver'),sides:1});assert.match(get('smartAnalysisSub').textContent,/First photo received/);assert.equal(get('smartCameraProButton').textContent,'Scan Opposite Side');assert.equal(get('smartCameraLibraryButton').textContent,'Choose Opposite Side Photo')});
 test('Second photo restores fresh scan choices',()=>{context.renderSmartCameraAnalysis(scan('Fine silver'));assert.equal(get('smartCameraProButton').textContent,'Scan again');assert.equal(get('smartCameraLibraryButton').textContent,'Choose Bullion Photo')});
+
+
+test('Free users can fill all bullion details while records stay locked',()=>{active=false;context.fillBullionDetails({year:2024,purity:'.999',mint:'Example mint',serial:'123'});context.syncProInventoryVisibility();assert.equal(get('holdingYear').value,2024);assert.equal(get('holdingSerial').value,'123');assert.equal(get('proInventoryFields').hidden,true);active=true});
+test('Product suggestions do not replace user-entered purity or mint',()=>{get('product').value='American Silver Eagle';vm.runInContext("metal='silver'",context);get('holdingPurity').value='.999 confirmed';get('holdingMint').value='Custom mint';context.suggestBullionDetails();assert.equal(get('holdingPurity').value,'.999 confirmed');assert.equal(get('holdingMint').value,'Custom mint')});
+test('Fresh form clears previous year and serial and suggests known product details',()=>{context.openAdd();assert.equal(get('holdingYear').value,'');assert.equal(get('holdingSerial').value,'');assert.equal(get('holdingPurity').value,'22K gold');assert.equal(get('holdingMint').value,'United States Mint')});
