@@ -1,0 +1,23 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const html=fs.readFileSync('App/public/index.html','utf8');
+const nodes=new Map();const make=()=>({children:[],hidden:false,append(...xs){this.children.push(...xs)},replaceChildren(...xs){this.children=xs}});
+const get=id=>{if(!nodes.has(id))nodes.set(id,make());return nodes.get(id)};
+let revoked=[],n=0;
+const context=vm.createContext({document:{getElementById:get,createElement:make},URL:{createObjectURL:()=> 'blob:'+(++n),revokeObjectURL:url=>revoked.push(url)},pendingScannerPhotoFiles:[{name:'front.jpg'},{name:'back.jpg'}],holdingPhotoObjectUrl:null,holdingReceiptObjectUrl:null,holdingPhotoViewUrl:null,holdingReceiptViewUrl:null,supabaseClient:null});
+vm.runInContext(html.slice(html.indexOf('let scannerPreviewObjectUrls='),html.indexOf('function resetProInventoryForm()')),context);
+vm.runInContext(html.slice(html.indexOf('async function hydrateExistingAttachmentPreviews('),html.indexOf('function viewHoldingAttachment(')),context);
+context.previewPendingScannerPhotos();
+assert.equal(get('holdingScannerPhotoPreviews').children.length,2);
+assert.equal(get('holdingScannerPhotoPreviews').children[1].children[0].textContent,'Opposite side');
+assert.equal(get('proInventoryFields').open,true);
+context.clearAttachmentObjectUrls();assert.equal(revoked.length,2);assert.equal(get('holdingScannerPhotoPreviews').hidden,true);
+context.signedHoldingFileUrl=async p=>'https://signed.example/'+p;
+(async()=>{
+ await context.hydrateExistingAttachmentPreviews({scannerPhotoPaths:['front','back']});
+ assert.equal(get('holdingScannerPhotoPreviews').children.length,2);
+ let done;context.signedHoldingFileUrl=()=>new Promise(r=>done=r);
+ const old=context.hydrateExistingAttachmentPreviews({scannerPhotoPaths:['old']});
+ context.clearAttachmentObjectUrls();done('https://signed.example/old');await old;
+ assert.equal(get('holdingScannerPhotoPreviews').hidden,true);
+ console.log('PASS scanner photos preview both sides, reopen saved photos, revoke blobs, and ignore stale previews');
+})().catch(e=>{console.error(e);process.exitCode=1});
