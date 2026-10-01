@@ -6886,6 +6886,9 @@ function smartCameraDesignCatalogMatch(design,text,metal){
   };
   const product=familyProducts[design]?.[resolvedMetal]||'';
   if(!product||(PRODUCT_MAP[resolvedMetal]||[]).includes(product)===false)return null;
+  // Multi-metal families need an independent family/country inscription before
+  // the artwork suggestion can become a concrete metal-specific product.
+  if(design==='canadian_maple_leaf'&&!/\b(?:canada|can)\b/.test(text))return null;
   if(design==='american_eagle'){
     const modernYear=smartCameraYearCandidates(text).some(year=>year>=1986);
     if(resolvedMetal!=='silver'||(!modernYear&&!/\b(?:one|1) dollar\b/.test(text)))return null;
