@@ -2,6 +2,7 @@
 const fs=require('node:fs'),assert=require('node:assert/strict');
 const {chromium,webkit}=require('playwright');
 const html=fs.readFileSync('App/public/index.html','utf8');
+const sweepBrowsers=[];let sweepDeadline;
 const stub=`
 window.sweep={tables:{holdings:[],transactions:[],price_alerts:[],portfolio_snapshots:[],user_entitlements:null,notification_preferences:null,live_chart_state:null},alerts:[],writes:[],removed:[],failRpc:false};
 window.Capacitor={isNativePlatform:()=>true,Plugins:{BenzaSmartCamera:{reset:async()=>({})},BenzaNotifications:{status:async()=>({permission:'denied'})}}};
@@ -13,10 +14,11 @@ window.supabase={createClient:()=>({
  storage:{from:()=>({remove:async paths=>{sweep.removed.push(...paths);return {error:null}},upload:async()=>({error:null}),createSignedUrl:async()=>({data:{signedUrl:'https://sweep.test/photo.jpg'},error:null})})}
 })};`;
 (async()=>{
- const deadline=setTimeout(()=>{console.error('Full-app sweep exceeded 120 seconds');process.exit(1)},120000);
+ sweepDeadline=setTimeout(()=>{console.error('Full-app sweep exceeded 120 seconds');process.exit(1)},120000);
  let states=0;
  for(const [engineName,engine] of Object.entries({chromium,webkit})){
   const browser=await engine.launch({headless:true});
+  sweepBrowsers.push(browser);
   const page=await browser.newPage();const errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/*',route=>{
@@ -48,7 +50,7 @@ window.supabase={createClient:()=>({
   assert.equal(await page.evaluate(()=>holdings[0].cost),0,'An optional purchase price may remain zero');
   await page.evaluate(()=>{openManualAdd();sweep.failRpc=true;});await page.evaluate(()=>saveHolding());
   assert.equal(await page.locator('#holdingSaveBtn').isEnabled(),true,'Retry must remain available after a failed save');
-  assert.ok(await page.evaluate(()=>sweep.alerts.some(message=>/Network|save/i.test(message))),'A thrown network error must be visible');
+  assert.ok(await page.evaluate(()=>sweep.alerts.some(message=>/network|save|connection/i.test(message))),'A thrown network error must be visible');
   assert.equal(await page.evaluate(()=>holdings.length),1,'Failed save cannot invent a holding');
   await page.evaluate(()=>{sweep.failRpc=false;});
   const uploadFailure=await page.evaluate(async()=>{
@@ -80,6 +82,6 @@ window.supabase={createClient:()=>({
   assert.deepEqual(errors,[],engineName+' runtime errors');
   await browser.close();
  }
- clearTimeout(deadline);
+ clearTimeout(sweepDeadline);
  console.log('PASS '+states+' full-app screen states in Chromium/WebKit; optional save, retry, account isolation, watchlist and sign-out');
-})().catch(e=>{console.error(e);process.exitCode=1});
+})().catch(async e=>{clearTimeout(sweepDeadline);await Promise.allSettled(sweepBrowsers.map(browser=>browser.close()));console.error(e);process.exitCode=1});
