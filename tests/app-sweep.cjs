@@ -13,6 +13,7 @@ window.supabase={createClient:()=>({
  storage:{from:()=>({remove:async paths=>{sweep.removed.push(...paths);return {error:null}},upload:async()=>({error:null}),createSignedUrl:async()=>({data:{signedUrl:'https://sweep.test/photo.jpg'},error:null})})}
 })};`;
 (async()=>{
+ const deadline=setTimeout(()=>{console.error('Full-app sweep exceeded 120 seconds');process.exit(1)},120000);
  let states=0;
  for(const [engineName,engine] of Object.entries({chromium,webkit})){
   const browser=await engine.launch({headless:true});
@@ -27,17 +28,20 @@ window.supabase={createClient:()=>({
    return route.fulfill({status:200,contentType:'text/plain',body:''});
   });
   await page.goto('https://sweep.test/');
+  console.log('Loaded bundled app in '+engineName);
   await page.evaluate(()=>{currentUser={id:'account-a',email:'sweep@example.test',user_metadata:{}};document.getElementById('authScreen').style.display='none';});
   for(const width of [320,390,768])for(const theme of ['dark','light'])for(const pro of [false,true]){
+   console.log('Check',engineName,width,theme,pro?'Pro':'Free');
    await page.setViewportSize({width,height:844});
    await page.evaluate(({theme,pro})=>{applyTheme(theme);benzaEntitlement={tier:pro?'pro':'free',status:pro?'active':'inactive'};updateProIntegratedUI();},{theme,pro});
    for(const open of ['goPortfolio','openAnalytics','openMarkets','openNews','openSettings','openManualAdd','openSmartCamera']){
-    await page.evaluate(async name=>{closeAdd();closeAddChoice();closeSmartCamera();hideMainOverlays();await window[name]();},open);
+    await page.evaluate(async name=>{closeAdd();closeAddChoice();closeSmartCamera();hideMainOverlays();await Promise.race([Promise.resolve(window[name]()),new Promise((_,reject)=>setTimeout(()=>reject(Error(name+' did not finish')),5000))]);},open);
     const metric=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth+1,visible:[...document.querySelectorAll('.show')].map(n=>n.id).filter(Boolean)}));
     assert.equal(metric.overflow,false,JSON.stringify({engineName,width,theme,pro,open,metric}));
     states++;
    }
   }
+  console.log('Check save and account flows in '+engineName);
   await page.evaluate(()=>{closeSmartCamera();openManualAdd();document.getElementById('cost').value='0';document.getElementById('holdingYear').value='';document.getElementById('holdingPurity').value='';document.getElementById('holdingMint').value='';});
   await page.evaluate(()=>saveHolding());
   assert.equal(await page.evaluate(()=>holdings.length),1,'Optional inventory fields may remain blank');
@@ -60,9 +64,10 @@ window.supabase={createClient:()=>({
    const original=supabaseClient;const callbacks=[];
    supabaseClient={from:()=>({select(){return this},order(){return this},then(resolve){callbacks.push(resolve)}})};
    const a=loadHoldingsFromSupabase(),b=loadActivityFromSupabase();
-   await Promise.resolve();currentUser={id:'account-b'};holdings=[];activities=[];
+   await new Promise(resolve=>setTimeout(resolve,0));currentUser={id:'account-b'};holdings=[];activities=[];
+   if(callbacks.length<2)throw Error('Delayed account query fixture was not initialized');
    callbacks.forEach(resolve=>resolve({data:[{id:'private-a',metal:'silver',product:'PRIVATE ACCOUNT A',quantity:1,weight_oz:1,total_oz:1}],error:null}));
-   await Promise.all([a,b]);supabaseClient=original;return {holdings:holdings.length,activities:activities.length};
+   await Promise.race([Promise.all([a,b]),new Promise((_,reject)=>setTimeout(()=>reject(Error('Delayed account reads did not finish')),5000))]);supabaseClient=original;return {holdings:holdings.length,activities:activities.length};
   });assert.deepEqual(stale,{holdings:0,activities:0});
   await page.evaluate(()=>{localStorage.setItem('benzaWatchlist',JSON.stringify([{metal:'gold',target:9999}]));localStorage.setItem('benzaWatchlist:account-a',JSON.stringify([{metal:'silver',target:100}]));sweep.tables.price_alerts=[];});
   await page.evaluate(()=>loadBenzaWatchlist());
@@ -75,5 +80,6 @@ window.supabase={createClient:()=>({
   assert.deepEqual(errors,[],engineName+' runtime errors');
   await browser.close();
  }
+ clearTimeout(deadline);
  console.log('PASS '+states+' full-app screen states in Chromium/WebKit; optional save, retry, account isolation, watchlist and sign-out');
 })().catch(e=>{console.error(e);process.exitCode=1});

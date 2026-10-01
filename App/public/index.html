@@ -11589,8 +11589,11 @@ async function saveNativeBenzaSubscription(token){
 }
 async function removeNativeBenzaSubscriptions(){
   if(!supabaseClient||!currentUser)return;
+  const userId=currentUser.id;
+  const state=await nativeBenzaNotifications()?.status();
+  if(currentUser?.id!==userId||!state?.token)return;
   const {error}=await supabaseClient.from('notification_subscriptions')
-    .delete().eq('user_id',currentUser.id).like('endpoint','apns:%');
+    .delete().eq('user_id',userId).eq('endpoint',nativeBenzaEndpoint(state.token));
   if(error)throw error;
 }
 async function updateNotificationUI(message=''){
