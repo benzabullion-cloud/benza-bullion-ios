@@ -7121,9 +7121,29 @@ function selectSmartCameraPhotoEvidence(result){
       }
     }
   }
-  const lines=[...new Set(accepted.flatMap(c=>c.photo.lines).concat(cautionLines))];
+  // If multiple crops disagree only on a calendar year, prefer the clearly
+  // stronger date crop; keep both when confidence is close so the UI can flag
+  // the ambiguity instead of guessing.
+  let finalAccepted=accepted;
+  const dated=accepted.map(candidate=>({
+    candidate,
+    years:smartCameraYearCandidates(normalizeSmartCameraText(candidate.photo.lines.join(' '))),
+    confidence:candidate.photo.confidence
+  })).filter(entry=>entry.years.length===1);
+  const distinctYears=[...new Set(dated.map(entry=>entry.years[0]))];
+  if(distinctYears.length>1){
+    const ordered=[...dated].sort((a,b)=>b.confidence-a.confidence);
+    if(ordered[0].confidence-ordered[1].confidence>=.20){
+      const keepYear=ordered[0].years[0];
+      finalAccepted=accepted.filter(candidate=>{
+        const years=smartCameraYearCandidates(normalizeSmartCameraText(candidate.photo.lines.join(' ')));
+        return years.length!==1||years[0]===keepYear;
+      });
+    }
+  }
+  const lines=[...new Set(finalAccepted.flatMap(c=>c.photo.lines).concat(cautionLines))];
   return {...result,lines,text:lines.join('\n'),confidence:primary.photo.confidence,
-    selectedPasses:accepted.length,rejectedPasses:result.passes.length-accepted.length};
+    selectedPasses:finalAccepted.length,rejectedPasses:result.passes.length-finalAccepted.length};
 }
 function smartCameraFailureReason(suggestion){
   if(suggestion.warnings?.length)return suggestion.warnings[0];
