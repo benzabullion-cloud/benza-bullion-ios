@@ -6669,12 +6669,43 @@ const SMART_CAMERA_CATALOG=[
   {product:'Mexican 5 Peso Gold',metal:'gold',strong:['5 pesos'],support:['oro puro'],mint:'Casa de Moneda de México',purity:'.900 gold'},
   {product:'Mexican 2.5 Peso Gold',metal:'gold',strong:['2 1/2 pesos','2.5 pesos'],support:['oro puro'],mint:'Casa de Moneda de México',purity:'.900 gold'},
   {product:'British Gold Sovereign',metal:'gold',strong:['sovereign'],support:['dei gra rex fid def'],mint:'The Royal Mint',purity:'22K gold'},
-  {product:'Morgan Silver Dollar',metal:'silver',strong:['morgan'],support:['e pluribus unum','one dollar','in god we trust'],mint:'United States Mint',purity:'.900 silver',yearMin:1878,yearMax:1921},
-  {product:'Peace Silver Dollar',metal:'silver',strong:['peace dollar','peace'],support:['one dollar','in god we trust'],mint:'United States Mint',purity:'.900 silver',yearMin:1921,yearMax:1935},
-  {product:'Walking Liberty Half Dollar',metal:'silver',strong:['half dollar'],support:['walking liberty'],mint:'United States Mint',purity:'.900 silver',yearMin:1916,yearMax:1947},
-  {product:'Franklin Half Dollar',metal:'silver',strong:['franklin'],support:['half dollar'],mint:'United States Mint',purity:'.900 silver',yearMin:1948,yearMax:1963},
-  {product:'1964 Kennedy Half Dollar',metal:'silver',strong:['kennedy'],support:['half dollar'],mint:'United States Mint',purity:'.900 silver',yearMin:1964,yearMax:1964},
-  {product:'Mercury Dime',metal:'silver',strong:['mercury dime'],support:['one dime','liberty'],mint:'United States Mint',purity:'.900 silver',yearMin:1916,yearMax:1945},
+  {product:'Morgan Silver Dollar',metal:'silver',strong:['morgan','one dollar'],support:['e pluribus unum','in god we trust'],mint:'United States Mint',purity:'.900 silver',yearMin:1878,yearMax:1921,requiresYear:true},
+  {product:'Peace Silver Dollar',metal:'silver',strong:['peace dollar','peace','one dollar'],support:['in god we trust'],mint:'United States Mint',purity:'.900 silver',yearMin:1921,yearMax:1935,requiresYear:true},
+  {product:'Walking Liberty Half Dollar',metal:'silver',strong:['half dollar'],support:['walking liberty'],mint:'United States Mint',purity:'.900 silver',yearMin:1916,yearMax:1947,requiresYear:true},
+  {product:'Franklin Half Dollar',metal:'silver',strong:['franklin','half dollar'],support:['united states of america'],mint:'United States Mint',purity:'.900 silver',yearMin:1948,yearMax:1963,requiresYear:true},
+  {product:'1964 Kennedy Half Dollar',metal:'silver',strong:['kennedy','half dollar'],support:['united states of america'],mint:'United States Mint',purity:'.900 silver',yearMin:1964,yearMax:1964,requiresYear:true},
+  {product:'Mercury Dime',metal:'silver',strong:['mercury dime','one dime','1 dime'],support:['liberty'],mint:'United States Mint',purity:'.900 silver',yearMin:1916,yearMax:1945,requiresYear:true},
+  {product:'British Gold Half Sovereign',metal:'gold',strong:['half sovereign'],support:['dei gra rex fid def'],mint:'The Royal Mint',purity:'22K gold'},
+  {product:'Swiss 20 Franc Gold',metal:'gold',strong:['helvetia','confederatio helvetica'],support:['20 francs','20 franc'],purity:'.900 gold'},
+  {product:'French 20 Franc Rooster',metal:'gold',strong:['republique francaise','liberte egalite fraternite'],support:['20 francs','20 franc'],purity:'.900 gold'},
+  {product:'Austrian 100 Corona Gold',metal:'gold',strong:['100 corona','100 korona'],support:['austria','osterreich'],purity:'.900 gold'},
+  {product:'Austrian 20 Corona Gold',metal:'gold',strong:['20 corona','20 korona'],support:['austria','osterreich'],purity:'.900 gold'},
+  {product:'U.S. $20 Saint-Gaudens Double Eagle',metal:'gold',strong:['twenty dollars','20 dollars'],support:['united states of america'],mint:'United States Mint',purity:'.900 gold',yearMin:1907,yearMax:1933,requiresYear:true},
+  {product:'U.S. $20 Liberty Head Double Eagle',metal:'gold',strong:['twenty dollars','20 dollars'],support:['united states of america'],mint:'United States Mint',purity:'.900 gold',yearMin:1849,yearMax:1907,requiresYear:true},
+  {product:'U.S. $10 Indian Head Eagle',metal:'gold',strong:['ten dollars','10 dollars'],support:['united states of america'],mint:'United States Mint',purity:'.900 gold',yearMin:1907,yearMax:1933,requiresYear:true},
+  {product:'U.S. $10 Liberty Head Eagle',metal:'gold',strong:['ten dollars','10 dollars'],support:['united states of america'],mint:'United States Mint',purity:'.900 gold',yearMin:1838,yearMax:1907,requiresYear:true},
+  {product:'U.S. $5 Indian Head Half Eagle',metal:'gold',strong:['five dollars','5 dollars'],support:['united states of america'],mint:'United States Mint',purity:'.900 gold',yearMin:1908,yearMax:1929,requiresYear:true},
+  {product:'U.S. $5 Liberty Head Half Eagle',metal:'gold',strong:['five dollars','5 dollars'],support:['united states of america'],mint:'United States Mint',purity:'.900 gold',yearMin:1839,yearMax:1908,requiresYear:true},
+  {product:'U.S. $2.50 Indian Head Quarter Eagle',metal:'gold',strong:['2 1/2 dollars','2.5 dollars','2 50 dollars'],support:['united states of america'],mint:'United States Mint',purity:'.900 gold',yearMin:1908,yearMax:1929,requiresYear:true},
+  {product:'U.S. $2.50 Liberty Head Quarter Eagle',metal:'gold',strong:['2 1/2 dollars','2.5 dollars','2 50 dollars'],support:['united states of america'],mint:'United States Mint',purity:'.900 gold',yearMin:1840,yearMax:1907,requiresYear:true},
+  {product:'Gold Bullion Coin',metal:'gold',strong:['gold bullion coin'],support:['fine gold'],purity:'.9999 fine gold',baseline:true},
+  {product:'Armenian Silver Noah’s Ark',metal:'silver',strong:["noah's ark",'noahs ark'],support:['armenia','republic of armenia'],purity:'.999 fine silver'},
+  {product:'Somali Silver Elephant',metal:'silver',strong:['somali elephant','african wildlife elephant'],support:['somalia','african wildlife'],purity:'.9999 fine silver'},
+  {product:'Washington Silver Quarter',metal:'silver',strong:['quarter dollar'],support:['united states of america'],mint:'United States Mint',purity:'.900 silver',yearMin:1932,yearMax:1964,requiresYear:true},
+  {product:'Standing Liberty Quarter',metal:'silver',strong:['quarter dollar'],support:['united states of america'],mint:'United States Mint',purity:'.900 silver',yearMin:1916,yearMax:1930,requiresYear:true},
+  {product:'Barber Quarter',metal:'silver',strong:['quarter dollar'],support:['united states of america'],mint:'United States Mint',purity:'.900 silver',yearMin:1892,yearMax:1916,requiresYear:true},
+  {product:'Roosevelt Silver Dime',metal:'silver',strong:['one dime','1 dime'],support:['united states of america'],mint:'United States Mint',purity:'.900 silver',yearMin:1946,yearMax:1964,requiresYear:true},
+  {product:'Barber Dime',metal:'silver',strong:['one dime','1 dime'],support:['united states of america'],mint:'United States Mint',purity:'.900 silver',yearMin:1892,yearMax:1916,requiresYear:true},
+  {product:'Barber Half Dollar',metal:'silver',strong:['half dollar'],support:['united states of america'],mint:'United States Mint',purity:'.900 silver',yearMin:1892,yearMax:1915,requiresYear:true},
+  {product:'U.S. 90% Silver Coinage',metal:'silver',strong:['90% silver','90 percent silver','us 90 silver','u s 90 silver'],support:['united states'],purity:'.900 silver',baseline:true},
+  {product:'Silver Bullion Coin',metal:'silver',strong:['silver bullion coin'],support:['fine silver'],purity:'.999 fine silver',baseline:true},
+  {product:'Isle of Man Platinum Noble',metal:'platinum',strong:['platinum noble','isle of man noble'],support:['isle of man','noble'],purity:'.9995 platinum'},
+  {product:'Platinum Bullion Coin',metal:'platinum',strong:['platinum bullion coin'],support:['fine platinum'],purity:'.9995 platinum',baseline:true},
+  {product:'Russian Palladium Ballerina',metal:'palladium',strong:['palladium ballerina','russian ballerina'],support:['russia','ballerina'],purity:'.999 palladium'},
+  {product:'Palladium Bullion Coin',metal:'palladium',strong:['palladium bullion coin'],support:['fine palladium'],purity:'.9995 palladium',baseline:true},
+  {product:'Copper Bullion Coin',metal:'copper',strong:['copper bullion coin'],support:['fine copper'],baseline:true},
+  {product:'Copper Coin Collection',metal:'copper',strong:['copper coin collection'],support:['copper'],baseline:true},
+  {product:'U.S. Copper Cents',metal:'copper',strong:['copper cent','copper cents'],support:['one cent','united states of america'],yearMin:1793,yearMax:1981,requiresYear:true},
   {product:'Gold Bar',metal:'gold',strong:['gold bar'],support:['fine gold','9999 gold','999.9 gold'],purity:'.9999 fine gold'},
   {product:'Silver Bar',metal:'silver',strong:['silver bar'],support:['fine silver','999 silver','9999 silver'],purity:'.999 fine silver'},
   {product:'Platinum Bar',metal:'platinum',strong:['platinum bar'],support:['fine platinum'],purity:'.9995 platinum'},
@@ -6749,10 +6780,17 @@ function smartCameraCatalogMatch(text,metal){
   const years=smartCameraYearCandidates(text);
   const ranked=SMART_CAMERA_CATALOG.filter(item=>(!metal||item.metal===metal)&&(PRODUCT_MAP[item.metal]||[]).includes(item.product))
     .map(item=>{
-      // A generic weight/metal inscription cannot identify a sovereign coin.
-      const strongHits=(item.strong||[]).filter(term=>text.includes(term)&&!['1 oz fine silver','1 oz fine gold','.9999 fine gold','half dollar'].includes(term));
-      const supportHits=(item.support||[]).filter(term=>text.includes(term));
+      // Generic metal/weight text cannot identify a sovereign coin. Historic
+      // denomination-only families may use "half dollar", "quarter dollar", etc.,
+      // but only when a readable year places the coin in that exact series.
       const plausibleYears=years.filter(y=>(!item.yearMin||y>=item.yearMin)&&(!item.yearMax||y<=item.yearMax));
+      const strongHits=(item.strong||[]).filter(term=>{
+        if(!text.includes(term))return false;
+        if(['1 oz fine silver','1 oz fine gold','.9999 fine gold'].includes(term))return false;
+        if(item.requiresYear&&!plausibleYears.length)return false;
+        return true;
+      });
+      const supportHits=(item.support||[]).filter(term=>text.includes(term));
       let score=strongHits.length*7+supportHits.length;
       if(item.product.includes('Maple Leaf') && metal===item.metal && /\b(?:canada|can)\b/.test(text) && /9999|999\.9/.test(text) && !/\bbar\b/.test(text)){
         strongHits.push('Canadian metal + .9999 markings');score+=8;
