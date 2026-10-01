@@ -456,10 +456,20 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
                         "CANADA", "LIBERTY", "IN GOD WE TRUST", "E PLURIBUS UNUM",
                         "UNITED STATES OF AMERICA", "ONE DOLLAR", "ONE OUNCE", "ONE TROY OUNCE",
                         "FINE SILVER", "FINE GOLD", "FINE PLATINUM", "FINE PALLADIUM", "FINE COPPER",
-                        "American Eagle", "Maple Leaf", "Britannia", "Krugerrand",
-                        "Philharmoniker", "Kangaroo", "Kookaburra", "Koala", "Panda",
-                        "Libertad", "PAMP", "Valcambi", "Engelhard", "Johnson Matthey",
-                        "1 OZ", "1 TROY OZ", "9999", "9995", "999", "999.9"
+                        "American Eagle", "American Buffalo", "Maple Leaf", "Britannia", "Queen's Beasts",
+                        "Krugerrand", "Philharmoniker", "Kangaroo", "Kookaburra", "Koala", "Panda",
+                        "Libertad", "Noah's Ark", "Somali Elephant", "Sovereign", "Half Sovereign",
+                        "Swiss 20 Franc", "20 Franc", "Rooster", "Corona", "Saint-Gaudens",
+                        "Liberty Head", "Indian Head", "Double Eagle", "Morgan Dollar", "Peace Dollar",
+                        "Walking Liberty", "Franklin", "Kennedy", "Washington Quarter",
+                        "Standing Liberty", "Barber", "Mercury Dime", "Roosevelt Dime",
+                        "PAMP", "Valcambi", "Argor Heraeus", "Engelhard", "Johnson Matthey",
+                        "Scottsdale", "Sunshine Mint", "Asahi", "Geiger", "Heraeus",
+                        "Royal Canadian Mint", "Royal Mint", "Perth Mint", "Austrian Mint",
+                        "South African Mint", "Casa de Moneda",
+                        "1 OZ", "1/2 OZ", "1/4 OZ", "1/10 OZ", "1 TROY OZ", "2 OZ", "5 OZ", "10 OZ",
+                        "1 GRAM", "5 GRAM", "10 GRAM", "20 GRAM", "50 GRAM", "100 GRAM", "1 KG",
+                        "9999", "9995", "999", "999.9", "9167", "900"
                     ]
                     guard self.activate(request, generation: generation) else { return }
                     defer { self.releaseRequest(request) }

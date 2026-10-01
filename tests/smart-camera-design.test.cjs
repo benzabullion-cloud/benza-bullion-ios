@@ -28,5 +28,77 @@ await test('OCR pass selection preserves separate design channel',()=>{const sel
 await test('Actual two-photo flow retains artwork with no front text',async()=>{queued.push({lines:[],designSuggestion:design('canadian_maple_leaf')},{text:'CANADA fine gold 1/10 oz',confidence:.95,designSuggestion:design('unknown')});await context.runSmartCameraScan();assert.equal(context.last.designID,'canadian_maple_leaf');assert.equal(context.last.weight,0);await context.runSmartCameraScan(true);assert.equal(context.last.product,'Canadian Gold Maple Leaf');assert.equal(context.last.weight,.1);assert.equal(context.last.sides,2);assert.equal(context.canUseSmartCameraSuggestion(context.last),true)});
 await test('Fresh scan never inherits artwork from prior item',async()=>{queued.push({text:'fine silver 1 oz',confidence:.95});await context.runSmartCameraScan();assert.equal(context.last.designID,'');assert.equal(context.last.product,'');assert.equal(context.last.sides,1)});
 await test('Actual conflicting photo flow retains failure state',async()=>{queued.push({lines:[],designSuggestion:design('american_eagle')},{text:'CANADA fine gold 1 oz',confidence:.95,designSuggestion:design('canadian_maple_leaf')});await context.runSmartCameraScan();await context.runSmartCameraScan(true);assert.equal(context.canUseSmartCameraSuggestion(context.last),false);assert.match(context.last.warnings.join(' '),/different designs/)});
+await test('Every selectable bullion product has scanner catalogue coverage',()=>{
+  const metals=vm.runInContext('METALS',context);
+  const map=vm.runInContext('PRODUCT_MAP',context);
+  const catalog=vm.runInContext('SMART_CAMERA_CATALOG',context);
+  for(const metal of metals){
+    for(const product of map[metal]||[]){
+      assert.ok(catalog.some(item=>item.product===product&&item.metal===metal),metal+': '+product);
+    }
+  }
+});
+await test('Fragmented Maple rim OCR recombines product metal and weight',()=>{
+  const result=context.selectSmartCameraPhotoEvidence({
+    passes:[
+      {id:0,observations:[{text:'CANADA 9999',confidence:.86}],confidence:.86},
+      {id:1,observations:[{text:'FINE SILVER',confidence:.91}],confidence:.91},
+      {id:2,observations:[{text:'1 OZ ARGENT PUR',confidence:.64}],confidence:.64}
+    ],
+    designSuggestion:design('canadian_maple_leaf')
+  });
+  const r=context.interpretSmartCameraScan(result);
+  assert.equal(r.product,'Canadian Silver Maple Leaf');
+  assert.equal(r.metal,'silver');
+  assert.equal(r.weight,1);
+});
+await test('Representative sovereign families resolve across metals',()=>{
+  const cases=[
+    ['FINE GOLD 1 OZ BRITANNIA','britannia','British Gold Britannia','gold',1],
+    ['FINE SILVER 1 OZ BRITANNIA','britannia','British Silver Britannia','silver',1],
+    ['PLATINUM 1 OZ BRITANNIA','britannia','British Platinum Britannia','platinum',1],
+    ['FINE GOLD 1 OZ KRUGERRAND','krugerrand','South African Gold Krugerrand','gold',1],
+    ['FINE SILVER 1 OZ KRUGERRAND','krugerrand','South African Silver Krugerrand','silver',1],
+    ['PLATINUM 1 OZ PHILHARMONIKER','philharmonic','Austrian Platinum Philharmonic','platinum',1],
+    ['FINE SILVER 1 OZ PANDA','panda','Chinese Silver Panda','silver',1],
+    ['FINE GOLD 1 OZ LIBERTAD','libertad','Mexican Gold Libertad','gold',1]
+  ];
+  for(const [text,id,product,metal,weight] of cases){
+    const r=read(text,id);
+    assert.equal(r.product,product,text);
+    assert.equal(r.metal,metal,text);
+    assert.equal(r.weight,weight,text);
+  }
+});
+await test('Generic bars and rounds resolve for all five metals',()=>{
+  const cases=[
+    ['FINE GOLD 10 OZ','generic_bar','Gold Bar','gold',10],
+    ['FINE SILVER 10 OZ','generic_bar','Silver Bar','silver',10],
+    ['FINE PLATINUM 1 OZ','generic_bar','Platinum Bar','platinum',1],
+    ['FINE PALLADIUM 1 OZ','generic_round','Palladium Round','palladium',1],
+    ['FINE COPPER 1 OZ','generic_round','Copper Bullion Round','copper',1]
+  ];
+  for(const [text,id,product,metal,weight] of cases){
+    const r=read(text,id);
+    assert.equal(r.product,product,text);
+    assert.equal(r.metal,metal,text);
+    assert.equal(r.weight,weight,text);
+  }
+});
+await test('Unsupported sovereign bullion still resolves to safe generic coin category',()=>{
+  const cases=[
+    ['FINE GOLD 1 OZ COIN','Gold Bullion Coin','gold',1],
+    ['FINE SILVER 2 OZ COIN','Silver Bullion Coin','silver',2],
+    ['FINE PLATINUM 1 OZ COIN','Platinum Bullion Coin','platinum',1],
+    ['FINE PALLADIUM 1 OZ COIN','Palladium Bullion Coin','palladium',1],
+    ['FINE COPPER 1 OZ COIN','Copper Bullion Coin','copper',1]
+  ];
+  for(const [text,product,metal,weight] of cases){
+    const r=read(text,'generic_coin');
+    assert.equal(r.product,product,text);
+    assert.equal(r.metal,metal,text);
+    assert.equal(r.weight,weight,text);
+  }
+});
 console.log(count+' design integration checks passed');
 })().catch(e=>{console.error(e);process.exitCode=1});

@@ -60,7 +60,9 @@ test('A weak alternate crop cannot poison a coherent Maple reading',()=>{
  assert.equal(selected.rejectedPasses,1);
 });
 test('Compatible crop can recover a date without stacking a different year',()=>{
- const r=interpreted([pass('UNITED STATES OF AMERICA ONE DOLLAR 1 OZ FINE SILVER'),pass('LIBERTY 2011'),pass('2012',.35)]);
+ const passes=[pass('UNITED STATES OF AMERICA ONE DOLLAR 1 OZ FINE SILVER'),pass('LIBERTY 2011'),pass('2012',.35)];
+ const selected=context.selectSmartCameraPhotoEvidence({passes});
+ const r=context.interpretSmartCameraScan(selected);
  assert.equal(r.product,'American Silver Eagle');assert.equal(r.year,2011);assert.equal(r.weight,1);
 });
 test('Equally complete conflicting metals remain blocked',()=>{
