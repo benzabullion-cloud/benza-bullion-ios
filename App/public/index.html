@@ -7079,6 +7079,12 @@ function selectSmartCameraPhotoEvidence(result){
   let reading=primary.reading;
   for(const c of candidates.slice(1)){
     if(!compatible(reading,c.reading))continue;
+    // Do not let a separate OCR crop stack a second calendar year onto an
+    // already coherent reading. This protects dates from low-confidence glare
+    // artifacts while still allowing a single clean date crop to enrich it.
+    const currentYears=smartCameraYearCandidates(normalizeSmartCameraText(accepted.flatMap(p=>p.photo.lines).join(' ')));
+    const candidateYears=smartCameraYearCandidates(normalizeSmartCameraText(c.photo.lines.join(' ')));
+    if(currentYears.length===1&&candidateYears.length===1&&currentYears[0]!==candidateYears[0])continue;
     const merged={...result,lines:accepted.flatMap(p=>p.photo.lines).concat(c.photo.lines),confidence:primary.photo.confidence};
     const next=interpretSmartCameraScan(merged);
     // Combining partial passes must not invent conflicting weights, years, or purity.
