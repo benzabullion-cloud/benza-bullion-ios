@@ -6905,7 +6905,8 @@ function smartCameraProductGuess(text,metal){
       : METAL_NAMES[metal]+' '+(kind==='bar'?'Bar':'Round');
   return (PRODUCT_MAP[metal]||[]).includes(name)?name:'';
 }
-const SMART_CAMERA_WEIGHT_PARSER_VERSION=2;
+const SMART_CAMERA_WEIGHT_PARSER_VERSION=3;
+const SMART_CAMERA_WEIGHT_MIN_CONFIDENCE=.5;
 function smartCameraWeightReadingLines(lines){
   const normalized=lines.filter(line=>typeof line==='string').flatMap(line=>line.split(/[\r\n]+/))
     .map(line=>normalizeSmartCameraText(line,false));
@@ -6914,7 +6915,7 @@ function smartCameraWeightReadingLines(lines){
   // ONE OCR pass. An isolated number or date never joins another line's unit.
   for(let i=0;i+1<normalized.length;i++){
     if(/\b(?:gold|silver|platinum|palladium|copper|weight|mass)\s+(?:\d+(?:\.\d+)?(?:\s*\/\s*\d+)?|one|two|five|ten|half)$/.test(normalized[i])&&
-      /^(?:troy\s+)?(?:oz|ounces?|onzas?|kg|kilograms?|g|grams?|gr|lbs?|pounds?)\b/.test(normalized[i+1])){
+      /^(?:troy\s+)?(?:oz|ounces?|onzas?)\b/.test(normalized[i+1])){
       readings.push(normalized[i]+' '+normalized[i+1]);
     }
   }
@@ -7280,13 +7281,17 @@ function selectSmartCameraPhotoEvidence(result){
   const candidates=result.passes.map(pass=>{
     const observations=Array.isArray(pass?.observations)?pass.observations:[];
     const lines=observations.filter(o=>typeof o?.text==='string'&&Number(o.confidence)>=.25).map(o=>o.text);
-    const weightLines=smartCameraWeightReadingLines(observations.filter(o=>typeof o?.text==='string'&&Number(o.confidence)>=.25).map(o=>o.text));
+    // Weight is a financial input. A pass average must never promote a weak
+    // number/unit observation because unrelated identity lines are confident.
+    const weightLines=smartCameraWeightReadingLines(observations.filter(o=>typeof o?.text==='string'&&Number(o.confidence)>=SMART_CAMERA_WEIGHT_MIN_CONFIDENCE).map(o=>o.text));
     const photo={lines,weightLines,confidence:Number(pass?.confidence)||0,designSuggestion:result.designSuggestion,designSuggestions:result.designSuggestions};
     const reading=interpretSmartCameraScan(photo);
     const score=(reading.usable?3:0)+(reading.metal?3:0)+(reading.product?4:0)+(reading.weight>0?3:0)+
       (reading.purity?1:0)+(reading.year ? .25 : 0)+photo.confidence-reading.warnings.length*12;
     return {photo,reading,score,id:pass?.id};
-  }).filter(c=>c.photo.lines.length).sort((a,b)=>b.score-a.score);
+  }).filter(c=>c.photo.lines.length&&!(c.photo.weightLines.length===0&&c.photo.lines.every(line=>
+    /^(?:\d+(?:\.\d+)?(?:\s*\/\s*\d+)?)\s*(?:troy\s*)?(?:oz|ounces?|onzas?|kg|kilograms?|g|grams?|gr|lbs?|pounds?)$/.test(normalizeSmartCameraText(line,false)))))
+    .sort((a,b)=>b.score-a.score);
   if(!candidates.length)return {...result,lines:[],weightLines:[],text:'',confidence:0,selectedPasses:0,rejectedPasses:result.passes.length};
   const primary=candidates[0];
   const accepted=[primary];
@@ -7608,15 +7613,20 @@ async function runSmartCameraScan(append=false,source='camera'){
         const lines=observations.map(o=>o.text);
         const metals=smartCameraMetalEvidence(normalizeSmartCameraText(lines.join(' ')));
         const metal=metals.length===1?metals[0]:'';
-        const tokens=smartCameraWeightReadingLines(lines).flatMap(line=>smartCameraWeightTokens(line,metal));
+        const trusted=observations.filter(o=>Number(o.confidence)>=SMART_CAMERA_WEIGHT_MIN_CONFIDENCE);
+        const tokens=smartCameraWeightReadingLines(trusted.map(o=>o.text)).flatMap(line=>smartCameraWeightTokens(line,metal));
+        const weakWeightCount=observations.filter(o=>Number(o.confidence)<SMART_CAMERA_WEIGHT_MIN_CONFIDENCE)
+          .reduce((count,o)=>count+smartCameraWeightTokens(normalizeSmartCameraText(o.text,false),metal).length,0);
         const weights=[...new Set(tokens.filter(token=>!token.reason).map(token=>token.value))];
         const rejectedReasons=tokens.filter(token=>token.reason).reduce((counts,token)=>{
           counts[token.reason]=(counts[token.reason]||0)+1;return counts;
         },{});
-        if(!tokens.length)return [];
+        if(weakWeightCount)rejectedReasons.lowConfidence=weakWeightCount;
+        if(!tokens.length&&!weakWeightCount)return [];
         return [{pass:pass.id,weightsOz:weights,rejectedReasons,confidence:Number(pass.confidence)||0,
           direct:observations.flatMap((o,lineIndex)=>{
-            const weights=smartCameraWeightCandidates(normalizeSmartCameraText(o.text,false),metal);
+            const weights=Number(o.confidence)>=SMART_CAMERA_WEIGHT_MIN_CONFIDENCE
+              ?smartCameraWeightCandidates(normalizeSmartCameraText(o.text,false),metal):[];
             return weights.length?[{lineIndex,weightsOz:weights,confidence:Number(o.confidence)||0}]:[];
           })}];
       })};

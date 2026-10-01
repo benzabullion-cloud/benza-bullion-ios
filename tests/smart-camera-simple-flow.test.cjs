@@ -78,7 +78,7 @@ test('Fresh retry clears diagnostic and recognized evidence',()=>{
 test('Successful result retains optional local build and weight-parser diagnostics',()=>{
  vm.runInContext('smartCameraLastDiagnostic={engineVersion:3}',context);
  context.renderSmartCameraAnalysis(complete);assert.equal(get('smartCameraDiagnostics').hidden,false);
- assert.equal(JSON.parse(get('smartCameraDiagnosticText').textContent).weightParserVersion,2);
+ assert.equal(JSON.parse(get('smartCameraDiagnosticText').textContent).weightParserVersion,3);
 });
 console.log(count+' scanner review checks passed');
 
