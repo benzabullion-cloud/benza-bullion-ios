@@ -54,9 +54,14 @@ import Vision
                 try VNImageRequestHandler(cgImage:photo).perform([request])
                 let observations=(request.results ?? []).compactMap { observation -> [String:Any]? in
                     guard let text=observation.topCandidates(1).first,text.confidence>=0.25 else {return nil}
-                    return ["text":text.string,"confidence":Double(text.confidence)]
+                    let line=text.string.trimmingCharacters(in:.whitespacesAndNewlines)
+                    guard !line.isEmpty else {return nil}
+                    return ["text":line,"confidence":Double(text.confidence)]
                 }
-                readings.append(["id":index,"confidence":observations.compactMap { $0["confidence"] as? Double }.max() ?? 0,"observations":observations,"elapsedMs":Int(Date().timeIntervalSince(passStarted)*1000)])
+                // Match the native bridge's Float sum / observation count.
+                let confidenceSum=observations.reduce(Float(0)) { sum,observation in sum+Float(observation["confidence"] as? Double ?? 0) }
+                let confidence=observations.isEmpty ? 0 : Double(confidenceSum)/Double(observations.count)
+                readings.append(["id":index,"confidence":confidence,"observations":observations,"elapsedMs":Int(Date().timeIntervalSince(passStarted)*1000)])
             }
             report.append(["side":side,"passes":readings,"rimImages":rims.count,"rimElapsedMs":rimElapsedMs,"elapsedMs":Int(Date().timeIntervalSince(started)*1000)])
         }
@@ -65,4 +70,3 @@ import Vision
         print(String(decoding:json,as:UTF8.self))
     }
 }
-
