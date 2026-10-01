@@ -4,7 +4,7 @@ import Vision
 
 /// Geometry only: never supplies a bullion identity, metal, purity or weight.
 public enum BenzaCoinRim {
-    public static func readingImages(_ image: CGImage, isCanceled: () -> Bool = { false }) -> [CGImage] {
+    public static func readingImages(_ image: CGImage, maximumCandidates: Int = 2, isCanceled: () -> Bool = { false }) -> [CGImage] {
         guard !isCanceled() else { return [] }
         let request = VNDetectContoursRequest()
         request.maximumImageDimension = 768
@@ -45,7 +45,7 @@ public enum BenzaCoinRim {
                 abs($0.width-candidate.0.width)<0.075
             }) { continue }
             boxes.append(candidate.0)
-            if boxes.count == 3 { break }
+            if boxes.count == max(1,min(3,maximumCandidates)) { break }
         }
         return boxes.flatMap { box -> [CGImage] in
             guard !isCanceled() else { return [] }
