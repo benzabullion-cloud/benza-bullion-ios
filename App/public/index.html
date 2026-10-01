@@ -6892,9 +6892,9 @@ function smartCameraDesignCatalogMatch(design,text,metal){
   }
   const item=SMART_CAMERA_CATALOG.find(item=>item.product===product&&item.metal===resolvedMetal);
   if(!item)return null;
-  if(design==='walking_liberty_half_dollar'&&!/\b(?:half dollar|50 cents?|liberty)\b/.test(text))return null;
-  if(design==='morgan_dollar'&&!/\b(?:morgan|one dollar|dollar)\b/.test(text))return null;
-  if(design==='peace_dollar'&&!/\b(?:peace|one dollar|dollar)\b/.test(text))return null;
+  // Historic U.S. coin artwork is too confusable to let visual identity alone
+  // create a product. Those products must still be established by the OCR catalogue.
+  if(['walking_liberty_half_dollar','morgan_dollar','peace_dollar'].includes(design))return null;
   return {item,strongHits:['on-device artwork family'+(metal?' + metal inscription':'')],supportHits:[],score:7};
 }
 function smartCameraDesignCompatibleProduct(design,product){
