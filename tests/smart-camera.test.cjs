@@ -101,4 +101,82 @@ test('Missing data has a specific failure reason',()=>{
  assert.match(context.smartCameraFailureReason(scan('Fine silver 1 OZ')),/product could not/);
  assert.match(context.smartCameraFailureReason(scan('Fine silver replica 1 OZ')),/replica/i);
 });
+test('Every existing holding title can be matched literally across all five metals',()=>{
+ const map=vm.runInContext('PRODUCT_MAP',context),catalog=vm.runInContext('SMART_CAMERA_CATALOG',context);
+ for(const [metal,products] of Object.entries(map))for(const product of products){
+  const profile=catalog.find(p=>p.product===product&&p.metal===metal);
+  const year=product==='U.S. Copper Cents'?1980:profile.yearMin||2026;
+  assert.equal(scan(product+' '+year+' '+metal).product,product,product);
+ }
+});
+test('Native OCR hints cover all holding titles without restricting recognition',()=>{
+ const native=fs.readFileSync('App/SceneDelegate.swift','utf8');
+ const words=JSON.parse(native.match(/request\.customWords\s*=\s*(\[[\s\S]*?\])/)[1]);
+ for(const product of vm.runInContext('Object.values(PRODUCT_MAP).flat()',context))assert.ok(words.includes(product),product);
+ assert.match(native,/automaticallyDetectsLanguage = true/);
+});
+test('Split family inscriptions resolve beyond Canadian and Australian coins',()=>{
+ const cases=[['A U S T R A L I A N K O O K A B U R R A FINE SILVER 1 OZ','Australian Silver Kookaburra'],
+ ['B R I T A N N I A FINE PLATINUM 1 OZ','British Platinum Britannia'],
+ ['K R U G E R R A N D FINE GOLD 1 OZ','South African Gold Krugerrand'],
+ ['P H I L H A R M O N I K E R FINE SILVER 1 OZ','Austrian Silver Philharmonic']];
+ for(const [text,product] of cases)assert.equal(scan(text).product,product);
+});
+test('Overlapping literal titles resolve exact denominations',()=>{
+ assert.equal(scan('Mexican 2.5 Peso Gold').product,'Mexican 2.5 Peso Gold');
+ assert.equal(scan('British Gold Half Sovereign').product,'British Gold Half Sovereign');
+ assert.equal(scan('Austrian 100 Corona Gold').product,'Austrian 100 Corona Gold');
+});
+test('Unicode inscriptions survive normalization even without a matching profile',()=>{
+ assert.match(context.normalizeSmartCameraText('中华人民共和国 熊猫 银 2026'),/熊猫 银/);
+});
+test('Actual historic dime inscriptions need no silver or ounce marking',()=>{
+ for(const [year,product] of [[1908,'Barber Dime'],[1944,'Mercury Dime'],[1958,'Roosevelt Silver Dime']]){
+  const r=scan('LIBERTY '+year+' UNITED STATES OF AMERICA ONE DIME E PLURIBUS UNUM',{sides:2});
+  assert.equal(r.product,product);assert.equal(r.metal,'silver');assert.equal(r.purity,'.900 silver');
+  assert.ok(Math.abs(r.weight-2.25/31.1034768)<1e-10);assert.equal(r.inferredWeight,true);assert.equal(r.inferredMetal,true);
+  assert.equal(r.usable,true);assert.equal(r.warnings.length,0);
+ }
+});
+test('Actual historic quarters fill fine silver rather than gross coin mass',()=>{
+ for(const [year,product] of [[1908,'Barber Quarter'],[1925,'Standing Liberty Quarter'],[1964,'Washington Silver Quarter']]){
+  const r=scan('LIBERTY '+year+' UNITED STATES OF AMERICA QUARTER DOLLAR',{sides:2});
+  assert.equal(r.product,product);assert.ok(Math.abs(r.weight-5.625/31.1034768)<1e-10);assert.equal(r.warnings.length,0);
+ }
+});
+test('Historic half dollars preserve standard content without inventing commemorative identity',()=>{
+ const generic=scan('UNITED STATES OF AMERICA HALF DOLLAR 1925',{sides:2});
+ assert.equal(generic.product,'U.S. 90% Silver Coinage');assert.ok(Math.abs(generic.weight-11.25/31.1034768)<1e-10);
+ const kennedy=scan('LIBERTY 1964 UNITED STATES OF AMERICA HALF DOLLAR',{sides:2});
+ assert.equal(kennedy.product,'1964 Kennedy Half Dollar');assert.equal(kennedy.purity,'.900 silver');
+});
+test('Missing country, denomination or date never supplies historical metal weight',()=>{
+ for(const text of ['ONE DIME 1964','UNITED STATES OF AMERICA ONE DIME','UNITED STATES OF AMERICA 1964',
+ 'CANADA ONE DIME 1964','AUSTRALIA QUARTER DOLLAR 1964','UNITED STATES OF AMERICA ONE DIME 1880']){
+  const r=scan(text);assert.equal(r.weight,0,text);assert.equal(r.inferredMetal,false,text);
+ }
+});
+test('Modern clad dates and unsupported compositions do not inherit 90 percent silver',()=>{
+ for(const text of ['UNITED STATES OF AMERICA ONE DIME 1965','UNITED STATES OF AMERICA QUARTER DOLLAR 2026',
+ 'UNITED STATES OF AMERICA HALF DOLLAR 1967','UNITED STATES OF AMERICA ONE DIME 1944 GOLD',
+ 'UNITED STATES OF AMERICA ONE DIME 1944 REPLICA','UNITED STATES OF AMERICA QUARTER DOLLAR 1931']){
+  const r=scan(text);assert.equal(r.weight,0,text);assert.equal(r.inferredMetal,false,text);
+ }
+});
+test('Ambiguous historic date or denomination cannot supply standard weight',()=>{
+ for(const text of ['UNITED STATES OF AMERICA ONE DIME 1964 1965','UNITED STATES OF AMERICA ONE DIME QUARTER DOLLAR 1964'])assert.equal(scan(text).weight,0,text);
+ const overlap=scan('UNITED STATES OF AMERICA ONE DIME 1916');
+ assert.equal(overlap.product,'U.S. 90% Silver Coinage');assert.ok(overlap.weight>0);
+});
+test('Historic gross gram inscriptions convert to fine content while conflicting weight stays blank',()=>{
+ const prefix='UNITED STATES OF AMERICA QUARTER DOLLAR 1964 ';
+ assert.ok(Math.abs(scan(prefix+'6.25 G').weight-5.625/31.1034768)<1e-10);
+ const conflict=scan(prefix+'1 OZ');assert.equal(conflict.weight,0);assert.match(conflict.warnings.join(' '),/historical silver specification/);
+ assert.equal(scan(prefix+'6.25 G 1 OZ').weight,0);
+ assert.match(scan(prefix+'.999 SILVER').warnings.join(' '),/Purity disagrees/);
+});
+test('Separate native readings combine historic country denomination and date',()=>{
+ const selected=context.selectSmartCameraPhotoEvidence({passes:[pass('UNITED STATES OF AMERICA ONE DIME'),pass('LIBERTY 1944')]});
+ const r=context.interpretSmartCameraScan(selected);assert.equal(r.product,'Mercury Dime');assert.ok(r.weight>0);assert.equal(r.warnings.length,0);
+});
 console.log(count+' scanner regression checks passed');
