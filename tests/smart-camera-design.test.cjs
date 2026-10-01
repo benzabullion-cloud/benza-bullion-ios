@@ -85,5 +85,20 @@ await test('Generic bars and rounds resolve for all five metals',()=>{
     assert.equal(r.weight,weight,text);
   }
 });
+await test('Unsupported sovereign bullion still resolves to safe generic coin category',()=>{
+  const cases=[
+    ['FINE GOLD 1 OZ COIN','Gold Bullion Coin','gold',1],
+    ['FINE SILVER 2 OZ COIN','Silver Bullion Coin','silver',2],
+    ['FINE PLATINUM 1 OZ COIN','Platinum Bullion Coin','platinum',1],
+    ['FINE PALLADIUM 1 OZ COIN','Palladium Bullion Coin','palladium',1],
+    ['FINE COPPER 1 OZ COIN','Copper Bullion Coin','copper',1]
+  ];
+  for(const [text,product,metal,weight] of cases){
+    const r=read(text,'generic_coin');
+    assert.equal(r.product,product,text);
+    assert.equal(r.metal,metal,text);
+    assert.equal(r.weight,weight,text);
+  }
+});
 console.log(count+' design integration checks passed');
 })().catch(e=>{console.error(e);process.exitCode=1});
