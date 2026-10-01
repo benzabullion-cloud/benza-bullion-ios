@@ -7446,6 +7446,7 @@ async function openSmartCamera(){
         : '<strong>Smart Camera is a Pro feature</strong>Upgrade to Benza Bullion Pro to scan supported bullion and prefill holding details.';
   }
   smartCameraSession++;
+  pendingScannerPhotoFiles=[];
   clearSmartCameraEvidence();
   if(status)status.textContent=active
     ? ''
@@ -7560,10 +7561,11 @@ function openAdd(){
   update();
   addScreen.classList.add('show');
 }
-function closeAdd(){
+function closeAdd({preserveScannerPhotos=false}={}){
   addScreen.classList.remove('show');
   editingHoldingIndex=null;
   setHoldingSheetMode('add');
+  if(!preserveScannerPhotos)pendingScannerPhotoFiles=[];
 }
 function selectMetal(m, preserveValues=false){
   metal=m;
@@ -9764,6 +9766,7 @@ async function saveHolding(){
   const notes=proActive?(document.getElementById('holdingNotes')?.value||'').trim():'';
   const photoFile=proActive?document.getElementById('holdingPhoto')?.files?.[0]:null;
   const receiptFile=proActive?document.getElementById('holdingReceipt')?.files?.[0]:null;
+  const scannerPhotoFiles=proActive?pendingScannerPhotoFiles.slice():[];
   const originalHolding=editingHoldingIndex!==null?holdings[editingHoldingIndex]:null;
   const portfolioValueBeforeMutation=currentPortfolioMarketValue();
 
@@ -9832,18 +9835,15 @@ async function saveHolding(){
 
       rebaseLiveChartForPortfolioFlow(portfolioValueBeforeMutation,currentPortfolioMarketValue());
       renderHoldings();
-      closeAdd();
+      if(scannerPhotoFiles.length)await finishScannerPhotoUploads(row.id,scannerPhotoFiles);
+      pendingScannerPhotoFiles=[];
+      closeAdd({preserveScannerPhotos:true});
       setButtonBusy(button,false);
       if(photoFile||receiptFile)finishHoldingAttachmentUploads({
         holdingId:row.id,photoFile,receiptFile,
         oldPhotoPath:originalHolding?.photoPath||null,
         oldReceiptPath:originalHolding?.receiptPath||null
       });
-      if(pendingScannerPhotoFiles.length){
-        const files=pendingScannerPhotoFiles.slice();
-        pendingScannerPhotoFiles=[];
-        finishScannerPhotoUploads(row.id,files);
-      }
       Promise.resolve()
         .then(()=>loadActivityFromSupabase())
         .then(()=>recordPortfolioSnapshot(true))
@@ -9884,14 +9884,11 @@ async function saveHolding(){
 
     rebaseLiveChartForPortfolioFlow(portfolioValueBeforeMutation,currentPortfolioMarketValue());
     renderHoldings();
-    closeAdd();
+    if(scannerPhotoFiles.length)await finishScannerPhotoUploads(row.id,scannerPhotoFiles);
+    pendingScannerPhotoFiles=[];
+    closeAdd({preserveScannerPhotos:true});
     setButtonBusy(button,false);
     if(photoFile||receiptFile)finishHoldingAttachmentUploads({holdingId:row.id,photoFile,receiptFile});
-    if(pendingScannerPhotoFiles.length){
-      const files=pendingScannerPhotoFiles.slice();
-      pendingScannerPhotoFiles=[];
-      finishScannerPhotoUploads(row.id,files);
-    }
     Promise.resolve()
       .then(()=>loadActivityFromSupabase())
       .then(()=>recordPortfolioSnapshot(true))
