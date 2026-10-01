@@ -6,9 +6,14 @@ import Vision
 @main struct PhotoOCR {
     static func main() throws {
         let root = URL(fileURLWithPath: "experiments/private-vision/NativeCore/Tests/BenzaPrivateVisionTests/Fixtures")
+        // Use the app's complete OCR vocabulary, never a fixture-specific dictionary.
+        let app=try String(contentsOf:URL(fileURLWithPath:"App/SceneDelegate.swift"),encoding:.utf8)
+        let pattern=try NSRegularExpression(pattern:"request\\.customWords\\s*=\\s*(\\[[\\s\\S]*?\\])")
+        guard let match=pattern.firstMatch(in:app,range:NSRange(app.startIndex...,in:app)),let range=Range(match.range(at:1),in:app) else { throw NSError(domain:"OCRSettings",code:1) }
+        let vocabulary=try JSONDecoder().decode([String].self,from:Data(app[range].utf8))
         var report: [[String: Any]] = []
         for side in ["obverse","reverse"] {
-            let encoded=try String(contentsOf: root.appendingPathComponent("maple-\(side).b64"))
+            let encoded=try String(contentsOf: root.appendingPathComponent("maple-\(side).b64"),encoding:.utf8)
             guard let data=Data(base64Encoded: encoded.trimmingCharacters(in: .whitespacesAndNewlines)),
                   let source=CGImageSourceCreateWithData(data as CFData,nil),
                   let raw=CGImageSourceCreateImageAtIndex(source,0,nil),
@@ -40,14 +45,14 @@ import Vision
                 let supported=(try? request.supportedRecognitionLanguages()) ?? ["en-US"]
                 request.recognitionLanguages=["en-US","fr-FR","es-ES","de-DE"].filter { supported.contains($0) }
                 request.minimumTextHeight=0.002
-                request.customWords=["CANADA","FINE SILVER","ARGENT PUR","1 OZ","9999"]
+                request.customWords=vocabulary
                 let passStarted=Date()
                 try VNImageRequestHandler(cgImage:photo).perform([request])
                 let observations=(request.results ?? []).compactMap { observation -> [String:Any]? in
                     guard let text=observation.topCandidates(1).first,text.confidence>=0.25 else {return nil}
                     return ["text":text.string,"confidence":Double(text.confidence)]
                 }
-                readings.append(["id":index,"observations":observations,"elapsedMs":Int(Date().timeIntervalSince(passStarted)*1000)])
+                readings.append(["id":index,"confidence":observations.compactMap { $0["confidence"] as? Double }.max() ?? 0,"observations":observations,"elapsedMs":Int(Date().timeIntervalSince(passStarted)*1000)])
             }
             report.append(["side":side,"passes":readings,"rimImages":rims.count,"elapsedMs":Int(Date().timeIntervalSince(started)*1000)])
         }
