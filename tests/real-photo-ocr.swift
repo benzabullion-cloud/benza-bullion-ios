@@ -20,11 +20,7 @@ import Vision
           guard let caseID=fixture["id"] as? String,let photos=fixture["photos"] as? [[String:String]],photos.count==2 else { throw NSError(domain:"PhotoManifest",code:2) }
           for photo in photos {
             guard let side=photo["side"],let path=photo["path"] else { throw NSError(domain:"PhotoManifest",code:3) }
-            let file:URL
-            if path.hasPrefix("https://www.usmint.gov/") {
-                guard let remote=URL(string:path) else { throw NSError(domain:"PhotoManifest",code:4) }
-                file=remote
-            } else { file=URL(fileURLWithPath:path) }
+            let file=URL(fileURLWithPath:path)
             let bytes=try Data(contentsOf:file)
             let data:Data
             if file.pathExtension == "b64" {

@@ -14,8 +14,8 @@ weight parser version 4, confidence thresholds and conflict handling are unchang
 - `node tests/app-sweep.cjs`: Chromium and WebKit screen checks plus actual
   reviewed-scan handoff, quantity/cost calculation and two-photo save. Cloud
   services are mocked; these tests do not prove production database permissions.
-- Native CI: Apple Vision reads the authorized silver Maple pair and official
-  2025 platinum Eagle pair. The latter is a studio image, not a handheld test.
+- Native CI: Apple Vision reads the authorized silver Maple pair. Additional
+  coin pairs can run through the same manifest gate; they are not yet verified.
 - CI stores separate inscription and photo benchmark JSON artifacts. The photo
   report counts correct, blank and incorrect fields separately, with pair timing.
   A missing side or missing output fails the gate.
@@ -37,9 +37,9 @@ BENZA_SCANNER_PHOTO_MANIFEST=/absolute/path/private-cases.json /tmp/benza-photo-
 BENZA_SCANNER_PHOTO_MANIFEST=/absolute/path/private-cases.json node tests/real-photo-gate.cjs
 ```
 
-Only the test runner downloads explicitly listed U.S. Mint reference images.
-The app itself stays on-device. Future official image URL changes fail the test,
-not the production scanner. The runner uses shared rim processing and OCR
+The benchmark and app require no external image server. An attempted official
+U.S. Mint platinum Eagle pair was blocked by HTTP 403 and is not counted as
+verified photo coverage. The runner uses shared rim processing and OCR
 settings but a smaller pass set than the actual iOS camera; final phone checks
 are still required.
 
@@ -53,6 +53,6 @@ both saved photos and reopening the holding. Test camera cancellation and the
 photo-picker path. Wrong metal/weight, stale evidence or failed saving block
 release; an unreadable year or uncommon name can be completed in review.
 
-Do not describe 143 passing text cases or two photo pairs as a catalog-wide
+Do not describe 143 passing text cases or one photo pair as a catalog-wide
 camera accuracy rate. Broader camera coverage remains unverified until more
 authorized real photo pairs or phone trials are recorded.

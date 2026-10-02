@@ -21,29 +21,6 @@
         "mint": "Royal Canadian Mint",
         "usable": true
       }
-    },
-    {
-      "id": "platinum-eagle-2025-official",
-      "source": "https://www.usmint.gov/learn/coins-and-medals/collectible-coins/american-eagle/2025-platinum-proof-right-to-petition",
-      "photos": [
-        {
-          "side": "obverse",
-          "path": "https://www.usmint.gov/content/usmint/us/en/learn/coins-and-medals/collectible-coins/american-eagle/2025-platinum-proof-right-to-petition/_jcr_content/root/container_1426747781/imagegallerypdp/item_1772815224816.coreimg.jpeg/1772815293583/2025-american-eagle-platinum-proof-coin-obverse.jpeg"
-        },
-        {
-          "side": "reverse",
-          "path": "https://www.usmint.gov/content/usmint/us/en/learn/coins-and-medals/collectible-coins/american-eagle/2025-platinum-proof-right-to-petition/_jcr_content/root/container_1426747781/imagegallerypdp/item_1772815226239.coreimg.jpeg/1772815315076/2025-american-eagle-platinum-proof-coin-reverse.jpeg"
-        }
-      ],
-      "expected": {
-        "metal": "platinum",
-        "product": "American Platinum Eagle",
-        "weight": 1,
-        "year": 2025,
-        "purity": ".9995",
-        "mint": "United States Mint",
-        "usable": true
-      }
     }
   ]
 }
