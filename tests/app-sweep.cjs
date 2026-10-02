@@ -43,12 +43,47 @@ window.supabase={createClient:()=>({
     states++;
    }
   }
+  console.log('Check purchase cost and analytics fixtures in '+engineName);
+  const purchaseFixture=await page.evaluate(async()=>{
+    closeSmartCamera();openManualAdd();selectMetal('silver');qty.value='3';weight.value='1';cost.value='65';update();
+    const perPiece={total:purchaseTotalCost(cost.value,qty.value,'each'),summary:document.getElementById('purchaseCostSummary').textContent};
+    document.getElementById('purchaseCostMode').value='total';changePurchaseCostMode();
+    const totalMode={input:cost.value,total:purchaseTotalCost(cost.value,qty.value,'total')};
+    document.getElementById('purchaseCostMode').value='each';changePurchaseCostMode();
+    const eachAgain=cost.value;
+    await saveHolding();
+    const saved=holdings.at(-1).cost;
+    holdings=[{id:'eagle',metal:'silver',product:'American Silver Eagle',qty:3,weight:1,oz:3,cost:195,costKnown:true,date:'2026-09-09'},
+      {id:'round',metal:'silver',product:'Silver Round',qty:1,weight:1,oz:1,cost:65,costKnown:true,date:'2026-09-09'},
+      {id:'maple',metal:'silver',product:'Canadian Silver Maple Leaf',qty:1,weight:1,oz:1,cost:65,costKnown:true,date:'2026-09-09'}];
+    livePrices.silver=61.23;renderAnalytics();renderProAnalytics();
+    const analytics={value:document.getElementById('anTotalValue').textContent,cost:document.getElementById('anCost').textContent,
+      gain:document.getElementById('anTotalGain').textContent,avg:document.getElementById('anSilverAvg').textContent,
+      ret:document.getElementById('anSilverReturn').textContent,largest:document.getElementById('anLargestShare').textContent,
+      scenario:document.getElementById('anSensitivity').textContent,detail:proHoldingInsightHtml(holdings[0])};
+    const recovery=proHoldingInsightHtml({...holdings[0],cost:225});
+    holdings[0].costKnown=false;renderAnalytics();renderProAnalytics();
+    const missing={cost:document.getElementById('anCost').textContent,ret:document.getElementById('anSilverReturn').textContent,detail:proHoldingInsightHtml(holdings[0])};
+    const invalid=[purchaseTotalCost('',3,'each'),purchaseTotalCost('65',0,'each'),purchaseTotalCost('-1',3,'total')];
+    const fractional=purchaseTotalCost('0.10',3,'each');
+    holdings=[];return {perPiece,totalMode,eachAgain,saved,analytics,recovery,missing,invalid,fractional};
+  });
+  assert.equal(purchaseFixture.perPiece.total,195);assert.match(purchaseFixture.perPiece.summary,/195\.00.*total cost basis/);
+  assert.equal(purchaseFixture.totalMode.input,'195');assert.equal(purchaseFixture.totalMode.total,195);
+  assert.equal(purchaseFixture.eachAgain,'65');assert.equal(purchaseFixture.saved,195);
+  assert.equal(purchaseFixture.analytics.value,'$306.15');assert.equal(purchaseFixture.analytics.cost,'$325.00');
+  assert.equal(purchaseFixture.analytics.gain,'-$18.85 (-5.80%)');assert.equal(purchaseFixture.analytics.avg,'$65.00');
+  assert.equal(purchaseFixture.analytics.ret,'-5.80%');assert.equal(purchaseFixture.analytics.largest,'60.0%');
+  assert.match(purchaseFixture.analytics.scenario,/\$275\.54/);assert.match(purchaseFixture.analytics.scenario,/\$336\.77/);
+  assert.match(purchaseFixture.recovery,/\+22\.49%/);assert.equal(purchaseFixture.missing.cost,'Unavailable');
+  assert.equal(purchaseFixture.missing.ret,'—');assert.doesNotMatch(purchaseFixture.missing.detail,/0\.00%|NaN|Infinity/);
+  assert.deepEqual(purchaseFixture.invalid,[null,null,null]);assert.equal(purchaseFixture.fractional,0.3);
   console.log('Check save and account flows in '+engineName);
   await page.evaluate(()=>{closeSmartCamera();openManualAdd();document.getElementById('cost').value='0';document.getElementById('holdingYear').value='';document.getElementById('holdingPurity').value='';document.getElementById('holdingMint').value='';});
   await page.evaluate(()=>saveHolding());
   assert.equal(await page.evaluate(()=>holdings.length),1,'Optional inventory fields may remain blank');
   assert.equal(await page.evaluate(()=>holdings[0].cost),0,'An optional purchase price may remain zero');
-  await page.evaluate(()=>{openManualAdd();sweep.failRpc=true;});await page.evaluate(()=>saveHolding());
+  await page.evaluate(()=>{openManualAdd();cost.value='65';sweep.failRpc=true;});await page.evaluate(()=>saveHolding());
   assert.equal(await page.locator('#holdingSaveBtn').isEnabled(),true,'Retry must remain available after a failed save');
   assert.ok(await page.evaluate(()=>sweep.alerts.includes('You appear to be offline. Reconnect and try again.')),'A thrown network error must show the offline recovery message');
   assert.equal(await page.evaluate(()=>holdings.length),1,'Failed save cannot invent a holding');

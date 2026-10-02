@@ -75,3 +75,54 @@ test('sale function source matches deployed cent rounding',()=>{assert.match(sal
 test('statistics patch has no recovered syntax typo',()=>{assert.doesNotMatch(html,/async const SUPABASE_PAGE_SIZE/)});
 
 console.log('PASS 19 statistics fixture groups plus source/deployment guards');
+
+// Exercise functions extracted verbatim from the bundled app, rather than duplicated formulas.
+const vm=require('node:vm');
+function appFunction(name){
+  const start=html.indexOf('function '+name+'(');
+  assert.ok(start>=0,name+' exists');
+  const end=html.indexOf('\n}',start)+2;
+  return html.slice(start,end);
+}
+test('actual purchase entry distinguishes each and total, including cents and invalid input',()=>{
+  const context=vm.createContext({});vm.runInContext(appFunction('roundCurrency')+'\n'+appFunction('purchaseTotalCost'),context);
+  const calc=context.purchaseTotalCost;
+  assert.equal(calc('65',3,'each'),195);assert.equal(calc('65',3,'total'),65);
+  assert.equal(calc('0.10',3,'each'),0.3);assert.equal(calc('0',3,'each'),0);
+  for(const args of [['',3,'each'],['65',0,'each'],['-1',3,'total'],['Infinity',3,'each']])assert.equal(calc(...args),null);
+});
+test('actual per-holding recovery and unknown basis output',()=>{
+  const context=vm.createContext({livePrices:{silver:50},holdingHasCostBasis:h=>h.costKnown!==false,
+    isProActive:()=>true,money:n=>'$'+n.toFixed(2),signedMoney:n=>(n>=0?'+':'-')+'$'+Math.abs(n).toFixed(2),pct:n=>n.toFixed(2)+'%'});
+  vm.runInContext(appFunction('proHoldingInsightHtml'),context);
+  const h={metal:'silver',oz:1,cost:75,costKnown:true};
+  assert.match(context.proHoldingInsightHtml(h),/Spot move to break-even.*\+50\.00%/);
+  assert.doesNotMatch(context.proHoldingInsightHtml({...h,costKnown:false}),/0\.00%|NaN|Infinity/);
+  assert.doesNotMatch(context.proHoldingInsightHtml({...h,cost:0}),/NaN|Infinity/);
+});
+test('all inline app scripts parse',()=>{
+  for(const script of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);
+});
+test('actual analytics renderer matches five-piece screenshot fixture and unknown cost',()=>{
+  const nodes=new Map();
+  const node=()=>({textContent:'',innerHTML:'',children:[],style:{},classList:{remove(){},add(){}},appendChild(child){this.children.push(child)}});
+  const document={getElementById(id){if(!nodes.has(id))nodes.set(id,node());return nodes.get(id)},createElement:node};
+  const rows=[{metal:'silver',product:'American Silver Eagle',qty:3,weight:1,oz:3,cost:195,costKnown:true,date:'2026-09-09'},
+    {metal:'silver',product:'Silver Round',qty:1,weight:1,oz:1,cost:65,costKnown:true,date:'2026-09-09'},
+    {metal:'silver',product:'Canadian Silver Maple Leaf',qty:1,weight:1,oz:1,cost:65,costKnown:true,date:'2026-09-09'}];
+  const context=vm.createContext({document,holdings:rows,METALS:metals,METAL_NAMES:Object.fromEntries(metals.map(m=>[m,m])),
+    livePrices:{gold:4180.1,silver:61.23,platinum:1724,palladium:1206,copper:.41},AVOIR_OZ_TO_TROY_OZ:28.349523125/31.1034768,
+    activeAnalyticsTab:'performance',setAnalyticsTab(){},renderStackScore(){},renderMilestones(){},updateBullionCalculator(){},
+    formatDate:s=>s,escapeBullionHtml:s=>s});
+  for(const name of ['roundCurrency','holdingHasCostBasis','metalStats','renderAnalytics'])vm.runInContext(appFunction(name),context);
+  vm.runInContext("function money(n){return '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})};function pct(n){return n.toFixed(2)+'%'};function signedMoney(n){return (n>=0?'+':'-')+money(Math.abs(n))};function setReturnClass(){}",context);
+  context.renderAnalytics();
+  assert.equal(nodes.get('anTotalValue').textContent,'$306.15');assert.equal(nodes.get('anCost').textContent,'$325.00');
+  assert.equal(nodes.get('anTotalGain').textContent,'-$18.85 (-5.80%)');assert.equal(nodes.get('anSilverAvg').textContent,'$65.00');
+  assert.equal(nodes.get('anSilverReturn').textContent,'-5.80%');assert.equal(nodes.get('anLargestShare').textContent,'60.0%');
+  assert.equal(nodes.get('anOunces').textContent,'5.00 troy oz eq.');
+  assert.match(nodes.get('anSensitivity').children[0].innerHTML,/\$275\.54/);
+  assert.match(nodes.get('anSensitivity').children[3].innerHTML,/\$336\.77/);
+  rows[0].costKnown=false;context.renderAnalytics();
+  assert.equal(nodes.get('anCost').textContent,'Unavailable');assert.equal(nodes.get('anSilverReturn').textContent,'—');
+});
