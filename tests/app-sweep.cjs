@@ -46,8 +46,8 @@ window.supabase={createClient:()=>({
   console.log('Check scanner assistant editor in '+engineName);
   for(const width of [320,390,768])for(const theme of ['dark','light']){
    await page.setViewportSize({width,height:844});
-   await page.evaluate(theme=>{
-    document.documentElement.dataset.theme=theme;openSmartCamera();
+   await page.evaluate(async theme=>{
+    document.documentElement.dataset.theme=theme;await openSmartCamera();
     renderSmartCameraAnalysis(interpretSmartCameraScan({text:'Fine silver',sides:2,confidence:.95}));openSmartScanEditor();
    },theme);
    await page.selectOption('#smartEditMetal','silver');await page.selectOption('#smartEditProduct','Canadian Silver Maple Leaf');
