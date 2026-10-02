@@ -61,6 +61,18 @@ window.supabase={createClient:()=>({
    assert.equal(await page.locator('#holdingPurity').inputValue(),'.9999');assert.equal(await page.locator('#holdingMint').inputValue(),'Royal Canadian Mint');
   }
   console.log('Check reviewed scan through save and both photo attachments in '+engineName);
+  await page.evaluate(async()=>{
+   closeAdd();await openSmartCamera();
+   renderSmartCameraAnalysis(interpretSmartCameraScan({text:'American Silver Eagle 1 OZ FINE SILVER',sides:2,confidence:.95}));
+   openSmartScanEditor();smartCameraCapturedFiles=[{name:'front.jpg'},{name:'back.jpg'}];
+  });
+  await page.getByRole('button',{name:'Reset scan',exact:true}).click();
+  await page.waitForFunction(()=>!smartCameraScanning&&pendingSmartCameraSuggestion===null);
+  const resetState=await page.evaluate(()=>({open:document.getElementById('smartCameraScreen').classList.contains('show'),
+   files:smartCameraCapturedFiles.length,editorHidden:document.getElementById('smartScanEditor').hidden,
+   scan:document.getElementById('smartCameraProButton').textContent,badge:document.querySelector('.smartCameraEyebrow').textContent,
+   overflow:document.documentElement.scrollWidth>innerWidth+1}));
+  assert.deepEqual(resetState,{open:true,files:0,editorHidden:true,scan:'Scan Bullion',badge:'BULLION SCAN ASSIST - BETA',overflow:false});
   const scanSave=await page.evaluate(async()=>{
    holdings=[];sweep.writes=[];
    closeAdd();await openSmartCamera();

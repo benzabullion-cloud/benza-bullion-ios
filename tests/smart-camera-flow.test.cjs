@@ -29,6 +29,18 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
  await test('Lower confidence detail cannot reduce prior good evidence',async()=>{queued.push({text:'fine silver 1 oz .999',confidence:.95});await context.runSmartCameraScan();const before=pending().confidence;queued.push({text:'2011',confidence:.25});await context.runSmartCameraScan(true);assert.ok(pending().confidence>=before)});
  await test('Two-side limit preserves the first side',async()=>{queued.push({text:'2011',confidence:.9},{text:'Fine silver 1 oz',confidence:.9});await context.runSmartCameraScan();await context.runSmartCameraScan(true);const n=calls.length;await context.runSmartCameraScan(true);assert.equal(calls.length,n);assert.equal(views(),2);assert.equal(pending().year,2011)});
  await test('Explicit reset clears results and calls native reset',async()=>{const n=resetCalls;await context.resetSmartCameraScan();assert.equal(resetCalls,n+1);assert.equal(pending(),null);assert.equal(views(),0);assert.equal(get('smartAnalysisUseButton').disabled,true)});
+ await test('Visible reset action clears both photos and editor while keeping scanner open',async()=>{
+  assert.match(html,/<div class="smartCameraEyebrow">BULLION SCAN ASSIST - BETA<\/div>/);
+  assert.match(html,/<button id="smartCameraResetButton"[^>]*data-scan-control[^>]*onclick="resetSmartCameraScan\(\)"[^>]*>Reset scan<\/button>/);
+  get('smartCameraScreen').classList.add('show');get('smartScanEditor').hidden=false;
+  vm.runInContext('smartCameraCapturedFiles=[{name:"front.jpg"},{name:"reverse.jpg"}];smartCameraPhotoCount=2;smartCameraAwaitingReverse=true;smartCameraLastDiagnostic={engineVersion:5}',context);
+  const callsBefore=calls.length;await context.resetSmartCameraScan();
+  assert.equal(get('smartCameraScreen').classList.contains('show'),true);assert.equal(calls.length,callsBefore);
+  assert.equal(vm.runInContext('smartCameraCapturedFiles.length+smartCameraPhotoCount',context),0);
+  assert.equal(vm.runInContext('smartCameraLastDiagnostic',context),null);assert.equal(get('smartScanEditor').hidden,true);
+  assert.equal(get('smartCameraProButton').textContent,'Scan Bullion');assert.equal(get('smartCameraLibraryButton').textContent,'Choose Bullion Photo');
+  assert.equal(get('smartCameraResetButton').disabled,false);assert.equal(get('smartCameraStatus').textContent,'Ready for a new item.');
+ });
  await test('Closing Smart Camera releases cached model runtime',async()=>{context.closeSmartCamera();await new Promise(resolve=>setImmediate(resolve));assert.equal(resetOptions.at(-1).releaseModels,true)});
  await test('Reset waits for native cleanup before enabling a new scan',async()=>{let done;resetHook=()=>new Promise(resolve=>done=resolve);const reset=context.resetSmartCameraScan();const n=calls.length;await context.runSmartCameraScan();assert.equal(calls.length,n);assert.equal(get('smartCameraProButton').disabled,true);done();await reset;resetHook=async()=>{};assert.equal(get('smartCameraProButton').disabled,false)});
  await test('Abandoned callback cannot unlock a newer operation',async()=>{let oldDone;queued.push(new Promise(resolve=>oldDone=resolve));const oldScan=context.runSmartCameraScan();await new Promise(resolve=>setImmediate(resolve));await context.resetSmartCameraScan();let newDone;queued.push(new Promise(resolve=>newDone=resolve));const newScan=context.runSmartCameraScan();await new Promise(resolve=>setImmediate(resolve));oldDone({text:'Fine gold',confidence:.9});await oldScan;assert.equal(get('smartCameraProButton').disabled,true);assert.equal(pending(),null);newDone({text:'Fine silver',confidence:.9});await newScan;assert.equal(pending().metal,'silver');assert.equal(get('smartCameraProButton').disabled,false)});
@@ -135,4 +147,3 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
  });
  console.log(count+' scanner flow checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1});
-
