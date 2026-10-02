@@ -11375,8 +11375,11 @@ try{
   console.warn('Account service initialization failed:',e);
 }
 restoreSession();
-if(!navigator.onLine)updateNetworkState();
-fetchLivePrices();
+// Markets is declared in the following script. Start the feed only after all scripts initialize.
+window.addEventListener('DOMContentLoaded',()=>{
+  if(!navigator.onLine)updateNetworkState();
+  fetchLivePrices();
+},{once:true});
 setInterval(fetchLivePrices,30000);
 setInterval(()=>{
   if(lastMarketFeedData)renderLiveFeedStatus(lastMarketFeedData);
