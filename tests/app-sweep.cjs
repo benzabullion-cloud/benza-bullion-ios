@@ -65,7 +65,10 @@ window.supabase={createClient:()=>({
    holdings=[];sweep.writes=[];
    closeAdd();await openSmartCamera();
    renderSmartCameraAnalysis(interpretSmartCameraScan({text:'CANADA .9995 FINE PALLADIUM 50 DOLLARS',sides:2,confidence:.95}));
-   smartCameraCapturedFiles=[new File(['front'],'front.jpg',{type:'image/jpeg'}),new File(['reverse'],'reverse.jpg',{type:'image/jpeg'})];
+   const canvas=document.createElement('canvas');canvas.width=2;canvas.height=2;
+   const ctx=canvas.getContext('2d');ctx.fillStyle='#999';ctx.fillRect(0,0,2,2);
+   const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg'));
+   smartCameraCapturedFiles=[new File([blob],'front.jpg',{type:'image/jpeg'}),new File([blob],'reverse.jpg',{type:'image/jpeg'})];
    openSmartScanEditor();document.getElementById('smartEditWeight').value='1';document.getElementById('smartEditYear').value='2024';
    if(!saveSmartScanReview())throw Error('Review failed');useSmartCameraAnalysis();
    qty.value='3';cost.value='65';update();
