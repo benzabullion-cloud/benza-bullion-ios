@@ -21,6 +21,28 @@
         "mint": "Royal Canadian Mint",
         "usable": true
       }
+    },
+    {
+      "id": "palladium-maple-obscured-year",
+      "photos": [
+        {
+          "side": "obverse",
+          "path": "tests/fixtures/palladium-maple-obverse.b64"
+        },
+        {
+          "side": "reverse",
+          "path": "tests/fixtures/palladium-maple-reverse.b64"
+        }
+      ],
+      "expected": {
+        "product": "Canadian Palladium Maple Leaf",
+        "metal": "palladium",
+        "weight": 1,
+        "year": null,
+        "purity": ".9995",
+        "mint": "Royal Canadian Mint",
+        "usable": true
+      }
     }
   ]
 }
