@@ -771,7 +771,7 @@ html[data-theme="dark"] .marketCard{background:linear-gradient(145deg,#1a1b20,#1
   padding:11px;font-weight:700;font-size:13px;
 }
 
-/* Pro Bullion Scanner Assistant roadmap screen */
+/* Pro Bullion Scanner Assist roadmap screen */
 .smartCameraScreen{
   position:fixed;inset:0;background:var(--surface);color:var(--text);
   z-index:2147482999;display:none;overflow:auto;
@@ -5781,7 +5781,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
       <button class="addChoiceOption smartCameraChoice" onclick="openSmartCamera()">
         <div class="addChoiceIcon">⌾</div>
         <div class="addChoiceText">
-          <strong>Bullion Scanner Assistant <span style="font-size:9px;color:#d6a53a">BETA</span></strong>
+          <strong>Bullion Scanner Assist <span style="font-size:9px;color:#d6a53a">BETA</span></strong>
           <span>Scan markings, then review and complete details</span>
         </div>
         <div class="smartCameraBadge">PRO</div>
@@ -5802,7 +5802,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
   <section id="smartCameraScreen" class="smartCameraScreen" aria-hidden="true">
     <div class="smartCameraHeader">
       <button class="smartCameraBack" onclick="closeSmartCamera()" aria-label="Back">‹</button>
-      Bullion Scanner Assistant
+      Bullion Scanner Assist
     </div>
     <div class="smartCameraBody">
       <div class="smartCameraHero">
@@ -6391,7 +6391,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
         <div class="settingsProFeatureList">
           <div><strong>Advanced analytics</strong><span>Profit/loss attribution, break-even distance, realized sales, acquisition history, and independent scenarios—beyond the Free performance snapshot.</span></div>
           <div><strong>Unlimited price alerts</strong><span>Track as many active price targets as you want.</span></div>
-          <div><strong>Bullion Scanner Assistant</strong><span>Scan supported bullion markings on iPhone to prefill metal, product, weight, and year for review.</span></div><div><strong>Inventory records</strong><span>Save private notes, item photos, and receipts.</span></div>
+          <div><strong>Bullion Scanner Assist</strong><span>Scan supported bullion markings on iPhone to prefill metal, product, weight, and year for review.</span></div><div><strong>Inventory records</strong><span>Save private notes, item photos, and receipts.</span></div>
           <div><strong>Portfolio report</strong><span>Create a detailed inventory and performance report.</span></div>
           <div><strong>Future Pro releases</strong><span>Active subscriptions and Founder access automatically receive new features added to Benza Bullion Pro, including planned Future Potential tools.</span></div>
         </div>
@@ -7553,7 +7553,7 @@ function applySmartCameraSuggestion(suggestion){
   document.getElementById('cost').value='';
   fillBullionDetails({year:suggestion.year,purity:suggestion.purity,mint:suggestion.mint,serial:suggestion.serial});
   document.getElementById('proInventoryFields').open=true;
-  document.getElementById('holdingDetailsHint').textContent=suggestion.userReviewed?'Details confirmed in Bullion Scanner Assistant. Review before saving.':canUseSmartCameraSuggestion(suggestion)?'Details filled from your scan. Review every field before saving.':'Partial scan. Review the details before saving. Additional bullion details are optional.'+(suggestion.warnings.length?' '+suggestion.warnings.join(' '):'');
+  document.getElementById('holdingDetailsHint').textContent=suggestion.userReviewed?'Details confirmed in Bullion Scanner Assist. Review before saving.':canUseSmartCameraSuggestion(suggestion)?'Details filled from your scan. Review every field before saving.':'Partial scan. Review the details before saving. Additional bullion details are optional.'+(suggestion.warnings.length?' '+suggestion.warnings.join(' '):'');
   if(isProActive()&&suggestion.denomination){
     document.getElementById('holdingNotes').value='Denomination: '+suggestion.denomination;
   }
@@ -7603,7 +7603,7 @@ function setSmartCameraBusy(busy){
   smartCameraScanning=busy;
   document.querySelectorAll('[data-scan-control]').forEach(el=>el.disabled=busy);
   const button=document.getElementById('smartCameraProButton');
-  if(button){button.disabled=busy;button.textContent=busy?'Reading your bullion…':isProActive()?(smartCameraAwaitingReverse?'Scan Opposite Side':pendingSmartCameraSuggestion?'Scan again':'Scan Bullion'):'Unlock Bullion Scanner Assistant with Pro';}
+  if(button){button.disabled=busy;button.textContent=busy?'Reading your bullion…':isProActive()?(smartCameraAwaitingReverse?'Scan Opposite Side':pendingSmartCameraSuggestion?'Scan again':'Scan Bullion'):'Unlock Bullion Scanner Assist with Pro';}
   const libraryButton=document.getElementById('smartCameraLibraryButton');
   if(libraryButton){libraryButton.disabled=busy;libraryButton.textContent=smartCameraAwaitingReverse?'Choose Opposite Side Photo':'Choose Bullion Photo';}
   const useButton=document.getElementById('smartAnalysisUseButton');
@@ -7646,12 +7646,12 @@ async function runSmartCameraScan(append=false,source='camera'){
     return;
   }
   if(!isBenzaNativeRuntime()){
-    if(status)status.textContent='Bullion Scanner Assistant scanning is available in the native Benza bullion iPhone app.';
+    if(status)status.textContent='Bullion Scanner Assist scanning is available in the native Benza bullion iPhone app.';
     return;
   }
   const plugin=smartCameraPlugin();
   if(!plugin){
-    if(status)status.textContent='Bullion Scanner Assistant is still loading. Close and reopen this screen, then try again.';
+    if(status)status.textContent='Bullion Scanner Assist is still loading. Close and reopen this screen, then try again.';
     return;
   }
   if(append&&smartCameraPhotoCount>=SMART_CAMERA_MAX_VIEWS){
@@ -7748,7 +7748,7 @@ async function runSmartCameraScan(append=false,source='camera'){
     renderSmartCameraAnalysis(suggestion);
     if(status)status.textContent='';
   }catch(error){
-    console.error('Bullion Scanner Assistant failed:',error);
+    console.error('Bullion Scanner Assist failed:',error);
     if(run!==smartCameraRunId||session!==smartCameraSession)return;
     if(status)status.textContent='I couldn’t read that photo. Please try again.';
   }finally{
@@ -7766,15 +7766,15 @@ async function openSmartCamera(){
   const active=isProActive();
   const founder=isFounderPro();
   if(button){
-    button.textContent=active?'Scan Bullion':'Unlock Bullion Scanner Assistant with Pro';
+    button.textContent=active?'Scan Bullion':'Unlock Bullion Scanner Assist with Pro';
     button.disabled=smartCameraScanning;
   }
   if(promise){
     promise.innerHTML=founder
-      ? '<strong>Included permanently with Founder access</strong>Bullion Scanner Assistant is active as part of your Founder Lifetime Pro access.'
+      ? '<strong>Included permanently with Founder access</strong>Bullion Scanner Assist is active as part of your Founder Lifetime Pro access.'
       : active
         ? '<strong>Included with your Pro plan</strong>Scan photos stay private and are saved with the holding after you add it.'
-        : '<strong>Bullion Scanner Assistant is a Pro feature</strong>Upgrade to Benza Bullion Pro to scan supported bullion and prefill holding details.';
+        : '<strong>Bullion Scanner Assist is a Pro feature</strong>Upgrade to Benza Bullion Pro to scan supported bullion and prefill holding details.';
   }
   smartCameraSession++;
   smartCameraSource='camera';
@@ -7782,10 +7782,10 @@ async function openSmartCamera(){
   clearSmartCameraEvidence();
   if(status)status.textContent=active
     ? ''
-    : 'Upgrade to Pro to use Bullion Scanner Assistant. Add Manually remains free.';
+    : 'Upgrade to Pro to use Bullion Scanner Assist. Add Manually remains free.';
   screen.classList.add('show');
   screen.setAttribute('aria-hidden','false');
-  // Opening Bullion Scanner Assistant now lands on the choice screen. The user explicitly
+  // Opening Bullion Scanner Assist now lands on the choice screen. The user explicitly
   // chooses Scan Bullion or Choose bullion photo before native capture begins.
   if(active&&isBenzaNativeRuntime())await resetSmartCameraScan(true);
 }
@@ -9128,7 +9128,7 @@ function proContextCopy(context){
     inventory:'Keep serial numbers, private notes, item photos, and receipts with your holdings.',
     sale:'Track partial or full sales and preserve realized gain/loss automatically.',
     report:'Create polished portfolio and inventory reports for your records.',
-    'smart-camera':'Bullion Scanner Assistant uses on-device Apple Vision to recognize supported bullion markings, prefill details, and let you review everything before adding it.',
+    'smart-camera':'Bullion Scanner Assist uses on-device Apple Vision to recognize supported bullion markings, prefill details, and let you review everything before adding it.',
     analytics:'Add deeper portfolio intelligence today and receive future Pro releases with an active subscription or permanent Founder access.'
   };
   return map[context]||'Get deeper analytics, unlimited alerts, private inventory, detailed reports, and future features released as part of Benza Bullion Pro.';
@@ -10226,8 +10226,8 @@ async function finishScannerPhotoUploads(holdingId,files=[]){
     return uploaded;
   }catch(error){
     await removePrivateHoldingFiles(uploaded);
-    console.warn('Bullion Scanner Assistant photo upload failed:',error);
-    alert('Your holding was saved, but the Bullion Scanner Assistant photos could not be attached. You can add photos from Edit Holding.');
+    console.warn('Bullion Scanner Assist photo upload failed:',error);
+    alert('Your holding was saved, but the Bullion Scanner Assist photos could not be attached. You can add photos from Edit Holding.');
     return [];
   }
 }
@@ -12008,7 +12008,7 @@ loadBenzaWatchlist();
       padding-bottom:env(safe-area-inset-bottom, 0px) !important;
     }
 
-    /* Bullion Scanner Assistant / roadmap screen */
+    /* Bullion Scanner Assist / roadmap screen */
     html.native-app .smartCameraHeader{
       box-sizing:border-box !important;
       height:calc(58px + env(safe-area-inset-top, 0px)) !important;
