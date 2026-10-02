@@ -10,7 +10,7 @@ window.alert=message=>sweep.alerts.push(message);window.confirm=()=>true;
 window.supabase={createClient:()=>({
  auth:{getSession:async()=>({data:{session:null}}),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}}),signOut:async()=>({error:null})},
  from(table){const query={_from:0,_to:null,select(){return this},eq(){return this},gte(){return this},order(){return this},limit(){return this},range(from,to){this._from=from;this._to=to;return this},maybeSingle(){return this},insert(value){sweep.writes.push({table,value});return this},upsert(value){sweep.writes.push({table,value});return this},update(){return this},delete(){return this},then(resolve,reject){const rows=sweep.tables[table]??null;const data=Array.isArray(rows)&&this._to!==null?rows.slice(this._from,this._to+1):rows;return Promise.resolve({data,error:null}).then(resolve,reject)}};return query},
- rpc:async(name,args)=>{if(sweep.failRpc)throw Error('Network unavailable');sweep.writes.push({name,args});const row={id:args.p_holding_id||'sweep-holding',metal:args.p_metal,product:args.p_product,quantity:args.p_quantity,weight_oz:args.p_weight_oz,total_oz:args.p_quantity*args.p_weight_oz,cost_basis:args.p_cost_basis,purchase_date:args.p_purchase_date};return {data:row,error:null}},
+ rpc:async(name,args)=>{if(sweep.failRpc)throw Error('Network unavailable');sweep.writes.push({name,args});const row={id:args.p_holding_id||'sweep-holding',metal:args.p_metal,product:args.p_product,quantity:args.p_quantity,weight_oz:args.p_weight_oz,total_oz:args.p_quantity*args.p_weight_oz,cost_basis:args.p_cost_basis,purchase_date:args.p_purchase_date,bullion_year:args.p_year,purity:args.p_purity,mint:args.p_mint,scanner_photo_paths:args.p_paths};return {data:row,error:null}},
  storage:{from:()=>({remove:async paths=>{sweep.removed.push(...paths);return {error:null}},upload:async()=>({error:null}),createSignedUrl:async()=>({data:{signedUrl:'https://sweep.test/photo.jpg'},error:null})})}
 })};`;
 (async()=>{
@@ -60,6 +60,25 @@ window.supabase={createClient:()=>({
    assert.equal(await page.locator('#product').inputValue(),'Canadian Silver Maple Leaf');assert.equal(await page.locator('#holdingYear').inputValue(),'2024');
    assert.equal(await page.locator('#holdingPurity').inputValue(),'.9999');assert.equal(await page.locator('#holdingMint').inputValue(),'Royal Canadian Mint');
   }
+  console.log('Check reviewed scan through save and both photo attachments in '+engineName);
+  const scanSave=await page.evaluate(async()=>{
+   holdings=[];sweep.writes=[];
+   closeAdd();await openSmartCamera();
+   renderSmartCameraAnalysis(interpretSmartCameraScan({text:'CANADA .9995 FINE PALLADIUM 50 DOLLARS',sides:2,confidence:.95}));
+   smartCameraCapturedFiles=[new File(['front'],'front.jpg',{type:'image/jpeg'}),new File(['reverse'],'reverse.jpg',{type:'image/jpeg'})];
+   openSmartScanEditor();document.getElementById('smartEditWeight').value='1';document.getElementById('smartEditYear').value='2024';
+   if(!saveSmartScanReview())throw Error('Review failed');useSmartCameraAnalysis();
+   qty.value='3';cost.value='65';update();
+   const staged=pendingScannerPhotoFiles.length;await saveHolding();
+   const h=holdings[0],write=sweep.writes.find(w=>w.name==='benza_add_holding_details');
+   const photos=sweep.writes.find(w=>w.name==='benza_update_scanner_photos');
+   const result={staged,product:h.product,metal:h.metal,oz:h.oz,cost:h.cost,year:h.year,mint:h.mint,photoPaths:h.scannerPhotoPaths.length,
+    savedQuantity:write.args.p_quantity,savedWeight:write.args.p_weight_oz,savedCost:write.args.p_cost_basis,
+    attachedPhotos:photos.args.p_paths.length,pending:pendingScannerPhotoFiles.length};
+   holdings=[];return result;
+  });
+  assert.deepEqual(scanSave,{staged:2,product:'Canadian Palladium Maple Leaf',metal:'palladium',oz:3,cost:195,year:2024,mint:'Royal Canadian Mint',photoPaths:2,
+   savedQuantity:3,savedWeight:1,savedCost:195,attachedPhotos:2,pending:0});
   console.log('Check purchase cost and analytics fixtures in '+engineName);
   const purchaseFixture=await page.evaluate(async()=>{
     closeSmartCamera();openManualAdd();selectMetal('silver');qty.value='3';weight.value='1';cost.value='65';update();

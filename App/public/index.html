@@ -6880,6 +6880,23 @@ function smartCameraCatalogMatch(text,metal){
         !/\b(?:bar|round)\b/.test(text)){
         strongHits.push('Canadian palladium + .9995 + denomination or ounce inscription');score+=8;
       }
+      // RCM platinum bullion uses .9995 too. Require all identifying inscriptions;
+      // the independent weight parser still decides whether a weight is readable.
+      // https://www.mint.ca/en/shop/coins/2023/2023-50-1oz-9995-pure-platinum-coin-ptml-bullion
+      if(item.product==='Canadian Platinum Maple Leaf'&&metal==='platinum'&&
+        /\bcanada\b/.test(text)&&/(?:^|\s)\.?9995\b/.test(text)&&
+        /\b(?:50 dollars?|fifty dollars?)\b/.test(text)&&
+        /\b(?:one|1) (?:troy )?(?:oz|ounce)\b/.test(text)&&!/\b(?:bar|round)\b/.test(text)){
+        strongHits.push('Canadian platinum + .9995 + fifty dollars + ounce');score+=8;
+      }
+      // US Mint documents this reverse combination for the platinum Eagle.
+      // https://www.usmint.gov/learn/coins-and-medals/collectible-coins/american-eagle/2025-platinum-proof-right-to-petition
+      if(item.product==='American Platinum Eagle'&&metal==='platinum'&&
+        /\bunited states of america\b/.test(text)&&/(?:^|\s)\.?9995\b/.test(text)&&
+        /(?:^|\s)\$100\b|\b(?:100|one hundred) dollars?\b/.test(text)&&
+        /\b(?:one|1) (?:troy )?(?:oz|ounce)\b/.test(text)&&!/\b(?:bar|round)\b/.test(text)){
+        strongHits.push('US platinum + .9995 + hundred dollars + ounce');score+=8;
+      }
       if(item.product.includes('Britannia') && metal===item.metal && /\bbritannia\b/.test(text)){
         strongHits.push('Britannia inscription');score+=8;
       }
