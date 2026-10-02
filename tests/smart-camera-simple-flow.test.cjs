@@ -126,3 +126,28 @@ test('Manual metal choice updates unit label and removes stale incompatible prod
 test('Free account cannot confirm manual scanner review',()=>{
  context.renderSmartCameraAnalysis(complete);active=false;assert.equal(context.saveSmartScanReview(),false);active=true;
 });
+test('Feedback stays collapsed and previews an email without private scan data',()=>{
+ context.renderSmartCameraAnalysis({...complete,raw:'SECRET RAW OCR',serial:'SECRET123',scannerPhotoPaths:['private/photo.jpg']});
+ assert.equal(get('smartScanFeedback').hidden,true);
+ context.toggleSmartScanFeedback();assert.equal(get('smartScanFeedback').hidden,false);
+ get('smartFeedbackIssue').value='Wrong product';get('smartFeedbackCorrection').value='This is a silver round.';
+ get('smartFeedbackEmail').setAttribute=(name,value)=>get('smartFeedbackEmail')[name]=value;
+ vm.runInContext('smartCameraLastDiagnostic={appBuild:"92",engineVersion:5}',context);
+ context.previewSmartScanFeedback();
+ const report=get('smartFeedbackReport').value;
+ assert.match(report,/American Silver Eagle/);assert.match(report,/This is a silver round/);assert.match(report,/App build: 92/);
+ assert.doesNotMatch(report,/SECRET|private\/|photo|receipt|cost|account/i);
+ assert.equal(get('smartFeedbackPreview').hidden,false);
+ assert.match(get('smartFeedbackEmail').href,/^mailto:benzabullion@gmail.com\?subject=/);
+ assert.equal(new URL(get('smartFeedbackEmail').href).searchParams.get('body'),report);
+ context.clearSmartCameraEvidence();assert.equal(get('smartScanFeedback').hidden,true);
+ assert.equal(get('smartFeedbackReport').value,'');assert.equal(get('smartFeedbackCorrection').value,'');
+ assert.equal(get('smartFeedbackEmail').href,'mailto:benzabullion@gmail.com');
+});
+test('Reviewed scan feedback reports the original reading rather than replacing it with corrected evidence',()=>{
+ context.renderSmartCameraAnalysis({...complete,product:'Canadian Silver Maple Leaf',userReviewed:true,scanEvidence:complete});
+ get('smartFeedbackIssue').value='Wrong product';get('smartFeedbackCorrection').value='Correct product: Canadian Silver Maple Leaf';
+ context.previewSmartScanFeedback();
+ assert.match(get('smartFeedbackReport').value,/Scan product: American Silver Eagle/);
+ assert.match(get('smartFeedbackReport').value,/Correct product: Canadian Silver Maple Leaf/);
+});

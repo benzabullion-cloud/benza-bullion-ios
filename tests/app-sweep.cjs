@@ -59,6 +59,19 @@ window.supabase={createClient:()=>({
    await page.getByRole('button',{name:'Use reviewed details',exact:true}).click();
    assert.equal(await page.locator('#product').inputValue(),'Canadian Silver Maple Leaf');assert.equal(await page.locator('#holdingYear').inputValue(),'2024');
    assert.equal(await page.locator('#holdingPurity').inputValue(),'.9999');assert.equal(await page.locator('#holdingMint').inputValue(),'Royal Canadian Mint');
+   await page.evaluate(async()=>{closeAdd();await openSmartCamera();renderSmartCameraAnalysis(interpretSmartCameraScan({text:'Fine silver',sides:2,confidence:.95}));});
+   assert.equal(await page.locator('#smartScanFeedback').isVisible(),false);
+   const hierarchy=await page.evaluate(()=>({linkSize:parseFloat(getComputedStyle(document.getElementById('smartScanFeedbackLink')).fontSize),
+    actionSize:parseFloat(getComputedStyle(document.getElementById('smartCameraProButton')).fontSize),linkBackground:getComputedStyle(document.getElementById('smartScanFeedbackLink')).backgroundColor}));
+   assert.ok(hierarchy.linkSize<hierarchy.actionSize);assert.equal(hierarchy.linkBackground,'rgba(0, 0, 0, 0)');
+   await page.getByRole('button',{name:'Report a scan issue',exact:true}).click();
+   await page.selectOption('#smartFeedbackIssue',{label:'Missing details'});await page.fill('#smartFeedbackCorrection','Silver Maple, 1 troy oz');
+   await page.getByRole('button',{name:'Preview report',exact:true}).click();
+   assert.match(await page.locator('#smartFeedbackReport').inputValue(),/Silver Maple, 1 troy oz/);
+   assert.match(await page.locator('#smartFeedbackEmail').getAttribute('href'),/^mailto:benzabullion@gmail.com\?/);
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,'Feedback overflow '+engineName+' '+width+' '+theme);
+   await page.getByRole('button',{name:'Reset scan',exact:true}).click();
+   await page.waitForFunction(()=>!smartCameraScanning);assert.equal(await page.locator('#smartScanFeedback').isVisible(),false);
   }
   console.log('Check reviewed scan through save and both photo attachments in '+engineName);
   await page.evaluate(async()=>{
