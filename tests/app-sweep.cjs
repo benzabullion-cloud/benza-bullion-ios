@@ -43,6 +43,23 @@ window.supabase={createClient:()=>({
     states++;
    }
   }
+  console.log('Check scanner assistant editor in '+engineName);
+  for(const width of [320,390,768])for(const theme of ['dark','light']){
+   await page.setViewportSize({width,height:844});
+   await page.evaluate(theme=>{
+    document.documentElement.dataset.theme=theme;openSmartCamera();
+    renderSmartCameraAnalysis(interpretSmartCameraScan({text:'Fine silver',sides:2,confidence:.95}));openSmartScanEditor();
+   },theme);
+   await page.selectOption('#smartEditMetal','silver');await page.selectOption('#smartEditProduct','Canadian Silver Maple Leaf');
+   await page.fill('#smartEditWeight','1');await page.fill('#smartEditYear','2024');await page.fill('#smartEditPurity','.9999');await page.fill('#smartEditMint','Royal Canadian Mint');
+   const editState=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth+1,disabled:document.getElementById('smartAnalysisUseButton').disabled}));
+   assert.equal(editState.overflow,false,engineName+' scanner editor '+width+' '+theme);assert.equal(editState.disabled,true);
+   await page.getByRole('button',{name:'Confirm changes',exact:true}).click();
+   assert.equal(await page.locator('#smartAnalysisTitle').textContent(),'Your reviewed details');
+   await page.getByRole('button',{name:'Use reviewed details',exact:true}).click();
+   assert.equal(await page.locator('#product').inputValue(),'Canadian Silver Maple Leaf');assert.equal(await page.locator('#holdingYear').inputValue(),'2024');
+   assert.equal(await page.locator('#holdingPurity').inputValue(),'.9999');assert.equal(await page.locator('#holdingMint').inputValue(),'Royal Canadian Mint');
+  }
   console.log('Check purchase cost and analytics fixtures in '+engineName);
   const purchaseFixture=await page.evaluate(async()=>{
     closeSmartCamera();openManualAdd();selectMetal('silver');qty.value='3';weight.value='1';cost.value='65';update();
