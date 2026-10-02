@@ -5844,12 +5844,12 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
   </div>
   <div class="analyticsBody">
     <div class="analyticsTabPanel" data-analytics-panel="performance"><div class="analyticsHero">
-      <div class="analyticsEyebrow">Portfolio market value</div>
+      <div class="analyticsEyebrow">Portfolio spot metal value</div>
       <div class="analyticsBig" id="anTotalValue">$0.00</div>
-      <div class="analyticsGain pos" id="anTotalGain">+$0.00 (0.00%)</div>
+      <div class="analyticsGain pos" id="anTotalGain">+$0.00 (0.00%)</div><p class="metricHint">Unrealized gain/loss = spot metal value minus total cost basis. Return % divides that gain/loss by total cost basis; it is not annualized.</p>
       <div class="metricGrid">
         <div class="metricCard"><div class="metricLabel">Cost basis</div><div class="metricValue" id="anCost">$0.00</div><div class="metricHint">Total amount paid for current holdings</div></div>
-        <div class="metricCard"><div class="metricLabel">Total ounces</div><div class="metricValue" id="anOunces">0.00 oz</div><div class="metricHint">All tracked metal weight; copper uses avoirdupois oz</div></div>
+        <div class="metricCard"><div class="metricLabel">Total weight</div><div class="metricValue" id="anOunces">0.00 oz</div><div class="metricHint">Troy-ounce equivalent weight; copper converted from avoirdupois ounces</div></div>
         <div class="metricCard"><div class="metricLabel">Positions</div><div class="metricValue" id="anPositions">0</div><div class="metricHint">Individual holding entries</div></div>
         <div class="metricCard"><div class="metricLabel">Pieces</div><div class="metricValue" id="anPieces">0</div><div class="metricHint">Total coins / units tracked</div></div>
       </div>
@@ -5905,56 +5905,56 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
 
     <div class="analyticsTabPanel" data-analytics-panel="performance"><div class="analyticsSection">
       <div class="freePerformanceNote"><strong>Included with Benza Bullion Free</strong>Your current portfolio snapshot, metal-by-metal cost and return, shared spot sensitivity, and holding rankings remain available without Pro.</div>
-      <div class="analyticsSectionHead"><h2>Metal performance</h2><span>Spot-based</span></div>
+      <div class="analyticsSectionHead"><h2>Metal performance</h2><span>Spot-based</span></div><p class="metricHint">Cost and break-even per ounce = total cost ÷ metal weight. Precious metals use troy ounces; copper uses avoirdupois ounces. Return % = (spot metal value − total cost) ÷ total cost × 100. Break-even excludes selling fees and dealer spreads.</p>
       <div class="metalAnalytics">
         <div class="metalPanel gold">
           <div class="metalTitle"><span>Gold</span><span class="dot"></span></div>
           <div class="metalOz" id="anGoldOz">0.00 oz</div><div class="metalSub" id="anGoldValue">$0.00 market value</div>
           <div class="metalRows">
-            <div class="metalRow"><span>Avg cost / oz</span><strong id="anGoldAvg">$0.00</strong></div>
+            <div class="metalRow"><span>Cost / oz</span><strong id="anGoldAvg">$0.00</strong></div>
             <div class="metalRow"><span>Spot / oz</span><strong id="anGoldSpot">$0.00</strong></div>
-            <div class="metalRow"><span>Break-even</span><strong id="anGoldBreak">$0.00</strong></div>
-            <div class="metalRow"><span>Return</span><strong class="metalReturn" id="anGoldReturn">0.00%</strong></div>
+            <div class="metalRow"><span>Break-even / oz</span><strong id="anGoldBreak">$0.00</strong></div>
+            <div class="metalRow"><span>Unrealized return</span><strong class="metalReturn" id="anGoldReturn">0.00%</strong></div>
           </div>
         </div>
         <div class="metalPanel silver">
           <div class="metalTitle"><span>Silver</span><span class="dot"></span></div>
           <div class="metalOz" id="anSilverOz">0.00 oz</div><div class="metalSub" id="anSilverValue">$0.00 market value</div>
           <div class="metalRows">
-            <div class="metalRow"><span>Avg cost / oz</span><strong id="anSilverAvg">$0.00</strong></div>
+            <div class="metalRow"><span>Cost / oz</span><strong id="anSilverAvg">$0.00</strong></div>
             <div class="metalRow"><span>Spot / oz</span><strong id="anSilverSpot">$0.00</strong></div>
-            <div class="metalRow"><span>Break-even</span><strong id="anSilverBreak">$0.00</strong></div>
-            <div class="metalRow"><span>Return</span><strong class="metalReturn" id="anSilverReturn">0.00%</strong></div>
+            <div class="metalRow"><span>Break-even / oz</span><strong id="anSilverBreak">$0.00</strong></div>
+            <div class="metalRow"><span>Unrealized return</span><strong class="metalReturn" id="anSilverReturn">0.00%</strong></div>
           </div>
         </div>
         <div class="metalPanel platinum">
           <div class="metalTitle"><span>Platinum</span><span class="dot"></span></div>
           <div class="metalOz" id="anPlatinumOz">0.00 oz</div><div class="metalSub" id="anPlatinumValue">$0.00 market value</div>
           <div class="metalRows">
-            <div class="metalRow"><span>Avg cost / oz</span><strong id="anPlatinumAvg">$0.00</strong></div>
+            <div class="metalRow"><span>Cost / oz</span><strong id="anPlatinumAvg">$0.00</strong></div>
             <div class="metalRow"><span>Spot / oz</span><strong id="anPlatinumSpot">$0.00</strong></div>
-            <div class="metalRow"><span>Break-even</span><strong id="anPlatinumBreak">$0.00</strong></div>
-            <div class="metalRow"><span>Return</span><strong class="metalReturn" id="anPlatinumReturn">0.00%</strong></div>
+            <div class="metalRow"><span>Break-even / oz</span><strong id="anPlatinumBreak">$0.00</strong></div>
+            <div class="metalRow"><span>Unrealized return</span><strong class="metalReturn" id="anPlatinumReturn">0.00%</strong></div>
           </div>
         </div>
         <div class="metalPanel palladium">
           <div class="metalTitle"><span>Palladium</span><span class="dot"></span></div>
           <div class="metalOz" id="anPalladiumOz">0.00 oz</div><div class="metalSub" id="anPalladiumValue">$0.00 market value</div>
           <div class="metalRows">
-            <div class="metalRow"><span>Avg cost / oz</span><strong id="anPalladiumAvg">$0.00</strong></div>
+            <div class="metalRow"><span>Cost / oz</span><strong id="anPalladiumAvg">$0.00</strong></div>
             <div class="metalRow"><span>Spot / oz</span><strong id="anPalladiumSpot">$0.00</strong></div>
-            <div class="metalRow"><span>Break-even</span><strong id="anPalladiumBreak">$0.00</strong></div>
-            <div class="metalRow"><span>Return</span><strong class="metalReturn" id="anPalladiumReturn">0.00%</strong></div>
+            <div class="metalRow"><span>Break-even / oz</span><strong id="anPalladiumBreak">$0.00</strong></div>
+            <div class="metalRow"><span>Unrealized return</span><strong class="metalReturn" id="anPalladiumReturn">0.00%</strong></div>
           </div>
         </div>
         <div class="metalPanel copper">
           <div class="metalTitle"><span>Copper</span><span class="dot"></span></div>
           <div class="metalOz" id="anCopperOz">0.00 oz</div><div class="metalSub" id="anCopperValue">$0.00 market value</div>
           <div class="metalRows">
-            <div class="metalRow"><span>Avg cost / oz</span><strong id="anCopperAvg">$0.00</strong></div>
+            <div class="metalRow"><span>Cost / oz</span><strong id="anCopperAvg">$0.00</strong></div>
             <div class="metalRow"><span>Spot / oz</span><strong id="anCopperSpot">$0.00</strong></div>
-            <div class="metalRow"><span>Break-even</span><strong id="anCopperBreak">$0.00</strong></div>
-            <div class="metalRow"><span>Return</span><strong class="metalReturn" id="anCopperReturn">0.00%</strong></div>
+            <div class="metalRow"><span>Break-even / oz</span><strong id="anCopperBreak">$0.00</strong></div>
+            <div class="metalRow"><span>Unrealized return</span><strong class="metalReturn" id="anCopperReturn">0.00%</strong></div>
           </div>
         </div>
       </div>
@@ -5970,7 +5970,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
     </div></div>
 
     <div class="analyticsTabPanel" data-analytics-panel="performance"><div class="analyticsSection">
-      <div class="analyticsSectionHead"><h2>Price sensitivity</h2><span>If spot moves together</span></div>
+      <div class="analyticsSectionHead"><h2>Price sensitivity</h2><span>Same % move in all metals</span></div>
       <div class="sensitivityCard" id="anSensitivity"></div>
     </div></div>
 
@@ -5979,7 +5979,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
       <div class="collectionCard">
         <div class="collectionGrid">
           <div class="collectionStat"><span>Unique products</span><strong id="anUniqueProducts">0</strong></div>
-          <div class="collectionStat"><span>Largest position</span><strong id="anLargestShare">0%</strong></div>
+          <div class="collectionStat"><span>Largest holding by value</span><strong id="anLargestShare">0%</strong><span>One holding entry ÷ total spot metal value</span></div>
           <div class="collectionStat"><span>First purchase</span><strong id="anFirstBuy">—</strong></div>
           <div class="collectionStat"><span>Latest purchase</span><strong id="anLatestBuy">—</strong></div>
         </div>
@@ -5987,7 +5987,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
     </div></div>
 
     <div class="analyticsTabPanel" data-analytics-panel="performance"><div class="analyticsSection">
-      <div class="analyticsSectionHead"><h2>Holding performance</h2><span>Best to worst</span></div>
+      <div class="analyticsSectionHead"><h2>Holding performance</h2><span>By unrealized return %</span></div>
       <div class="leaderCard" id="anLeaderboard"></div>
     </div></div>
 
@@ -6036,7 +6036,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
         </div>
 
         <div class="analyticsSection">
-          <div class="analyticsSectionHead"><h2>Break-even distance</h2><span>Required move by metal</span></div>
+          <div class="analyticsSectionHead"><h2>Spot move to break-even</h2><span>From current spot price</span></div>
           <div id="proBreakEven" class="proCard"></div>
         </div>
 
@@ -6046,7 +6046,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
         </div>
 
         <div class="analyticsSection">
-          <div class="analyticsSectionHead"><h2>Acquisition timeline</h2><span>How your stack was built</span></div>
+          <div class="analyticsSectionHead"><h2>Current holdings by purchase month</h2><span>Remaining weight and cost</span></div>
           <div id="proAcquisition" class="proCard"></div>
         </div>
 
@@ -6447,8 +6447,11 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
       </div>
 
       <div class="holdingSectionTitle">Purchase</div>
-      <label>What did you pay?</label>
-      <div class="money"><span>$</span><input id="cost" type="number" min="0" step=".01" value="3450"></div>
+      <label for="purchaseCostMode">Purchase price entry</label>
+      <select id="purchaseCostMode" onchange="changePurchaseCostMode()"><option value="each">Price per piece</option><option value="total">Total cost for this holding</option></select>
+      <label id="purchaseCostLabel" for="cost">Price per piece</label>
+      <div class="money"><span>$</span><input id="cost" type="number" min="0" step=".01" placeholder="Enter amount" aria-describedby="purchaseCostSummary"></div>
+      <p id="purchaseCostSummary" class="holdingDetailHint" aria-live="polite">Enter your purchase price.</p>
 
       <label>Purchase date</label>
       <div class="dateField"><span id="dateDisplay" aria-hidden="true"></span><input id="date" type="date" aria-label="Purchase date"></div>
@@ -6497,7 +6500,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
 
       <div class="preview">
         <div><span>Estimated current value</span><strong id="estimate">$3,450.00</strong></div>
-        <div><span>Estimated gain</span><strong class="green" id="gain">+$0.00</strong></div>
+        <div><span>Unrealized gain / loss</span><strong class="green" id="gain">+$0.00</strong></div>
       </div>
 
       <button id="holdingSaveBtn" class="save" onclick="saveHolding()">Add to portfolio</button>
@@ -7864,7 +7867,8 @@ function openAdd(){
   selectMetal('gold');
   document.getElementById('qty').value=1;
   document.getElementById('weight').value=1;
-  document.getElementById('cost').value=3450;
+  document.getElementById('purchaseCostMode').value='each';
+  document.getElementById('cost').value='';
   document.getElementById('date').value=new Date().toISOString().slice(0,10);
   resetProInventoryForm();
   resetBullionDetails();
@@ -7887,9 +7891,9 @@ function selectMetal(m, preserveValues=false){
   });
   setProductOptions(PRODUCT_MAP[m]||GOLD_PRODUCTS);
   if(!preserveValues){
-    const defaults={gold:3450,silver:45,platinum:1500,palladium:1400,copper:5};
+    // Purchase cost must be entered by the owner; metal prices are not purchase defaults.
     weight.value=1;
-    cost.value=defaults[m]||0;
+    cost.value='';
     resetBullionDetails();
     suggestBullionDetails();
   }
@@ -7904,7 +7908,8 @@ function editHolding(i){
   document.getElementById('product').value=h.product;
   document.getElementById('qty').value=h.qty;
   document.getElementById('weight').value=h.weight;
-  document.getElementById('cost').value=h.cost;
+  document.getElementById('purchaseCostMode').value='total';
+  document.getElementById('cost').value=holdingHasCostBasis(h)?h.cost:'';
   document.getElementById('date').value=h.date || new Date().toISOString().slice(0,10);
   resetProInventoryForm();
   syncProInventoryVisibility();
@@ -7933,16 +7938,38 @@ function syncPurchaseDateDisplay(){
 document.getElementById('date')?.addEventListener('input',syncPurchaseDateDisplay);
 document.getElementById('date')?.addEventListener('change',syncPurchaseDateDisplay);
 
+function roundCurrency(value){
+  return Math.round((value+Number.EPSILON*Math.abs(value))*100)/100;
+}
+function purchaseTotalCost(amount,quantity,mode){
+  if(amount===null||amount===undefined||String(amount).trim()==='')return null;
+  const price=Number(amount),q=Number(quantity);
+  if(!Number.isFinite(price)||price<0||!Number.isFinite(q)||q<=0)return null;
+  const total=mode==='each'?price*q:price;
+  return Number.isFinite(total)?roundCurrency(total):null;
+}
+let previousPurchaseCostMode='each';
+function changePurchaseCostMode(){
+  const mode=document.getElementById('purchaseCostMode').value;
+  const total=purchaseTotalCost(cost.value,qty.value,previousPurchaseCostMode);
+  if(total!==null)cost.value=mode==='each'?String(total/Number(qty.value)):String(total);
+  update();
+}
 function update(){
   syncPurchaseDateDisplay();
-  const c=Number(cost.value)||0, q=Number(qty.value)||0, w=Number(weight.value)||0;
+  const mode=document.getElementById('purchaseCostMode').value;
+  previousPurchaseCostMode=mode;
+  const q=Number(qty.value)||0, w=Number(weight.value)||0;
+  const c=purchaseTotalCost(cost.value,q,mode);
+  document.getElementById('purchaseCostLabel').textContent=mode==='each'?'Price per piece':'Total cost for this holding';
+  document.getElementById('purchaseCostSummary').textContent=c===null?'Enter the amount paid. Enter 0 only for a gift or a free holding.':q.toLocaleString()+' pieces · '+money(c/q)+' per piece · '+money(c)+' total cost basis';
   // Use the latest live or cached reference price for the selected metal.
   const spot=livePrices[metal]||0;
   const value=q*w*spot;
   estimate.textContent='$'+value.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
-  const g=value-c;
-  gain.textContent=(g>=0?'+':'-')+'$'+Math.abs(g).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
-  gain.className=g>=0?'green':'neg';
+  const g=c===null?null:value-c;
+  gain.textContent=g===null?'—':(g>=0?'+':'-')+'$'+Math.abs(g).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  gain.className=g===null?'':g>=0?'green':'neg';
 }
 [cost,qty,weight].forEach(x=>x.addEventListener('input',update));
 document.getElementById('date').value=new Date().toISOString().slice(0,10);
@@ -8627,7 +8654,7 @@ function renderHoldings(){
           lot.innerHTML=`
             <div class="bullionLotInfo">
               <div class="bullionLotTitle">${Number(h.qty.toFixed(2)).toLocaleString()} × ${Number(h.weight.toFixed(4)).toLocaleString()} oz</div>
-              <div class="bullionLotSub">${dateText} · Cost ${holdingHasCostBasis(h)?money(h.cost):'—'}</div>
+              <div class="bullionLotSub">${dateText} · Total cost ${holdingHasCostBasis(h)?money(h.cost):'—'}</div>
               ${proHoldingInsightHtml(h)}
               ${proInventoryMetaHtml(h)}
             </div>
@@ -8705,7 +8732,7 @@ function calculateStackScore(stats,totalValue,totalCost,pieces,uniqueProducts){
     parts:[
       {label:'Diversification',value:diversification,max:25},
       {label:'Balance',value:balance,max:25},
-      {label:'Cost basis',value:costHealth,max:20},
+      {label:'Unrealized return',value:costHealth,max:20},
       {label:'Product variety',value:variety,max:15},
       {label:'Tracking depth',value:tracking,max:15}
     ],
@@ -9275,14 +9302,15 @@ function handlePremiumReport(){
 }
 function proHoldingInsightHtml(h){
   const spot=Number(livePrices[h.metal]||0);
-  const avg=h.oz>0?h.cost/h.oz:0;
+  const known=holdingHasCostBasis(h);
+  const avg=known&&h.oz>0?h.cost/h.oz:null;
   const value=h.oz*spot;
-  const gain=value-h.cost;
-  const ret=h.cost>0?gain/h.cost*100:0;
+  const gain=known?value-h.cost:null;
+  const ret=known&&h.cost>0?gain/h.cost*100:null;
   if(isProActive()){
-    const breakEven=avg;
-    const breakEvenGap=spot>0&&breakEven>0?((spot-breakEven)/breakEven*100):0;
-    return `<div class="proHoldingInsight"><div class="proHoldingInsightGrid"><div><span>Break-even spot</span><strong>${breakEven?money(breakEven)+'/oz':'—'}</strong></div><div><span>Distance to break-even</span><strong class="${breakEvenGap>=0?'pos':'neg'}">${breakEvenGap>=0?'+':''}${pct(breakEvenGap)}</strong></div><div><span>Unrealized gain/loss</span><strong class="${gain>=0?'pos':'neg'}">${signedMoney(gain)}</strong></div><div><span>Return</span><strong class="${ret>=0?'pos':'neg'}">${ret>=0?'+':''}${pct(ret)}</strong></div></div></div>`;
+    const needed=avg!==null&&spot>0?(avg/spot-1)*100:null;
+    const unit=h.metal==='copper'?'av oz':'t oz';
+    return `<div class="proHoldingInsight"><div class="proHoldingInsightGrid"><div><span>Break-even spot / ${unit}</span><strong>${avg===null?'—':money(avg)}</strong></div><div><span>Spot move to break-even</span><strong>${needed===null?'—':(needed>=0?'+':'')+pct(needed)}</strong></div><div><span>Unrealized gain/loss</span><strong class="${gain===null?'':gain>=0?'pos':'neg'}">${gain===null?'—':signedMoney(gain)}</strong></div><div><span>Unrealized return</span><strong class="${ret===null?'':ret>=0?'pos':'neg'}">${ret===null?'—':(ret>=0?'+':'')+pct(ret)}</strong></div></div></div>`;
   }
   return `<button class="proHoldingTeaser" type="button" onclick="event.stopPropagation();openProUpgrade('holding')"><span class="proHoldingTeaserLabel">Per-Holding Break-Even Details</span><span class="proMiniBadge">PRO</span></button>`;
 }
@@ -9423,9 +9451,9 @@ function renderProAnalytics(){
     const rows=METALS.filter(m=>stats[m].oz>0).map(m=>{
       const s=stats[m];
       if(s.avg===null)return `<div class="proMetricRow"><div><strong>${METAL_NAMES[m]}</strong><span>Cost basis unavailable · spot ${money(s.spot)}/oz</span></div><div class="proMetricRight"><strong>—</strong><span>Break-even unavailable</span></div></div>`;
-      const distance=(s.spot-s.avg)/s.avg*100;
-      const needed=s.spot?((s.avg-s.spot)/s.spot*100):null;
-      return `<div class="proMetricRow"><div><strong>${METAL_NAMES[m]}</strong><span>Average cost ${money(s.avg)}/oz · spot ${money(s.spot)}/oz</span></div><div class="proMetricRight ${distance>=0?'pos':'neg'}"><strong>${distance>=0?'+':''}${distance.toFixed(2)}%</strong><span>${distance>=0?'Above break-even':needed===null?'Spot unavailable':`${Math.max(0,needed).toFixed(2)}% spot rise to break-even`}</span></div></div>`;
+      const needed=s.spot>0?(s.avg/s.spot-1)*100:null;
+      const unit=m==='copper'?'av oz':'t oz';
+      return `<div class="proMetricRow"><div><strong>${METAL_NAMES[m]}</strong><span>Cost ${money(s.avg)}/${unit} · spot ${money(s.spot)}/${unit}</span></div><div class="proMetricRight ${needed===null?'':needed>0?'neg':'pos'}"><strong>${needed===null?'—':(needed>=0?'+':'')+needed.toFixed(2)+'%'}</strong><span>${needed===null?'Spot unavailable':needed>0?'Spot rise needed to recover cost':needed<0?'Spot can fall this much before break-even':'At break-even'}</span></div></div>`;
     });
     breakEven.innerHTML=rows.length?rows.join(''):'<div class="proEmpty">Add holdings with cost basis to see break-even analytics.</div>';
   }
@@ -9446,14 +9474,15 @@ function renderProAnalytics(){
     const groups={};
     holdings.forEach(h=>{
       const key=(h.date||h.created_at||'').slice(0,7)||'Unknown';
-      if(!groups[key])groups[key]={cost:0,oz:0,pieces:0};
+      if(!groups[key])groups[key]={cost:0,costKnown:true,oz:0,pieces:0};
+      groups[key].costKnown=groups[key].costKnown&&holdingHasCostBasis(h);
       groups[key].cost+=Number(h.cost)||0;
-      groups[key].oz+=Number(h.oz)||0;
+      groups[key].oz+=(Number(h.oz)||0)*(h.metal==='copper'?AVOIR_OZ_TO_TROY_OZ:1);
       groups[key].pieces+=Number(h.qty)||0;
     });
     const rows=Object.entries(groups).sort((a,b)=>a[0].localeCompare(b[0])).slice(-12).map(([key,g])=>{
       const label=key==='Unknown'?'Date unavailable':new Date(key+'-01T12:00:00').toLocaleDateString(undefined,{month:'short',year:'numeric'});
-      return `<div class="proMetricRow"><div><strong>${label}</strong><span>${g.pieces.toLocaleString(undefined,{maximumFractionDigits:2})} pieces · ${g.oz.toLocaleString(undefined,{maximumFractionDigits:2})} oz added</span></div><div class="proMetricRight"><strong>${money(g.cost)}</strong><span>acquisition cost</span></div></div>`;
+      return `<div class="proMetricRow"><div><strong>${label}</strong><span>${g.pieces.toLocaleString(undefined,{maximumFractionDigits:2})} pieces · ${g.oz.toLocaleString(undefined,{maximumFractionDigits:2})} troy oz eq. held</span></div><div class="proMetricRight"><strong>${g.costKnown?money(g.cost):'Unavailable'}</strong><span>cost of current holdings</span></div></div>`;
     });
     acquisition.innerHTML=rows.length?rows.join(''):'<div class="proEmpty">Purchase dates will build your acquisition timeline.</div>';
   }
@@ -9485,11 +9514,13 @@ function updateProScenario(){
     current+=base;
     projected+=base*(1+(proScenarioMoves[h.metal]||0)/100);
   });
+  current=roundCurrency(current);
+  projected=roundCurrency(projected);
   const valueEl=document.getElementById('proScenarioValue');
   const deltaEl=document.getElementById('proScenarioDelta');
   if(valueEl)valueEl.textContent=money(projected);
   if(deltaEl){
-    const delta=projected-current;
+    const delta=roundCurrency(projected-current);
     deltaEl.textContent=signedMoney(delta);
     setReturnClass(deltaEl,delta);
   }
@@ -9551,7 +9582,7 @@ function renderAnalytics(){
   const gainEl=document.getElementById('anTotalGain');
   gainEl.textContent=totalGain===null?'—':signedMoney(totalGain)+' ('+(totalRet===null?'—':(totalRet>=0?'+':'')+pct(totalRet))+')';
   if(totalGain!==null)setReturnClass(gainEl,totalGain);
-  document.getElementById('anCost').textContent=money(totalCost);
+  document.getElementById('anCost').textContent=totalCostKnown?money(totalCost):'Unavailable';
   document.getElementById('anOunces').textContent=totalOz.toFixed(2)+' troy oz eq.';
   document.getElementById('anPositions').textContent=holdings.length.toLocaleString();
   document.getElementById('anPieces').textContent=pieces.toLocaleString(undefined,{maximumFractionDigits:2});
@@ -9583,7 +9614,9 @@ function renderAnalytics(){
   METALS.forEach(m=>{
     const s=stats[m], prefix='an'+m.charAt(0).toUpperCase()+m.slice(1);
     document.getElementById(prefix+'Oz').textContent=s.oz.toFixed(2)+(m==='copper'?' av oz':' t oz');
-    document.getElementById(prefix+'Value').textContent=money(s.value)+' market value';
+    document.getElementById(prefix+'Value').textContent=money(s.value)+' spot metal value';
+    document.getElementById(prefix+'Break').title='Total recorded cost divided by metal weight. Excludes selling fees and dealer spreads.';
+    document.getElementById(prefix+'Return').title='(Spot metal value − total cost basis) ÷ total cost basis × 100. Not annualized.';
     document.getElementById(prefix+'Avg').textContent=s.avg===null?'—':money(s.avg);
     document.getElementById(prefix+'Spot').textContent=s.spot?money(s.spot):'—';
     document.getElementById(prefix+'Break').textContent=s.avg===null?'—':money(s.avg);
@@ -9611,13 +9644,13 @@ function renderAnalytics(){
 
   const gs=livePrices.silver?livePrices.gold/livePrices.silver:0;
   const pp=livePrices.palladium?livePrices.platinum/livePrices.palladium:0;
-  document.getElementById('anRatio').textContent='Gold/Silver: '+(gs?gs.toFixed(1)+':1':'—')+' · Platinum/Palladium: '+(pp?pp.toFixed(2)+':1':'—');
+  document.getElementById('anRatio').textContent='Spot price ratios (not your holdings): Gold/Silver '+(gs?gs.toFixed(1)+':1':'—')+' · Platinum/Palladium: '+(pp?pp.toFixed(2)+':1':'—');
 
   const sens=document.getElementById('anSensitivity');
-  sens.innerHTML='';
+  sens.innerHTML='<p class="metricHint">Each row shows projected metal value and change from today’s value, with holdings unchanged. This is a scenario, not a forecast or profit relative to purchase cost.</p>';
   [-10,-5,5,10].forEach(move=>{
-    const projected=totalValue*(1+move/100);
-    const delta=projected-totalValue;
+    const projected=roundCurrency(totalValue*(1+move/100));
+    const delta=roundCurrency(projected-roundCurrency(totalValue));
     const row=document.createElement('div');row.className='sensRow';
     const width=Math.max(8,Math.min(100,50+move*4));
     row.innerHTML=`<div class="sensMove">${move>0?'+':''}${move}%</div>
@@ -9650,7 +9683,7 @@ function renderAnalytics(){
       const ret=hasCost&&Number(h.cost)>0?((value-Number(h.cost))/Number(h.cost)*100):null;
       const gain=hasCost?value-Number(h.cost):null;
       const row=document.createElement('div');row.className='leaderItem';
-      row.innerHTML=`<div><div class="leaderName">${escapeBullionHtml(h.product||'Bullion holding')}</div><div class="leaderMeta">${h.oz.toFixed(2)} oz · ${(METAL_NAMES[h.metal]||h.metal).toUpperCase()} · cost ${hasCost?money(h.cost):'—'}</div></div>
+      row.innerHTML=`<div><div class="leaderName">${escapeBullionHtml(h.product||'Bullion holding')}</div><div class="leaderMeta">${h.oz.toFixed(2)} ${h.metal==='copper'?'av oz':'t oz'} · ${(METAL_NAMES[h.metal]||h.metal).toUpperCase()} · total cost ${hasCost?money(h.cost):'—'}</div></div>
         <div class="leaderRight"><div class="leaderValue">${money(value)}</div><div class="holdingReturn ${ret===null?'':(ret>=0?'pos':'neg')}">${ret===null?'Return —':`${ret>=0?'+':''}${pct(ret)} · ${signedMoney(gain)}`}</div></div>`;
       leaderboard.appendChild(row);
     });
@@ -9664,7 +9697,8 @@ function renderAnalytics(){
     METALS.forEach(m=>{
       const s=stats[m];
       if(!s.oz||s.avg===null)return;
-      const distance=(s.spot-s.avg)/s.avg*100;
+      const distance=s.avg>0&&s.spot>0?(s.spot-s.avg)/s.avg*100:null;
+      if(distance===null)return;
       insightList.push(`${METAL_NAMES[m]} spot is ${Math.abs(distance).toFixed(1)}% ${distance>=0?'above':'below'} your average ${METAL_NAMES[m].toLowerCase()} cost basis of ${money(s.avg)}/oz.`);
     });
     if(largestShare>=60) insightList.push('Your stack is highly concentrated in one holding.');
@@ -10131,7 +10165,7 @@ async function saveHolding(){
   if(button?.disabled)return;
   const q=Number(document.getElementById('qty').value);
   const w=Number(document.getElementById('weight').value);
-  const totalPaid=Number(document.getElementById('cost').value);
+  const totalPaid=purchaseTotalCost(document.getElementById('cost').value,q,document.getElementById('purchaseCostMode').value);
   const date=document.getElementById('date').value;
   const product=(document.getElementById('product').value||'').trim();
   const proActive=isProActive();
@@ -10150,7 +10184,7 @@ async function saveHolding(){
 
   if(!Number.isFinite(q)||q<=0||q>100000){alert('Enter a quantity greater than 0.');return}
   if(!Number.isFinite(w)||w<=0||w>100000){alert('Enter a valid weight greater than 0.');return}
-  if(!Number.isFinite(totalPaid)||totalPaid<0||totalPaid>1000000000){alert('Enter a valid purchase price.');return}
+  if(totalPaid===null||!Number.isFinite(totalPaid)||totalPaid<0||totalPaid>1000000000){alert('Enter the amount paid. Use 0 only for a gift or a free holding.');return}
   if(!product){alert('Choose a bullion product.');return}
   if(year!==null&&(!Number.isInteger(year)||year<1000||year>9999)){alert('Enter a four-digit bullion year, or leave it blank.');return}
   if(!supabaseClient||!currentUser){alert('Please log in before saving a holding.');return}
@@ -11341,8 +11375,11 @@ try{
   console.warn('Account service initialization failed:',e);
 }
 restoreSession();
-if(!navigator.onLine)updateNetworkState();
-fetchLivePrices();
+// Markets is declared in the following script. Start the feed only after all scripts initialize.
+window.addEventListener('DOMContentLoaded',()=>{
+  if(!navigator.onLine)updateNetworkState();
+  fetchLivePrices();
+},{once:true});
 setInterval(fetchLivePrices,30000);
 setInterval(()=>{
   if(lastMarketFeedData)renderLiveFeedStatus(lastMarketFeedData);
