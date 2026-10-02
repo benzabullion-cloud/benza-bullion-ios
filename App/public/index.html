@@ -6871,6 +6871,15 @@ function smartCameraCatalogMatch(text,metal){
       if(item.product.includes('Maple Leaf') && metal===item.metal && /\b(?:canada|can)\b/.test(text) && /9999|999\.9/.test(text) && !/\bbar\b/.test(text)){
         strongHits.push('Canadian metal + .9999 markings');score+=8;
       }
+      // Palladium Maples carry .9995, unlike the .9999 gold/silver wording above.
+      // Recognize their inscriptions without requiring the words "maple leaf" on the coin.
+      // RCM: https://www.mint.ca/en-us/shopping/bullion-products/2015-palladium-maple-leaf-coin
+      if(item.product==='Canadian Palladium Maple Leaf'&&metal==='palladium'&&
+        /\b(?:canada|can)\b/.test(text)&&/(?:^|\s)\.?9995\b/.test(text)&&
+        /\b(?:(?:50|fifty) dollars?|(?:one|1) (?:troy )?(?:oz|ounce))\b/.test(text)&&
+        !/\b(?:bar|round)\b/.test(text)){
+        strongHits.push('Canadian palladium + .9995 + denomination or ounce inscription');score+=8;
+      }
       if(item.product.includes('Britannia') && metal===item.metal && /\bbritannia\b/.test(text)){
         strongHits.push('Britannia inscription');score+=8;
       }
