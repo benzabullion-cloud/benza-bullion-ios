@@ -5,16 +5,29 @@ import Vision
 
 @main struct PhotoOCR {
     static func main() throws {
-        let root = URL(fileURLWithPath: "experiments/private-vision/NativeCore/Tests/BenzaPrivateVisionTests/Fixtures")
+        // A private manifest can add authorized local photos without publishing pixels.
+        let manifestPath=ProcessInfo.processInfo.environment["BENZA_SCANNER_PHOTO_MANIFEST"] ?? "tests/scanner-photo-cases.json"
+        let manifestData=try Data(contentsOf:URL(fileURLWithPath:manifestPath))
+        guard let manifest=try JSONSerialization.jsonObject(with:manifestData) as? [String:Any],
+              let cases=manifest["cases"] as? [[String:Any]], !cases.isEmpty else { throw NSError(domain:"PhotoManifest",code:1) }
         // Use the app's complete OCR vocabulary, never a fixture-specific dictionary.
         let app=try String(contentsOf:URL(fileURLWithPath:"App/SceneDelegate.swift"),encoding:.utf8)
         let pattern=try NSRegularExpression(pattern:"request\\.customWords\\s*=\\s*(\\[[\\s\\S]*?\\])")
         guard let match=pattern.firstMatch(in:app,range:NSRange(app.startIndex...,in:app)),let range=Range(match.range(at:1),in:app) else { throw NSError(domain:"OCRSettings",code:1) }
         let vocabulary=try JSONDecoder().decode([String].self,from:Data(app[range].utf8))
         var report: [[String: Any]] = []
-        for side in ["obverse","reverse"] {
-            let encoded=try String(contentsOf: root.appendingPathComponent("maple-\(side).b64"),encoding:.utf8)
-            guard let data=Data(base64Encoded: encoded.trimmingCharacters(in: .whitespacesAndNewlines)),
+        for fixture in cases {
+          guard let caseID=fixture["id"] as? String,let photos=fixture["photos"] as? [[String:String]],photos.count==2 else { throw NSError(domain:"PhotoManifest",code:2) }
+          for photo in photos {
+            guard let side=photo["side"],let path=photo["path"] else { throw NSError(domain:"PhotoManifest",code:3) }
+            let file=URL(fileURLWithPath:path)
+            let bytes=try Data(contentsOf:file)
+            let data:Data
+            if file.pathExtension == "b64" {
+                guard let decoded=Data(base64Encoded:String(decoding:bytes,as:UTF8.self).trimmingCharacters(in:.whitespacesAndNewlines)) else { throw NSError(domain:"PhotoFixture",code:4) }
+                data=decoded
+            } else { data=bytes }
+            guard
                   let source=CGImageSourceCreateWithData(data as CFData,nil),
                   let raw=CGImageSourceCreateImageAtIndex(source,0,nil),
                   let context=CGContext(data:nil,width:raw.width,height:raw.height,bitsPerComponent:8,
@@ -63,7 +76,8 @@ import Vision
                 let confidence=observations.isEmpty ? 0 : Double(confidenceSum)/Double(observations.count)
                 readings.append(["id":index,"confidence":confidence,"observations":observations,"elapsedMs":Int(Date().timeIntervalSince(passStarted)*1000)])
             }
-            report.append(["side":side,"passes":readings,"rimImages":rims.count,"rimElapsedMs":rimElapsedMs,"elapsedMs":Int(Date().timeIntervalSince(started)*1000)])
+            report.append(["caseId":caseID,"side":side,"passes":readings,"rimImages":rims.count,"rimElapsedMs":rimElapsedMs,"elapsedMs":Int(Date().timeIntervalSince(started)*1000)])
+          }
         }
         let json=try JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys])
         try json.write(to:URL(fileURLWithPath:"/tmp/benza-real-photo-readings.json"))

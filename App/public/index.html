@@ -805,6 +805,14 @@ html[data-theme="dark"] .marketCard{background:linear-gradient(145deg,#1a1b20,#1
 .smartCameraPrimary{border:0;background:linear-gradient(135deg,#f0d47e,#d6a53a 52%,#b77a17);color:#151008}
 .smartCameraPrimary:disabled{opacity:.72}
 .smartCameraSecondary{border:1px solid var(--border);background:var(--surface3);color:var(--text)}
+.smartScanFeedbackLink{display:block;margin:0 auto 6px;padding:12px;border:0;background:none;color:var(--muted);font:inherit;font-size:10px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.smartScanFeedback{padding:0 16px 16px;font-size:11px;color:var(--muted)}
+.smartScanFeedback[hidden]{display:none!important}
+.smartScanFeedback label{display:block;margin:10px 0 5px}
+.smartScanFeedback select,.smartScanFeedback textarea{box-sizing:border-box;width:100%;min-width:0;padding:9px;border:1px solid var(--border);border-radius:9px;background:var(--surface3);color:var(--text);font:inherit}
+.smartScanFeedback textarea{resize:vertical}
+.smartScanFeedback p{line-height:1.5}
+.smartScanFeedback a{color:var(--text);font-size:11px}
 #smartCameraDiagnostics{min-width:0;max-width:100%}
 #smartCameraDiagnosticText{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;text-align:left;max-width:100%;font-family:inherit}
 .smartCameraFine{margin:11px 3px 0;color:var(--muted);font-size:9px;line-height:1.45;text-align:center}
@@ -5806,7 +5814,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
     </div>
     <div class="smartCameraBody">
       <div class="smartCameraHero">
-        <div class="smartCameraEyebrow">Benza bullion · Beta</div>
+        <div class="smartCameraEyebrow">BULLION SCAN ASSIST - BETA</div>
         <div class="smartCameraVisual" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M4 8.5h3l1.4-2h7.2l1.4 2h3v10H4Z"/><circle cx="12" cy="13.5" r="3.4"/></svg>
         </div>
@@ -5841,11 +5849,26 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
           <div class="smartAnalysisActions"><button type="button" class="smartAnalysisUse" data-scan-control onclick="saveSmartScanReview()">Confirm changes</button><button type="button" class="smartAnalysisAgain" data-scan-control onclick="closeSmartScanEditor()">Cancel edits</button></div>
         </div>
         <div class="smartAnalysisActions"><button id="smartAnalysisUseButton" class="smartAnalysisUse" type="button" onclick="useSmartCameraAnalysis()" disabled hidden>Review holding</button></div>
+        <button id="smartScanFeedbackLink" class="smartScanFeedbackLink" type="button" aria-controls="smartScanFeedback" aria-expanded="false" data-scan-control onclick="toggleSmartScanFeedback()">Report a scan issue</button>
+        <div id="smartScanFeedback" class="smartScanFeedback" hidden>
+          <p>Help improve recognition of less common bullion. Review your report before opening an email draft to benzabullion@gmail.com.</p>
+          <label for="smartFeedbackIssue">What went wrong?</label>
+          <select id="smartFeedbackIssue" data-scan-control><option>Wrong product</option><option>Wrong metal</option><option>Wrong weight</option><option>Missing details</option><option>Other scan issue</option></select>
+          <label for="smartFeedbackCorrection">Correct details or what happened</label>
+          <textarea id="smartFeedbackCorrection" rows="3" maxlength="1000" data-scan-control placeholder="Coin name, correct weight, or missing details"></textarea>
+          <p>No photos, receipts, purchase costs, account details or raw scanned text are included automatically. You may attach coin-only photos yourself in the email.</p>
+          <button class="smartScanFeedbackLink" type="button" data-scan-control onclick="previewSmartScanFeedback()">Preview report</button>
+          <div id="smartFeedbackPreview" hidden>
+            <label for="smartFeedbackReport">Report preview</label><textarea id="smartFeedbackReport" rows="8" readonly></textarea>
+            <a id="smartFeedbackEmail" href="mailto:benzabullion@gmail.com">Open email draft</a>
+          </div>
+        </div>
       </div>
       <div class="smartCameraActions">
         <button id="smartCameraProButton" class="smartCameraPrimary" type="button" onclick="handleSmartCameraProAction()">Scan Bullion</button>
         <button id="smartCameraLibraryButton" class="smartCameraSecondary" data-scan-control type="button" onclick="runSmartCameraScan(smartCameraAwaitingReverse,'library')">Choose Bullion Photo</button>
         <button class="smartCameraSecondary" type="button" onclick="closeSmartCamera();openManualAdd();">Enter manually</button>
+        <button id="smartCameraResetButton" class="smartCameraSecondary" data-scan-control type="button" onclick="resetSmartCameraScan()">Reset scan</button>
       </div>
       <div id="smartCameraStatus" class="smartCameraFine" role="status"></div>
       <details id="smartCameraDiagnostics" class="smartCameraFine" hidden><summary>Scanner check · stays on this phone</summary><p id="smartCameraDiagnosticText"></p></details>
@@ -6871,6 +6894,32 @@ function smartCameraCatalogMatch(text,metal){
       if(item.product.includes('Maple Leaf') && metal===item.metal && /\b(?:canada|can)\b/.test(text) && /9999|999\.9/.test(text) && !/\bbar\b/.test(text)){
         strongHits.push('Canadian metal + .9999 markings');score+=8;
       }
+      // Palladium Maples carry .9995, unlike the .9999 gold/silver wording above.
+      // Recognize their inscriptions without requiring the words "maple leaf" on the coin.
+      // RCM: https://www.mint.ca/en-us/shopping/bullion-products/2015-palladium-maple-leaf-coin
+      if(item.product==='Canadian Palladium Maple Leaf'&&metal==='palladium'&&
+        /\b(?:canada|can)\b/.test(text)&&/(?:^|\s)\.?9995\b/.test(text)&&
+        /\b(?:(?:50|fifty) dollars?|(?:one|1) (?:troy )?(?:oz|ounce))\b/.test(text)&&
+        !/\b(?:bar|round)\b/.test(text)){
+        strongHits.push('Canadian palladium + .9995 + denomination or ounce inscription');score+=8;
+      }
+      // RCM platinum bullion uses .9995 too. Require all identifying inscriptions;
+      // the independent weight parser still decides whether a weight is readable.
+      // https://www.mint.ca/en/shop/coins/2023/2023-50-1oz-9995-pure-platinum-coin-ptml-bullion
+      if(item.product==='Canadian Platinum Maple Leaf'&&metal==='platinum'&&
+        /\bcanada\b/.test(text)&&/(?:^|\s)\.?9995\b/.test(text)&&
+        /\b(?:50 dollars?|fifty dollars?)\b/.test(text)&&
+        /\b(?:one|1) (?:troy )?(?:oz|ounce)\b/.test(text)&&!/\b(?:bar|round)\b/.test(text)){
+        strongHits.push('Canadian platinum + .9995 + fifty dollars + ounce');score+=8;
+      }
+      // US Mint documents this reverse combination for the platinum Eagle.
+      // https://www.usmint.gov/learn/coins-and-medals/collectible-coins/american-eagle/2025-platinum-proof-right-to-petition
+      if(item.product==='American Platinum Eagle'&&metal==='platinum'&&
+        /\bunited states of america\b/.test(text)&&/(?:^|\s)\.?9995\b/.test(text)&&
+        /(?:^|\s)\$100\b|\b(?:100|one hundred) dollars?\b/.test(text)&&
+        /\b(?:one|1) (?:troy )?(?:oz|ounce)\b/.test(text)&&!/\b(?:bar|round)\b/.test(text)){
+        strongHits.push('US platinum + .9995 + hundred dollars + ounce');score+=8;
+      }
       if(item.product.includes('Britannia') && metal===item.metal && /\bbritannia\b/.test(text)){
         strongHits.push('Britannia inscription');score+=8;
       }
@@ -7455,6 +7504,37 @@ function canReviewSmartCameraSuggestion(suggestion){
     (!suggestion.product||(PRODUCT_MAP[suggestion.metal]||[]).includes(suggestion.product))&&
     Array.isArray(suggestion.warnings)&&suggestion.warnings.every(w=>/weight/i.test(w)));
 }
+function closeSmartScanFeedback(){
+  document.getElementById('smartScanFeedback').hidden=true;
+  document.getElementById('smartScanFeedbackLink').setAttribute('aria-expanded','false');
+  document.getElementById('smartFeedbackPreview').hidden=true;
+  document.getElementById('smartFeedbackCorrection').value='';
+  document.getElementById('smartFeedbackReport').value='';
+  document.getElementById('smartFeedbackIssue').selectedIndex=0;
+  document.getElementById('smartFeedbackEmail').setAttribute('href','mailto:benzabullion@gmail.com');
+}
+function toggleSmartScanFeedback(){
+  const panel=document.getElementById('smartScanFeedback');
+  panel.hidden=!panel.hidden;
+  document.getElementById('smartScanFeedbackLink').setAttribute('aria-expanded',String(!panel.hidden));
+}
+function previewSmartScanFeedback(){
+  const suggestion=pendingSmartCameraSuggestion?.scanEvidence||pendingSmartCameraSuggestion;
+  if(!suggestion)return;
+  const allowed=['Wrong product','Wrong metal','Wrong weight','Missing details','Other scan issue'];
+  const issue=document.getElementById('smartFeedbackIssue').value;
+  const safeIssue=allowed.includes(issue)?issue:'Other scan issue';
+  const diagnostic=smartCameraLastDiagnostic||{};
+  const body=['Bullion Scan Assist - Beta feedback','Issue: '+safeIssue,
+    'Scan product: '+(suggestion.product||'Not identified'),'Scan metal: '+(suggestion.metal||'Not identified'),
+    'Scan weight each: '+(suggestion.weight>0?suggestion.weight+' '+(suggestion.metal==='copper'?'avoirdupois oz':'troy oz'):'Not read'),
+    'App build: '+(diagnostic.appBuild||'Unknown'),'Scanner engine: '+(diagnostic.engineVersion||'Unknown'),
+    'Weight parser: '+SMART_CAMERA_WEIGHT_PARSER_VERSION,'',
+    'Correct details / description:',document.getElementById('smartFeedbackCorrection').value.trim().slice(0,1000)].join('\n');
+  document.getElementById('smartFeedbackReport').value=body;
+  document.getElementById('smartFeedbackEmail').setAttribute('href','mailto:benzabullion@gmail.com?subject='+encodeURIComponent('Bullion Scan Assist: '+safeIssue)+'&body='+encodeURIComponent(body));
+  document.getElementById('smartFeedbackPreview').hidden=false;
+}
 function updateSmartScanEditorProducts(product=''){
   const metal=document.getElementById('smartEditMetal').value;
   const select=document.getElementById('smartEditProduct');
@@ -7508,6 +7588,7 @@ function saveSmartScanReview(){
 }
 function renderSmartCameraAnalysis(suggestion){
   pendingSmartCameraSuggestion=suggestion;
+  closeSmartScanFeedback();
   document.getElementById('smartScanEditor').hidden=true;
   document.getElementById('smartScanEditButton').setAttribute('aria-expanded','false');
   const ready=canUseSmartCameraSuggestion(suggestion);
@@ -7581,6 +7662,7 @@ function scannerPhotoFileFromResult(result,index){
 }
 
 function clearSmartCameraEvidence(){
+  closeSmartScanFeedback();
   smartCameraScans=[];
   smartCameraPhotoCount=0;
   smartCameraCapturedFiles=[];

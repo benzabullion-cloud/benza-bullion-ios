@@ -1,0 +1,26 @@
+{
+  "cases": [
+    {
+      "id": "silver-maple-2022",
+      "photos": [
+        {
+          "side": "obverse",
+          "path": "experiments/private-vision/NativeCore/Tests/BenzaPrivateVisionTests/Fixtures/maple-obverse.b64"
+        },
+        {
+          "side": "reverse",
+          "path": "experiments/private-vision/NativeCore/Tests/BenzaPrivateVisionTests/Fixtures/maple-reverse.b64"
+        }
+      ],
+      "expected": {
+        "product": "Canadian Silver Maple Leaf",
+        "metal": "silver",
+        "weight": 1,
+        "year": 2022,
+        "purity": ".9999",
+        "mint": "Royal Canadian Mint",
+        "usable": true
+      }
+    }
+  ]
+}

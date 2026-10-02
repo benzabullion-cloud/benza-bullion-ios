@@ -311,3 +311,32 @@ test('Fraction repair retains native confidence and date protections',()=>{
  assert.equal(scan('Fine gold 2026 oz').weight,0);
 });
 console.log(count+' scanner checks passed including mixed-fraction coverage');
+
+// Synthetic inscription fixtures based on the supplied palladium Maple photos.
+// Diagnostics omit raw OCR; these do not claim to reproduce the complete native OCR output.
+test('Palladium Maple inscriptions identify product and mint without printed family name or visible year',()=>{
+ const r=scan('CANADA 9995 FINE PALLADIUM 1 OZ PALLADIUM PUR ELIZABETH II 50 DOLLARS RANDOM YEAR',{sides:2});
+ assert.equal(r.product,'Canadian Palladium Maple Leaf');assert.equal(r.metal,'palladium');
+ assert.equal(r.mint,'Royal Canadian Mint');assert.equal(r.purity.trim(),'.9995 palladium');assert.equal(r.weight,1);assert.equal(r.year,null);
+});
+test('Palladium Maple recognition keeps the diagnostic 1 and 91 ounce conflict blocked',()=>{
+ const r=scan('CANADA 9995 FINE PALLADIUM ELIZABETH II 50 DOLLARS RANDOM YEAR',
+   {sides:2,weightLines:['1 oz palladium pur','91 oz palladium pur']});
+ assert.equal(r.product,'Canadian Palladium Maple Leaf');assert.equal(r.mint,'Royal Canadian Mint');
+ assert.equal(r.weight,0);assert.ok(r.warnings.some(w=>/Different weights/.test(w)));assert.equal(context.canUseSmartCameraSuggestion(r),false);
+});
+test('Palladium Maple with denomination but absent weight never manufactures an ounce',()=>{
+ const r=scan('CANADA 9995 FINE PALLADIUM ELIZABETH II 50 DOLLARS',{sides:2});
+ assert.equal(r.product,'Canadian Palladium Maple Leaf');assert.equal(r.weight,0);assert.equal(r.year,null);
+});
+test('Canadian palladium bars and rounds remain generic, with real large bar weight intact',()=>{
+ for(const kind of ['BAR','ROUND']){
+  const r=scan('CANADA 9995 FINE PALLADIUM 1 OZ '+kind);assert.equal(r.product,kind==='BAR'?'Palladium Bar':'Palladium Round');
+ }
+ const large=scan('CANADA 9995 FINE PALLADIUM 91 OZ BAR');assert.equal(large.product,'Palladium Bar');assert.equal(large.weight,91);
+});
+test('Palladium purity alone and wrong-country coins do not identify a Canadian Maple',()=>{
+ assert.notEqual(scan('9995 FINE PALLADIUM 1 OZ').product,'Canadian Palladium Maple Leaf');
+ assert.notEqual(scan('RUSSIA 9995 FINE PALLADIUM 1 OZ').product,'Canadian Palladium Maple Leaf');
+ assert.notEqual(scan('CANADA 9995 FINE PALLADIUM').product,'Canadian Palladium Maple Leaf');
+});

@@ -50,7 +50,16 @@ jobs:
           node tests/smart-camera-flow.test.cjs
           node tests/smart-camera-simple-flow.test.cjs
           node tests/smart-camera-design.test.cjs
+          node tests/scanner-release-benchmark.cjs
+          node tests/scanner-photo-benchmark.test.cjs
           python3 -m unittest discover -s experiments/private-vision -p 'test_*.py'
+      - name: Save inscription benchmark report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scanner-inscription-benchmark
+          path: /tmp/benza-scanner-inscription-benchmark.json
+          if-no-files-found: error
       - name: Compile actual app integration without signing or model assets
         run: xcodebuild -project App.xcodeproj -scheme App -destination 'generic/platform=iOS' -derivedDataPath /tmp/benza-camera-app CODE_SIGNING_ALLOWED=NO build
       - name: Verify app privacy manifest is bundled
@@ -70,3 +79,10 @@ jobs:
         run: /tmp/benza-photo-ocr
       - name: Validate actual OCR through shared holding gates
         run: node tests/real-photo-gate.cjs
+      - name: Save photo benchmark report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scanner-photo-benchmark
+          path: /tmp/benza-scanner-photo-benchmark.json
+          if-no-files-found: error
