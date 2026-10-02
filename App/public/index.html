@@ -771,14 +771,14 @@ html[data-theme="dark"] .marketCard{background:linear-gradient(145deg,#1a1b20,#1
   padding:11px;font-weight:700;font-size:13px;
 }
 
-/* Pro Smart Camera roadmap screen */
+/* Pro Bullion Scan Assist roadmap screen */
 .smartCameraScreen{
   position:fixed;inset:0;background:var(--surface);color:var(--text);
   z-index:2147482999;display:none;overflow:auto;
 }
 .smartCameraScreen.show{display:block}
 .smartCameraHeader{
-  height:58px;display:flex;align-items:center;justify-content:center;
+  min-height:58px;box-sizing:border-box;padding:12px 54px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:14px;line-height:1.25;
   border-bottom:1px solid var(--border);position:sticky;top:0;
   background:var(--surface);z-index:2;font-weight:800;
 }
@@ -837,6 +837,12 @@ html[data-theme="dark"] .marketCard{background:linear-gradient(145deg,#1a1b20,#1
 .smartAnalysisActions button{width:100%;border-radius:12px;padding:12px;font-size:11px;font-weight:900}
 .smartAnalysisUse{border:0;background:linear-gradient(135deg,#f0d47e,#d6a53a 52%,#b77a17);color:#151008}
 .smartAnalysisAgain{border:1px solid var(--border);background:var(--surface3);color:var(--text)}
+#smartScanEditor[hidden]{display:none!important}
+.smartScanEditor{margin:0 14px 14px;padding:12px;border:1px solid var(--border);border-radius:13px;background:var(--surface)}
+.smartScanEditor label{display:block;font-size:11px;color:var(--muted);margin:12px 0 5px}
+.smartScanEditor input,.smartScanEditor select{box-sizing:border-box;width:100%;min-width:0;max-width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface3);color:var(--text);padding:10px;font-size:14px}
+.smartScanEditor .smartAnalysisActions{padding:8px 0 0}
+#smartEditError{color:#c7392f}
 .smartAnalysisDisclosure{padding:0 14px 14px;color:var(--muted);font-size:8px;line-height:1.4}
 @media(max-width:360px){.smartAnalysisChecks,.smartAnalysisGrid{grid-template-columns:1fr 1fr;gap:6px}}
 
@@ -5775,8 +5781,8 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
       <button class="addChoiceOption smartCameraChoice" onclick="openSmartCamera()">
         <div class="addChoiceIcon">⌾</div>
         <div class="addChoiceText">
-          <strong>Smart Camera <span style="font-size:9px;color:#d6a53a">BETA</span></strong>
-          <span>Intelligent bullion recognition</span>
+          <strong>Bullion Scan Assist <span style="font-size:9px;color:#d6a53a">BETA</span></strong>
+          <span>Scan markings, then review and complete details</span>
         </div>
         <div class="smartCameraBadge">PRO</div>
       </button>
@@ -5796,7 +5802,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
   <section id="smartCameraScreen" class="smartCameraScreen" aria-hidden="true">
     <div class="smartCameraHeader">
       <button class="smartCameraBack" onclick="closeSmartCamera()" aria-label="Back">‹</button>
-      Smart Camera
+      Bullion Scan Assist
     </div>
     <div class="smartCameraBody">
       <div class="smartCameraHero">
@@ -5805,7 +5811,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
           <svg viewBox="0 0 24 24"><path d="M4 8.5h3l1.4-2h7.2l1.4 2h3v10H4Z"/><circle cx="12" cy="13.5" r="3.4"/></svg>
         </div>
         <h2 class="smartCameraTitle">Scan your bullion</h2>
-        <p class="smartCameraCopy">Photograph the side with metal and weight markings. Review before adding.</p>
+        <p class="smartCameraCopy">An assistant for identifying bullion markings. Scan both sides, then review or complete the details before adding.</p>
       </div>
       <div id="smartCameraAnalysis" class="smartCameraAnalysis" aria-live="polite">
         <div class="smartAnalysisTop">
@@ -5816,6 +5822,23 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
           <div><span>Product</span><strong id="smartScanProduct"></strong></div>
           <div><span>Metal</span><strong id="smartScanMetal"></strong></div>
           <div><span>Weight each</span><strong id="smartScanWeight"></strong></div>
+          <div><span>Year</span><strong id="smartScanYear"></strong></div>
+          <div><span>Purity</span><strong id="smartScanPurity"></strong></div>
+          <div><span>Mint / refiner</span><strong id="smartScanMint"></strong></div>
+        </div>
+        <div class="smartAnalysisActions">
+          <button id="smartScanEditButton" aria-controls="smartScanEditor" aria-expanded="false" class="smartAnalysisAgain" type="button" data-scan-control onclick="openSmartScanEditor()">Quick edit details</button>
+        </div>
+        <div id="smartScanEditor" class="smartScanEditor" hidden>
+          <p class="smartAnalysisSub">Complete missing fields or correct a suggestion. These are your confirmed details; editing does not verify the item.</p>
+          <label for="smartEditMetal">Metal</label><select id="smartEditMetal" data-scan-control onchange="updateSmartScanEditorProducts()"><option value="">Choose metal</option><option value="gold">Gold</option><option value="silver">Silver</option><option value="platinum">Platinum</option><option value="palladium">Palladium</option><option value="copper">Copper</option></select>
+          <label for="smartEditProduct">Product</label><select id="smartEditProduct" data-scan-control></select>
+          <label id="smartEditWeightLabel" for="smartEditWeight">Weight each (troy oz of metal)</label><input id="smartEditWeight" type="number" min="0" step="any" inputmode="decimal" placeholder="Enter metal weight" data-scan-control>
+          <label for="smartEditYear">Year (optional)</label><input id="smartEditYear" type="number" min="1000" max="9999" step="1" inputmode="numeric" placeholder="Not identified" data-scan-control>
+          <label for="smartEditPurity">Purity (optional)</label><input id="smartEditPurity" type="text" maxlength="80" placeholder="e.g. .999 fine silver" data-scan-control>
+          <label for="smartEditMint">Mint / refiner (optional)</label><input id="smartEditMint" type="text" maxlength="120" placeholder="Not identified" data-scan-control>
+          <p id="smartEditError" class="smartAnalysisSub" role="alert"></p>
+          <div class="smartAnalysisActions"><button type="button" class="smartAnalysisUse" data-scan-control onclick="saveSmartScanReview()">Confirm changes</button><button type="button" class="smartAnalysisAgain" data-scan-control onclick="closeSmartScanEditor()">Cancel edits</button></div>
         </div>
         <div class="smartAnalysisActions"><button id="smartAnalysisUseButton" class="smartAnalysisUse" type="button" onclick="useSmartCameraAnalysis()" disabled hidden>Review holding</button></div>
       </div>
@@ -6368,7 +6391,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
         <div class="settingsProFeatureList">
           <div><strong>Advanced analytics</strong><span>Profit/loss attribution, break-even distance, realized sales, acquisition history, and independent scenarios—beyond the Free performance snapshot.</span></div>
           <div><strong>Unlimited price alerts</strong><span>Track as many active price targets as you want.</span></div>
-          <div><strong>Smart Camera</strong><span>Scan supported bullion markings on iPhone to prefill metal, product, weight, and year for review.</span></div><div><strong>Inventory records</strong><span>Save private notes, item photos, and receipts.</span></div>
+          <div><strong>Bullion Scan Assist</strong><span>Scan supported bullion markings on iPhone to prefill metal, product, weight, and year for review.</span></div><div><strong>Inventory records</strong><span>Save private notes, item photos, and receipts.</span></div>
           <div><strong>Portfolio report</strong><span>Create a detailed inventory and performance report.</span></div>
           <div><strong>Future Pro releases</strong><span>Active subscriptions and Founder access automatically receive new features added to Benza Bullion Pro, including planned Future Potential tools.</span></div>
         </div>
@@ -7432,14 +7455,67 @@ function canReviewSmartCameraSuggestion(suggestion){
     (!suggestion.product||(PRODUCT_MAP[suggestion.metal]||[]).includes(suggestion.product))&&
     Array.isArray(suggestion.warnings)&&suggestion.warnings.every(w=>/weight/i.test(w)));
 }
+function updateSmartScanEditorProducts(product=''){
+  const metal=document.getElementById('smartEditMetal').value;
+  const select=document.getElementById('smartEditProduct');
+  const products=Object.hasOwn(PRODUCT_MAP,metal)?PRODUCT_MAP[metal]:[];
+  select.innerHTML='<option value="">Choose product</option>'+products.map(p=>'<option>'+escapeSmartScanOption(p)+'</option>').join('');
+  select.value=products.includes(product)?product:'';
+  document.getElementById('smartEditWeightLabel').textContent=metal==='copper'?'Weight each (avoirdupois oz of copper)':'Weight each (troy oz of metal)';
+}
+function escapeSmartScanOption(text){return String(text).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;')}
+function openSmartScanEditor(){
+  if(!pendingSmartCameraSuggestion||smartCameraScanning||!isProActive())return;
+  const s=pendingSmartCameraSuggestion;
+  document.getElementById('smartEditMetal').value=Object.hasOwn(PRODUCT_MAP,s.metal)?s.metal:'';
+  updateSmartScanEditorProducts(s.product);
+  document.getElementById('smartEditWeight').value=s.weight>0?s.weight:'';
+  document.getElementById('smartEditYear').value=s.year||'';
+  document.getElementById('smartEditPurity').value=s.purity||'';
+  document.getElementById('smartEditMint').value=s.mint||'';
+  document.getElementById('smartEditError').textContent='';
+  document.getElementById('smartScanEditor').hidden=false;
+  document.getElementById('smartAnalysisUseButton').disabled=true;
+  document.getElementById('smartScanEditButton').setAttribute('aria-expanded','true');
+}
+function closeSmartScanEditor(){
+  document.getElementById('smartScanEditor').hidden=true;
+  document.getElementById('smartEditError').textContent='';
+  document.getElementById('smartScanEditButton').setAttribute('aria-expanded','false');
+  setSmartCameraBusy(smartCameraScanning);
+}
+function saveSmartScanReview(){
+  if(!pendingSmartCameraSuggestion||smartCameraScanning||!isProActive())return false;
+  const metal=document.getElementById('smartEditMetal').value;
+  const product=document.getElementById('smartEditProduct').value;
+  const weight=Number(document.getElementById('smartEditWeight').value);
+  const yearText=document.getElementById('smartEditYear').value.trim();
+  const year=yearText?Number(yearText):null;
+  const error=document.getElementById('smartEditError');
+  if(!Object.hasOwn(PRODUCT_MAP,metal)||!PRODUCT_MAP[metal].includes(product)){error.textContent='Choose a metal and a product for that metal.';return false;}
+  if(!Number.isFinite(weight)||weight<=0||weight>100000){error.textContent='Enter a valid metal weight greater than 0.';return false;}
+  if(year!==null&&(!Number.isInteger(year)||year<1000||year>9999)){error.textContent='Enter a four-digit year or leave it blank.';return false;}
+  const original=pendingSmartCameraSuggestion;
+  // User confirmation is a separate path from automatic recognition, never a stronger OCR result.
+  const reviewed={...original,metal,product,weight,year,
+    purity:document.getElementById('smartEditPurity').value.trim().slice(0,80),
+    mint:document.getElementById('smartEditMint').value.trim().slice(0,120),
+    warnings:[],usable:true,inferredWeight:false,userReviewed:true,
+    scanEvidence:original.scanEvidence||original,
+    originalScanWarnings:original.originalScanWarnings||[...(original.warnings||[])]};
+  renderSmartCameraAnalysis(reviewed);
+  return true;
+}
 function renderSmartCameraAnalysis(suggestion){
   pendingSmartCameraSuggestion=suggestion;
+  document.getElementById('smartScanEditor').hidden=true;
+  document.getElementById('smartScanEditButton').setAttribute('aria-expanded','false');
   const ready=canUseSmartCameraSuggestion(suggestion);
   smartCameraAwaitingReverse=!ready&&suggestion.sides<2;
   const panel=document.getElementById('smartCameraAnalysis');
   if(!panel)return;
-  document.getElementById('smartAnalysisTitle').textContent=ready?'Your scan is ready':smartCameraAwaitingReverse?'One more photo':'More details needed';
-  document.getElementById('smartAnalysisSub').textContent=ready
+  document.getElementById('smartAnalysisTitle').textContent=suggestion.userReviewed?'Your reviewed details':ready?'Your scan is ready':smartCameraAwaitingReverse?'One more photo':'More details needed';
+  document.getElementById('smartAnalysisSub').textContent=suggestion.userReviewed?'You confirmed these details. Review once more, then continue to your holding.':ready
     ? 'Review the details below, then continue to your holding.'
     : smartCameraAwaitingReverse
       ? 'First photo received. Photograph or choose a photo of the opposite side of the same item.'
@@ -7447,11 +7523,14 @@ function renderSmartCameraAnalysis(suggestion){
   document.getElementById('smartScanProduct').textContent=suggestion.product||'Not identified';
   document.getElementById('smartScanMetal').textContent=METAL_NAMES[suggestion.metal]||'Not identified';
   document.getElementById('smartScanWeight').textContent=suggestion.weight>0
-    ? Number(suggestion.weight.toFixed(4))+' oz'+(suggestion.inferredWeight?' · standard specification':''):'Not read';
+    ? Number(suggestion.weight.toFixed(4))+(suggestion.metal==='copper'?' av oz':' troy oz')+(suggestion.inferredWeight?' · standard specification':''):'Not read';
+  document.getElementById('smartScanYear').textContent=suggestion.year||'Not identified';
+  document.getElementById('smartScanPurity').textContent=suggestion.purity||'Not identified';
+  document.getElementById('smartScanMint').textContent=suggestion.mint||'Not identified';
   const use=document.getElementById('smartAnalysisUseButton');
-  if(use){const review=canReviewSmartCameraSuggestion(suggestion);use.hidden=!review;use.disabled=!review;use.textContent=ready?'Use scan details':'Review and complete holding';}
+  if(use){const review=canReviewSmartCameraSuggestion(suggestion);use.hidden=!review;use.disabled=!review;use.textContent=suggestion.userReviewed?'Use reviewed details':ready?'Use scan details':'Review and complete holding';}
   panel.classList.add('show');
-  renderSmartCameraDiagnostics(suggestion);
+  renderSmartCameraDiagnostics(suggestion.scanEvidence||suggestion);
   setSmartCameraBusy(smartCameraScanning);
 }
 function applySmartCameraSuggestion(suggestion){
@@ -7469,12 +7548,12 @@ function applySmartCameraSuggestion(suggestion){
     document.getElementById('product').value=suggestion.product;
   }
   document.getElementById('qty').value=1;
-  document.getElementById('weight').value=suggestion.weight>0&&!suggestion.warnings.some(w=>/weight/i.test(w))?Number(suggestion.weight.toFixed(4)):'';
+  document.getElementById('weight').value=suggestion.weight>0&&!suggestion.warnings.some(w=>/weight/i.test(w))?(suggestion.userReviewed?suggestion.weight:Number(suggestion.weight.toFixed(4))):'';
   if(!suggestion.product)document.getElementById('product').selectedIndex=-1;
   document.getElementById('cost').value='';
   fillBullionDetails({year:suggestion.year,purity:suggestion.purity,mint:suggestion.mint,serial:suggestion.serial});
   document.getElementById('proInventoryFields').open=true;
-  document.getElementById('holdingDetailsHint').textContent=canUseSmartCameraSuggestion(suggestion)?'Details filled from your scan. Review every field before saving.':'Partial scan. Review the details before saving. Additional bullion details are optional.'+(suggestion.warnings.length?' '+suggestion.warnings.join(' '):'');
+  document.getElementById('holdingDetailsHint').textContent=suggestion.userReviewed?'Details confirmed in Bullion Scan Assist. Review before saving.':canUseSmartCameraSuggestion(suggestion)?'Details filled from your scan. Review every field before saving.':'Partial scan. Review the details before saving. Additional bullion details are optional.'+(suggestion.warnings.length?' '+suggestion.warnings.join(' '):'');
   if(isProActive()&&suggestion.denomination){
     document.getElementById('holdingNotes').value='Denomination: '+suggestion.denomination;
   }
@@ -7482,7 +7561,7 @@ function applySmartCameraSuggestion(suggestion){
   return true;
 }
 function useSmartCameraAnalysis(){
-  if(!canReviewSmartCameraSuggestion(pendingSmartCameraSuggestion)){
+  if(!document.getElementById('smartScanEditor').hidden||!canReviewSmartCameraSuggestion(pendingSmartCameraSuggestion)){
     const status=document.getElementById('smartCameraStatus');
     if(status)status.textContent='Choose a metal manually or try another scan before continuing.';
     return;
@@ -7509,6 +7588,8 @@ function clearSmartCameraEvidence(){
   const diagnostic=document.getElementById('smartCameraDiagnostics');
   if(diagnostic){diagnostic.hidden=true;diagnostic.open=false;}
   pendingSmartCameraSuggestion=null;
+  document.getElementById('smartScanEditor').hidden=true;
+  document.getElementById('smartEditError').textContent='';
   smartCameraAwaitingReverse=false;
   document.getElementById('smartCameraAnalysis')?.classList.remove('show');
   for(const id of ['smartAnalysisChecks','smartAnalysisGrid','smartAnalysisNotes']){
@@ -7522,11 +7603,11 @@ function setSmartCameraBusy(busy){
   smartCameraScanning=busy;
   document.querySelectorAll('[data-scan-control]').forEach(el=>el.disabled=busy);
   const button=document.getElementById('smartCameraProButton');
-  if(button){button.disabled=busy;button.textContent=busy?'Reading your bullion…':isProActive()?(smartCameraAwaitingReverse?'Scan Opposite Side':pendingSmartCameraSuggestion?'Scan again':'Scan Bullion'):'Unlock Smart Camera with Pro';}
+  if(button){button.disabled=busy;button.textContent=busy?'Reading your bullion…':isProActive()?(smartCameraAwaitingReverse?'Scan Opposite Side':pendingSmartCameraSuggestion?'Scan again':'Scan Bullion'):'Unlock Bullion Scan Assist with Pro';}
   const libraryButton=document.getElementById('smartCameraLibraryButton');
   if(libraryButton){libraryButton.disabled=busy;libraryButton.textContent=smartCameraAwaitingReverse?'Choose Opposite Side Photo':'Choose Bullion Photo';}
   const useButton=document.getElementById('smartAnalysisUseButton');
-  if(useButton)useButton.disabled=busy||!canReviewSmartCameraSuggestion(pendingSmartCameraSuggestion);
+  if(useButton)useButton.disabled=busy||!document.getElementById('smartScanEditor').hidden||!canReviewSmartCameraSuggestion(pendingSmartCameraSuggestion);
 }
 async function resetSmartCameraScan(silent=false,releaseModels=false){
   const run=++smartCameraRunId;
@@ -7565,12 +7646,12 @@ async function runSmartCameraScan(append=false,source='camera'){
     return;
   }
   if(!isBenzaNativeRuntime()){
-    if(status)status.textContent='Smart Camera scanning is available in the native Benza bullion iPhone app.';
+    if(status)status.textContent='Bullion Scan Assist scanning is available in the native Benza bullion iPhone app.';
     return;
   }
   const plugin=smartCameraPlugin();
   if(!plugin){
-    if(status)status.textContent='Smart Camera is still loading. Close and reopen this screen, then try again.';
+    if(status)status.textContent='Bullion Scan Assist is still loading. Close and reopen this screen, then try again.';
     return;
   }
   if(append&&smartCameraPhotoCount>=SMART_CAMERA_MAX_VIEWS){
@@ -7667,7 +7748,7 @@ async function runSmartCameraScan(append=false,source='camera'){
     renderSmartCameraAnalysis(suggestion);
     if(status)status.textContent='';
   }catch(error){
-    console.error('Smart Camera failed:',error);
+    console.error('Bullion Scan Assist failed:',error);
     if(run!==smartCameraRunId||session!==smartCameraSession)return;
     if(status)status.textContent='I couldn’t read that photo. Please try again.';
   }finally{
@@ -7685,15 +7766,15 @@ async function openSmartCamera(){
   const active=isProActive();
   const founder=isFounderPro();
   if(button){
-    button.textContent=active?'Scan Bullion':'Unlock Smart Camera with Pro';
+    button.textContent=active?'Scan Bullion':'Unlock Bullion Scan Assist with Pro';
     button.disabled=smartCameraScanning;
   }
   if(promise){
     promise.innerHTML=founder
-      ? '<strong>Included permanently with Founder access</strong>Smart Camera is active as part of your Founder Lifetime Pro access.'
+      ? '<strong>Included permanently with Founder access</strong>Bullion Scan Assist is active as part of your Founder Lifetime Pro access.'
       : active
         ? '<strong>Included with your Pro plan</strong>Scan photos stay private and are saved with the holding after you add it.'
-        : '<strong>Smart Camera is a Pro feature</strong>Upgrade to Benza Bullion Pro to scan supported bullion and prefill holding details.';
+        : '<strong>Bullion Scan Assist is a Pro feature</strong>Upgrade to Benza Bullion Pro to scan supported bullion and prefill holding details.';
   }
   smartCameraSession++;
   smartCameraSource='camera';
@@ -7701,10 +7782,10 @@ async function openSmartCamera(){
   clearSmartCameraEvidence();
   if(status)status.textContent=active
     ? ''
-    : 'Upgrade to Pro to use Smart Camera. Add Manually remains free.';
+    : 'Upgrade to Pro to use Bullion Scan Assist. Add Manually remains free.';
   screen.classList.add('show');
   screen.setAttribute('aria-hidden','false');
-  // Opening Smart Camera now lands on the choice screen. The user explicitly
+  // Opening Bullion Scan Assist now lands on the choice screen. The user explicitly
   // chooses Scan Bullion or Choose bullion photo before native capture begins.
   if(active&&isBenzaNativeRuntime())await resetSmartCameraScan(true);
 }
@@ -9047,7 +9128,7 @@ function proContextCopy(context){
     inventory:'Keep serial numbers, private notes, item photos, and receipts with your holdings.',
     sale:'Track partial or full sales and preserve realized gain/loss automatically.',
     report:'Create polished portfolio and inventory reports for your records.',
-    'smart-camera':'Smart Camera uses on-device Apple Vision to recognize supported bullion markings, prefill details, and let you review everything before adding it.',
+    'smart-camera':'Bullion Scan Assist uses on-device Apple Vision to recognize supported bullion markings, prefill details, and let you review everything before adding it.',
     analytics:'Add deeper portfolio intelligence today and receive future Pro releases with an active subscription or permanent Founder access.'
   };
   return map[context]||'Get deeper analytics, unlimited alerts, private inventory, detailed reports, and future features released as part of Benza Bullion Pro.';
@@ -10145,8 +10226,8 @@ async function finishScannerPhotoUploads(holdingId,files=[]){
     return uploaded;
   }catch(error){
     await removePrivateHoldingFiles(uploaded);
-    console.warn('Smart Camera photo upload failed:',error);
-    alert('Your holding was saved, but the Smart Camera photos could not be attached. You can add photos from Edit Holding.');
+    console.warn('Bullion Scan Assist photo upload failed:',error);
+    alert('Your holding was saved, but the Bullion Scan Assist photos could not be attached. You can add photos from Edit Holding.');
     return [];
   }
 }
@@ -11927,7 +12008,7 @@ loadBenzaWatchlist();
       padding-bottom:env(safe-area-inset-bottom, 0px) !important;
     }
 
-    /* Smart Camera / roadmap screen */
+    /* Bullion Scan Assist / roadmap screen */
     html.native-app .smartCameraHeader{
       box-sizing:border-box !important;
       height:calc(58px + env(safe-area-inset-top, 0px)) !important;

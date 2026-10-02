@@ -89,3 +89,40 @@ test('Second photo restores fresh scan choices',()=>{context.renderSmartCameraAn
 test('Free account cannot see the Pro bullion detail fields',()=>{active=false;context.fillBullionDetails({year:2024,purity:'.999',mint:'Example mint',serial:'123'});context.syncProInventoryVisibility();assert.equal(get('holdingYear').value,2024);assert.equal(get('holdingSerial').value,'123');assert.equal(get('proInventoryFields').hidden,true);active=true});
 test('Product suggestions do not replace user-entered purity or mint',()=>{get('product').value='American Silver Eagle';vm.runInContext("metal='silver'",context);get('holdingPurity').value='.999 confirmed';get('holdingMint').value='Custom mint';context.suggestBullionDetails();assert.equal(get('holdingPurity').value,'.999 confirmed');assert.equal(get('holdingMint').value,'Custom mint')});
 test('Fresh form clears previous year and serial and suggests known product details',()=>{context.openAdd();assert.equal(get('holdingYear').value,'');assert.equal(get('holdingSerial').value,'');assert.equal(get('holdingPurity').value,'22K gold');assert.equal(get('holdingMint').value,'United States Mint')});
+
+test('Quick edit fills a partial scan, keeps original evidence and photos, and transfers optional fields',()=>{
+ const partial=scan('Fine silver');context.renderSmartCameraAnalysis(partial);
+ vm.runInContext('smartCameraCapturedFiles=[{name:"front.jpg"},{name:"back.jpg"}]',context);
+ context.openSmartScanEditor();assert.equal(get('smartScanEditor').hidden,false);assert.equal(get('smartAnalysisUseButton').disabled,true);
+ get('smartEditMetal').value='silver';context.updateSmartScanEditorProducts();
+ get('smartEditProduct').value='Canadian Silver Maple Leaf';get('smartEditWeight').value='1';
+ get('smartEditYear').value='2024';get('smartEditPurity').value='.9999';get('smartEditMint').value='Royal Canadian Mint';
+ assert.equal(context.saveSmartScanReview(),true);assert.equal(get('smartScanEditor').hidden,true);
+ assert.equal(get('smartAnalysisTitle').textContent,'Your reviewed details');assert.equal(get('smartAnalysisUseButton').textContent,'Use reviewed details');
+ assert.equal(vm.runInContext('pendingSmartCameraSuggestion.userReviewed',context),true);
+ assert.equal(vm.runInContext('pendingSmartCameraSuggestion.scanEvidence.weight',context),partial.weight);
+ context.useSmartCameraAnalysis();assert.equal(get('product').value,'Canadian Silver Maple Leaf');assert.equal(get('weight').value,1);
+ assert.equal(get('holdingYear').value,2024);assert.equal(get('holdingPurity').value,'.9999');assert.equal(get('holdingMint').value,'Royal Canadian Mint');
+ assert.equal(vm.runInContext('pendingScannerPhotoFiles.length',context),2);
+});
+test('Quick edit rejects mismatched product, invalid weight and invalid year without mutating suggestion',()=>{
+ context.renderSmartCameraAnalysis(complete);context.openSmartScanEditor();
+ get('smartEditMetal').value='gold';get('smartEditProduct').value='American Silver Eagle';get('smartEditWeight').value='1';get('smartEditYear').value='2024';
+ assert.equal(context.saveSmartScanReview(),false);assert.match(get('smartEditError').textContent,/metal and a product/);
+ get('smartEditMetal').value='silver';get('smartEditWeight').value='0';assert.equal(context.saveSmartScanReview(),false);
+ get('smartEditWeight').value='1';get('smartEditYear').value='24';assert.equal(context.saveSmartScanReview(),false);
+ assert.equal(vm.runInContext('pendingSmartCameraSuggestion.userReviewed||false',context),false);
+});
+test('Cancel edit preserves scan and reopening discards unsaved draft; reset closes editor',()=>{
+ context.renderSmartCameraAnalysis(complete);context.openSmartScanEditor();get('smartEditWeight').value='2';context.closeSmartScanEditor();
+ assert.equal(get('smartScanEditor').hidden,true);assert.equal(get('smartAnalysisUseButton').disabled,false);
+ context.openSmartScanEditor();assert.equal(get('smartEditWeight').value,1);
+ context.clearSmartCameraEvidence();assert.equal(get('smartScanEditor').hidden,true);assert.equal(vm.runInContext('pendingSmartCameraSuggestion',context),null);
+});
+test('Manual metal choice updates unit label and removes stale incompatible product',()=>{
+ context.renderSmartCameraAnalysis(complete);context.openSmartScanEditor();get('smartEditMetal').value='copper';context.updateSmartScanEditorProducts();
+ assert.equal(get('smartEditProduct').value,'');assert.match(get('smartEditWeightLabel').textContent,/avoirdupois/);
+});
+test('Free account cannot confirm manual scanner review',()=>{
+ context.renderSmartCameraAnalysis(complete);active=false;assert.equal(context.saveSmartScanReview(),false);active=true;
+});
