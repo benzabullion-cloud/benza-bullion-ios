@@ -194,5 +194,22 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
   done({lines:['AMERICAN GOLD BUFFALO .9999 1 OZ'],confidence:.95});await scan;
   assert.equal(pending(),null);assert.equal(views(),0);delete plugin.refine;
  });
+ await test('Recorded Palladium Maple Apple OCR still resolves with first-photo refinement in both orders',async()=>{
+  const pair=JSON.parse(fs.readFileSync('tests/fixtures/palladium-maple-ocr.json','utf8'));
+  for(const reversed of [false,true]){
+   reset();vm.runInContext('smartCameraScanning=false',context);
+   const originalScan=plugin.scan;let current;
+   plugin.scan=async options=>{const photo=await originalScan(options);current=photo.testPhoto;return photo};
+   plugin.refine=async()=>({passes:current.passes,confidence:.95});
+   for(const photo of reversed?[...pair].reverse():pair){
+    queued.push({passes:photo.passes.slice(0,4),testPhoto:photo,confidence:.95});
+   }
+   await context.runSmartCameraScan();await context.runSmartCameraScan(true);
+   assert.equal(pending().product,'Canadian Palladium Maple Leaf');assert.equal(pending().mint,'Royal Canadian Mint');
+   assert.equal(pending().weight,1);assert.equal(pending().year,null);assert.equal(pending().warnings.length,0);
+   assert.equal(context.canUseSmartCameraSuggestion(pending()),true);
+   plugin.scan=originalScan;delete plugin.refine;
+  }
+ });
  console.log(count+' scanner flow checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1});
