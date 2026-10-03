@@ -1,0 +1,827 @@
+[
+  {
+    "caseId": "palladium-maple-obscured-year",
+    "elapsedMs": 38621,
+    "passes": [
+      {
+        "confidence": 0.8333333333333334,
+        "elapsedMs": 2998,
+        "id": 0,
+        "observations": [
+          {
+            "confidence": 0.5,
+            "text": "CLARS"
+          },
+          {
+            "confidence": 1,
+            "text": "RANDOM"
+          },
+          {
+            "confidence": 1,
+            "text": "YEAR"
+          }
+        ]
+      },
+      {
+        "confidence": 0.6499999761581421,
+        "elapsedMs": 1242,
+        "id": 1,
+        "observations": [
+          {
+            "confidence": 0.30000001192092896,
+            "text": "S"
+          },
+          {
+            "confidence": 1,
+            "text": "ELIZABETH"
+          },
+          {
+            "confidence": 1,
+            "text": "ELIZABETH"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "LZABETHII"
+          }
+        ]
+      },
+      {
+        "confidence": 0.44999996821085614,
+        "elapsedMs": 1357,
+        "id": 2,
+        "observations": [
+          {
+            "confidence": 0.30000001192092896,
+            "text": "50"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "50"
+          },
+          {
+            "confidence": 1,
+            "text": "DOLLARS"
+          },
+          {
+            "confidence": 0.5,
+            "text": "DOLLARS."
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "OLLARS R"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "\uc74c\uc744"
+          }
+        ]
+      },
+      {
+        "confidence": 0.5333333412806193,
+        "elapsedMs": 1363,
+        "id": 3,
+        "observations": [
+          {
+            "confidence": 0.30000001192092896,
+            "text": "73"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "50"
+          },
+          {
+            "confidence": 1,
+            "text": "DOLLARS"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "<ANDOM/"
+          },
+          {
+            "confidence": 1,
+            "text": "YEAR"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "WIS93"
+          }
+        ]
+      },
+      {
+        "confidence": 0.6666666666666666,
+        "elapsedMs": 1227,
+        "id": 4,
+        "observations": [
+          {
+            "confidence": 1,
+            "text": "ELIZABETH"
+          },
+          {
+            "confidence": 0.5,
+            "text": "ELIZABETHI"
+          },
+          {
+            "confidence": 0.5,
+            "text": "IZABETHI"
+          }
+        ]
+      },
+      {
+        "confidence": 0.30000001192092896,
+        "elapsedMs": 1018,
+        "id": 5,
+        "observations": [
+          {
+            "confidence": 0.30000001192092896,
+            "text": "RAND-"
+          }
+        ]
+      },
+      {
+        "confidence": 0.36666667461395264,
+        "elapsedMs": 1205,
+        "id": 6,
+        "observations": [
+          {
+            "confidence": 0.5,
+            "text": "ELIZABETH"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "Nby"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "E L"
+          }
+        ]
+      },
+      {
+        "confidence": 0.5333333015441895,
+        "elapsedMs": 1055,
+        "id": 7,
+        "observations": [
+          {
+            "confidence": 1,
+            "text": "ELIZ"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "EL\u3066\u3044"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "ELIZS"
+          }
+        ]
+      },
+      {
+        "confidence": 0,
+        "elapsedMs": 1131,
+        "id": 8,
+        "observations": []
+      },
+      {
+        "confidence": 0.30000001192092896,
+        "elapsedMs": 1140,
+        "id": 9,
+        "observations": [
+          {
+            "confidence": 0.30000001192092896,
+            "text": "0 G"
+          }
+        ]
+      },
+      {
+        "confidence": 0.699999988079071,
+        "elapsedMs": 1726,
+        "id": 10,
+        "observations": [
+          {
+            "confidence": 0.30000001192092896,
+            "text": "RLIZABET\u042f"
+          },
+          {
+            "confidence": 1,
+            "text": "RANDOM"
+          },
+          {
+            "confidence": 1,
+            "text": "YEAR"
+          },
+          {
+            "confidence": 0.5,
+            "text": "POLLARS"
+          }
+        ]
+      },
+      {
+        "confidence": 0.6499999761581421,
+        "elapsedMs": 7697,
+        "id": 11,
+        "observations": [
+          {
+            "confidence": 0.30000001192092896,
+            "text": "\u041a\u0406Z\u0410\u0412\u0415\u0422\u0418"
+          },
+          {
+            "confidence": 1,
+            "text": "RANDOM"
+          },
+          {
+            "confidence": 1,
+            "text": "YEAR"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "DOLARS"
+          }
+        ]
+      },
+      {
+        "confidence": 0.30000001192092896,
+        "elapsedMs": 1685,
+        "id": 12,
+        "observations": [
+          {
+            "confidence": 0.30000001192092896,
+            "text": "\u041aL\u0406Z\u0410\u0412\u0415\u0422\u042f"
+          }
+        ]
+      },
+      {
+        "confidence": 0.30000001192092896,
+        "elapsedMs": 1707,
+        "id": 13,
+        "observations": [
+          {
+            "confidence": 0.30000001192092896,
+            "text": "\u041aZ\u0410\u0412\u0415\u0422"
+          }
+        ]
+      },
+      {
+        "confidence": 0.8333333333333334,
+        "elapsedMs": 1007,
+        "id": 14,
+        "observations": [
+          {
+            "confidence": 1,
+            "text": "RANDOM"
+          },
+          {
+            "confidence": 1,
+            "text": "YEAR"
+          },
+          {
+            "confidence": 0.5,
+            "text": "DOLLARS"
+          }
+        ]
+      },
+      {
+        "confidence": 0.8333333333333334,
+        "elapsedMs": 1659,
+        "id": 15,
+        "observations": [
+          {
+            "confidence": 1,
+            "text": "RANDOM"
+          },
+          {
+            "confidence": 1,
+            "text": "YEAR"
+          },
+          {
+            "confidence": 0.5,
+            "text": "OLLARS"
+          }
+        ]
+      },
+      {
+        "confidence": 0.30000001192092896,
+        "elapsedMs": 1036,
+        "id": 16,
+        "observations": [
+          {
+            "confidence": 0.30000001192092896,
+            "text": "50"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "ELI"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "N"
+          }
+        ]
+      },
+      {
+        "confidence": 1,
+        "elapsedMs": 1055,
+        "id": 17,
+        "observations": [
+          {
+            "confidence": 1,
+            "text": "RANDOM"
+          },
+          {
+            "confidence": 1,
+            "text": "YEAR"
+          }
+        ]
+      },
+      {
+        "confidence": 0.824999988079071,
+        "elapsedMs": 1897,
+        "id": 18,
+        "observations": [
+          {
+            "confidence": 0.30000001192092896,
+            "text": "H 1"
+          },
+          {
+            "confidence": 1,
+            "text": "RANDOM"
+          },
+          {
+            "confidence": 1,
+            "text": "YEAR"
+          },
+          {
+            "confidence": 1,
+            "text": "LARS"
+          }
+        ]
+      },
+      {
+        "confidence": 0.75,
+        "elapsedMs": 1928,
+        "id": 19,
+        "observations": [
+          {
+            "confidence": 0.5,
+            "text": "50"
+          },
+          {
+            "confidence": 1,
+            "text": "LARS"
+          },
+          {
+            "confidence": 0.5,
+            "text": "10"
+          },
+          {
+            "confidence": 0.5,
+            "text": "\uff3c"
+          },
+          {
+            "confidence": 1,
+            "text": "RANDOM"
+          },
+          {
+            "confidence": 1,
+            "text": "YEAR"
+          }
+        ]
+      },
+      {
+        "confidence": 0.8333333333333334,
+        "elapsedMs": 3104,
+        "id": 20,
+        "observations": [
+          {
+            "confidence": 0.5,
+            "text": "OLLARS"
+          },
+          {
+            "confidence": 1,
+            "text": "RANDOM"
+          },
+          {
+            "confidence": 1,
+            "text": "YEAR"
+          }
+        ]
+      }
+    ],
+    "rimElapsedMs": 233,
+    "rimImages": 9,
+    "side": "obverse"
+  },
+  {
+    "caseId": "palladium-maple-obscured-year",
+    "elapsedMs": 28915,
+    "passes": [
+      {
+        "confidence": 1,
+        "elapsedMs": 2628,
+        "id": 0,
+        "observations": [
+          {
+            "confidence": 1,
+            "text": "N"
+          },
+          {
+            "confidence": 1,
+            "text": "A"
+          },
+          {
+            "confidence": 1,
+            "text": "9995"
+          },
+          {
+            "confidence": 1,
+            "text": "FINE PALLADIUNA"
+          },
+          {
+            "confidence": 1,
+            "text": "9995"
+          }
+        ]
+      },
+      {
+        "confidence": 0.36666667461395264,
+        "elapsedMs": 1176,
+        "id": 1,
+        "observations": [
+          {
+            "confidence": 0.5,
+            "text": "CANIAD"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "CANIADA"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "A NIADA"
+          }
+        ]
+      },
+      {
+        "confidence": 0.5799999713897706,
+        "elapsedMs": 1225,
+        "id": 2,
+        "observations": [
+          {
+            "confidence": 0.30000001192092896,
+            "text": "FINE PALLADIUM 1 OZ PALLA"
+          },
+          {
+            "confidence": 1,
+            "text": "NE PALLADIUM"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "11 OZ PALLADIUN E"
+          },
+          {
+            "confidence": 1,
+            "text": "ADIUM"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "1OZ/PAILADIUM EUK"
+          }
+        ]
+      },
+      {
+        "confidence": 0.75,
+        "elapsedMs": 1258,
+        "id": 3,
+        "observations": [
+          {
+            "confidence": 1,
+            "text": "FINE PALLADIUM"
+          },
+          {
+            "confidence": 0.5,
+            "text": "OZ PALLADIUM PUR"
+          }
+        ]
+      },
+      {
+        "confidence": 0.30000001192092896,
+        "elapsedMs": 1173,
+        "id": 4,
+        "observations": [
+          {
+            "confidence": 0.30000001192092896,
+            "text": "CA N.AS"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "FA N.A D"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "1 N.ADA"
+          }
+        ]
+      },
+      {
+        "confidence": 0,
+        "elapsedMs": 928,
+        "id": 5,
+        "observations": []
+      },
+      {
+        "confidence": 0,
+        "elapsedMs": 1230,
+        "id": 6,
+        "observations": []
+      },
+      {
+        "confidence": 0.30000001192092896,
+        "elapsedMs": 1575,
+        "id": 7,
+        "observations": [
+          {
+            "confidence": 0.30000001192092896,
+            "text": "CANAIN"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "A"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "SNINN"
+          }
+        ]
+      },
+      {
+        "confidence": 0.36666667461395264,
+        "elapsedMs": 1259,
+        "id": 8,
+        "observations": [
+          {
+            "confidence": 0.30000001192092896,
+            "text": "TINE PALLADILA"
+          },
+          {
+            "confidence": 0.5,
+            "text": "INE PALLADIUNS"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "AILADIUM"
+          }
+        ]
+      },
+      {
+        "confidence": 0.4000000059604645,
+        "elapsedMs": 803,
+        "id": 9,
+        "observations": [
+          {
+            "confidence": 0.30000001192092896,
+            "text": "56"
+          },
+          {
+            "confidence": 0.5,
+            "text": "FINE PALLADIUNS"
+          }
+        ]
+      },
+      {
+        "confidence": 0.7666667302449545,
+        "elapsedMs": 1737,
+        "id": 10,
+        "observations": [
+          {
+            "confidence": 1,
+            "text": "N"
+          },
+          {
+            "confidence": 1,
+            "text": "9995"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "FINE PALLADID"
+          },
+          {
+            "confidence": 1,
+            "text": "9995"
+          },
+          {
+            "confidence": 1,
+            "text": "PUR"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "TOEINADUN"
+          }
+        ]
+      },
+      {
+        "confidence": 0.5799999713897706,
+        "elapsedMs": 1744,
+        "id": 11,
+        "observations": [
+          {
+            "confidence": 1,
+            "text": "9995"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "HIVE PALLARILN"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "9995"
+          },
+          {
+            "confidence": 1,
+            "text": "PUR"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "7 OZ PALLADIUM"
+          }
+        ]
+      },
+      {
+        "confidence": 0.6499999761581421,
+        "elapsedMs": 968,
+        "id": 12,
+        "observations": [
+          {
+            "confidence": 1,
+            "text": "N"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "A"
+          }
+        ]
+      },
+      {
+        "confidence": 1,
+        "elapsedMs": 1050,
+        "id": 13,
+        "observations": [
+          {
+            "confidence": 1,
+            "text": "N"
+          }
+        ]
+      },
+      {
+        "confidence": 0.30000001192092896,
+        "elapsedMs": 1109,
+        "id": 14,
+        "observations": [
+          {
+            "confidence": 0.30000001192092896,
+            "text": "NDIUM PUI"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "PINVE PALLADINE"
+          }
+        ]
+      },
+      {
+        "confidence": 0.30000001192092896,
+        "elapsedMs": 1123,
+        "id": 15,
+        "observations": [
+          {
+            "confidence": 0.30000001192092896,
+            "text": "FIVE PALLADMN!"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "1 Oz \u20b4"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "NDIUM PUI"
+          }
+        ]
+      },
+      {
+        "confidence": 0.6499999761581421,
+        "elapsedMs": 1307,
+        "id": 16,
+        "observations": [
+          {
+            "confidence": 1,
+            "text": "9995"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "FINE PALLADINI"
+          }
+        ]
+      },
+      {
+        "confidence": 0.7666666507720947,
+        "elapsedMs": 1016,
+        "id": 17,
+        "observations": [
+          {
+            "confidence": 0.30000001192092896,
+            "text": "UM"
+          },
+          {
+            "confidence": 1,
+            "text": "PUR"
+          },
+          {
+            "confidence": 1,
+            "text": "9995"
+          }
+        ]
+      },
+      {
+        "confidence": 0.699999988079071,
+        "elapsedMs": 1891,
+        "id": 18,
+        "observations": [
+          {
+            "confidence": 1,
+            "text": "9995"
+          },
+          {
+            "confidence": 0.5,
+            "text": "FINE PALLADIUNA"
+          },
+          {
+            "confidence": 1,
+            "text": "9995"
+          },
+          {
+            "confidence": 0.30000001192092896,
+            "text": "I WHEN THE CON"
+          }
+        ]
+      },
+      {
+        "confidence": 1,
+        "elapsedMs": 1783,
+        "id": 19,
+        "observations": [
+          {
+            "confidence": 1,
+            "text": "9995"
+          },
+          {
+            "confidence": 1,
+            "text": "FINE PALLADISA"
+          },
+          {
+            "confidence": 1,
+            "text": "PUR"
+          },
+          {
+            "confidence": 1,
+            "text": "9995"
+          },
+          {
+            "confidence": 1,
+            "text": "* OZ PALLADIUM"
+          }
+        ]
+      },
+      {
+        "confidence": 1,
+        "elapsedMs": 1441,
+        "id": 20,
+        "observations": [
+          {
+            "confidence": 1,
+            "text": "N"
+          },
+          {
+            "confidence": 1,
+            "text": "A"
+          },
+          {
+            "confidence": 1,
+            "text": "9995"
+          },
+          {
+            "confidence": 1,
+            "text": "FINE"
+          },
+          {
+            "confidence": 1,
+            "text": "9995"
+          },
+          {
+            "confidence": 1,
+            "text": "PALLADIUNA"
+          }
+        ]
+      }
+    ],
+    "rimElapsedMs": 302,
+    "rimImages": 9,
+    "side": "reverse"
+  }
+]

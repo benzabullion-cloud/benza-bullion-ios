@@ -6847,7 +6847,8 @@ function normalizeSmartCameraText(value,joinYearDigits=true){
   for(const [pattern,word] of SMART_CAMERA_WORD_REPAIRS){
     text=text.replace(pattern,word);
   }
-  text=text.replace(/\b(?:silv|silvr|stlver|stlvern|silvern|s1lver)\b/g,'silver')
+  text=text.replace(/\bcaniada\b/g,'canada') // Observed Apple rim OCR insertion; no broad fuzzy country match.
+    .replace(/\b(?:silv|silvr|stlver|stlvern|silvern|s1lver)\b/g,'silver')
     .replace(/\b(?:sine|f1ne)\s+(silver|gold)\b/g,'fine $1')
     .replace(/\bo\s*z\b|\b(?:o[z2]|0z)\b/g,'oz');
   return joinYearDigits?text.replace(/\b([12])\s+(\d)\s+(\d)\s+(\d)\b/g,'$1$2$3$4'):text;
@@ -7312,7 +7313,15 @@ function interpretSmartCameraScan(result){
     .map(match=>({five:5,ten:10,twenty:20,fifty:50}[match[1]]||Number(match[1])));
   const standardSilverMaple=product==='Canadian Silver Maple Leaf'&&/\b(?:canada|can)\b/.test(text)&&
     mapleDollarReadings.length>0&&mapleDollarReadings.every(value=>value===5);
-  const expected=standardSilverMaple?1:fixedWeights[product];
+  // The $50 .9995 palladium Maple is a fixed one-troy-ounce issue (RCM).
+  // Only use its specification after two sides and all independent markings;
+  // trusted conflicting weights still block inference below.
+  // https://www.mint.ca/en/shop/bullion-products/2015-palladium-maple-leaf-coin
+  const standardPalladiumMaple=product==='Canadian Palladium Maple Leaf'&&metal==='palladium'&&
+    /\bcanada\b/.test(text)&&/(?:^|\s)\.?9995\b/.test(text)&&
+    mapleDollarReadings.length>0&&mapleDollarReadings.every(value=>value===50)&&
+    Number(result?.sides)>=2&&!plated&&!/\b(?:bar|round)\b/.test(text);
+  const expected=standardSilverMaple||standardPalladiumMaple?1:fixedWeights[product];
   if(expected&&weight&&Math.abs(weight-expected)>.003){warnings.push('Weight disagrees with the matched product. Confirm product and weight.');weight=0;}
   if(expected&&!weight&&weights.length===0&&!rejectedWeight&&!plated){
     // A fixed catalogue weight is safe only after independent product evidence:
@@ -7360,12 +7369,23 @@ function interpretSmartCameraScan(result){
     matchedTerms,designID:design.id,inferredWeight,inferredMetal,inferredMint:!!mint&&!detectedMint,inferredPurity:!!purity&&!observedPurity,
     sides:result?.sides||1,usable:!!metal&&!plated&&metals.length<=1&&confidence>=.42};
 }
+// Rejoin a denomination split across adjacent observations in ONE OCR pass.
+// Identity evidence only: never add these lines to financial weight readings.
+function smartCameraIdentityReadingLines(lines){
+  const identity=[...lines];
+  for(let i=0;i+1<lines.length;i++){
+    const amount=normalizeSmartCameraText(lines[i]);
+    const unit=normalizeSmartCameraText(lines[i+1]);
+    if(/^(?:1|5|10|20|25|50|100)$/.test(amount)&&/^dollars?\.?$/.test(unit))identity.push(amount+' dollars');
+  }
+  return identity;
+}
 // OCR passes are alternative readings of ONE photo, not additional inscriptions.
 function selectSmartCameraPhotoEvidence(result){
   if(!Array.isArray(result?.passes))return result;
   const candidates=result.passes.map(pass=>{
     const observations=Array.isArray(pass?.observations)?pass.observations:[];
-    const lines=observations.filter(o=>typeof o?.text==='string'&&Number(o.confidence)>=.25).map(o=>o.text);
+    const lines=smartCameraIdentityReadingLines(observations.filter(o=>typeof o?.text==='string'&&Number(o.confidence)>=.25).map(o=>o.text));
     // Weight is a financial input. A pass average must never promote a weak
     // number/unit observation because unrelated identity lines are confident.
     const weightLines=smartCameraWeightReadingLines(observations.filter(o=>typeof o?.text==='string'&&Number(o.confidence)>=SMART_CAMERA_WEIGHT_MIN_CONFIDENCE).map(o=>o.text));
