@@ -6071,8 +6071,8 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
           <div class="proValueCard"><strong>Planned for Pro</strong><span>Future Potential historical scenarios with optional contributions, richer premium analysis, expanded alerts, reports, and new stack tools.</span></div>
         </div>
         <div class="proAccessPromise"><strong>Your Pro access grows with the app</strong>New features released as part of Benza Bullion Pro are included automatically with an active subscription—or permanently with Founder access.</div>
-        <div class="proPriceLine"><strong>$4.99/month</strong><span>· $39.99/year · $25 Founder lifetime</span></div>
-        <div class="proTrialLine">7-day trial for subscriptions · Founder compares to $119.97 over 3 years and saves nearly $95</div>
+        <div class="proPriceLine" id="proPriceSummary"><strong>View App Store pricing</strong></div>
+        <div class="proTrialLine">Monthly, annual, or Founder lifetime access. Available trials appear in Pro Plans.</div>
         <button class="proPrimaryBtn" onclick="openProUpgrade('analytics')">Start Pro</button>
         <button class="proRestoreBtn" onclick="restoreProPurchases()">Restore Purchases</button>
       </div>
@@ -6373,7 +6373,8 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
 
         <div class="settingsAccountDivider"></div>
         <button id="deleteAccountButton" class="settingsDeleteAccountButton" type="button" onclick="deleteBenzaAccount()">Delete Account</button>
-        <div class="settingsDeleteNote">Permanently deletes your Benza Bullion account and associated portfolio data. This cannot be undone.</div>
+        <div class="settingsDeleteNote">Permanently deletes your Benza Bullion account and associated portfolio data. This cannot be undone. Account deletion does not cancel Apple subscriptions; billing continues until you cancel through Apple.</div>
+        <button class="settingsAccountButton" type="button" onclick="openAppleSubscriptionManagement()">Manage Apple Subscriptions</button>
       </div>
     </div>
 
@@ -6438,9 +6439,9 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
         </div>
 
         <div id="settingsProPricing" class="settingsProPricing">
-          <div><strong>$4.99/month</strong><span>7 days free, then monthly</span></div>
-          <div><strong>$39.99/year</strong><span>7 days free, then yearly</span></div>
-          <div class="settingsFounderPrice"><div class="founderOfferBadge">LIMITED LAUNCH OFFER</div><strong>$25 one time</strong><span>Lifetime Pro access · comparable to $119.97 over 3 years · save nearly $95</span><span class="founderBadgeBonus">Includes the exclusive Founding Member badge on Home</span></div>
+          <div><strong data-store-price="monthly">Monthly subscription</strong><span data-store-offer="monthly">View App Store pricing</span></div>
+          <div><strong data-store-price="annual">Annual subscription</strong><span data-store-offer="annual">View App Store pricing</span></div>
+          <div class="settingsFounderPrice"><div class="founderOfferBadge">LIMITED LAUNCH OFFER</div><strong data-store-price="founder">Founder lifetime access</strong><span data-store-offer="founder">One-time purchase · never renews</span><span class="founderBadgeBonus">Includes the exclusive Founding Member badge on Home</span></div>
         </div>
 
         <div class="settingsProPageActions">
@@ -8722,6 +8723,8 @@ async function onSignedIn(){
 
   await loadHoldingsFromSupabase();
   await loadBenzaEntitlement();
+  refreshStoreKitProducts();
+  initializePendingPurchases();
   refreshNativeProEntitlementSilently().catch(()=>{});
   restoreLiveChartPoints();
   await loadLiveChartFromCloud();
@@ -9458,6 +9461,7 @@ function openProUpgrade(context='general'){
   modal?.classList.add('show');
   if(modal)modal.scrollTop=0;
   if(isBenzaNativeRuntime())document.body.style.overflow='hidden';
+  refreshStoreKitProducts();
 }
 function closeProUpgrade(){
   document.getElementById('proUpgradeModal')?.classList.remove('show');
@@ -9470,12 +9474,106 @@ function selectProPlan(plan){
   document.getElementById('proPlanAnnual')?.classList.toggle('selected',selectedProPlan==='annual');
   document.getElementById('proPlanFounder')?.classList.toggle('selected',selectedProPlan==='founder');
   const button=document.getElementById('proStartTrialBtn');
-  if(button)button.textContent=selectedProPlan==='founder'?'Get Founder Lifetime Access':'Start 7-Day Free Trial';
+  renderStoreKitProducts();
 }
 function nativeStoreKitPlugin(){
   return window.Capacitor?.Plugins?.BenzaStoreKit||null;
 }
+const storeKitPlanIds={monthly:'benza_pro_monthly',annual:'benza_pro_annual',founder:'benza_pro_founder_lifetime'};
+let storeKitProducts={};
+let storeKitProductsRequest=null;
+function storeKitPlanCopy(plan){
+  const product=storeKitProducts[storeKitPlanIds[plan]];
+  const period=plan==='monthly'?'month':plan==='annual'?'year':'one time';
+  const trial=product&&['day','week','month','year'].includes(product.trialUnit)&&Number(product.trialValue)>0
+    ?`${Number(product.trialValue)}-${product.trialUnit} free trial`:'';
+  return {available:!!product,price:product?(plan==='founder'?`${product.displayPrice} one time`:`${product.displayPrice}/${period}`):'App Store pricing unavailable',
+    offer:product?(plan==='founder'?'Lifetime Pro access · never renews':trial?`${trial} · then ${product.displayPrice}/${period}`:`Renews at ${product.displayPrice}/${period} unless canceled`):'Open Pro Plans to retry',
+    action:plan==='founder'?'Get Founder Lifetime Access':trial?`Start ${trial}`:'Subscribe'};
+}
+function renderStoreKitProducts(){
+  for(const plan of Object.keys(storeKitPlanIds)){
+    const copy=storeKitPlanCopy(plan);
+    document.querySelectorAll(`[data-store-price="${plan}"]`).forEach(el=>{el.textContent=copy.price;});
+    document.querySelectorAll(`[data-store-offer="${plan}"]`).forEach(el=>{el.textContent=copy.offer;});
+  }
+  const summary=document.getElementById('proPriceSummary');
+  if(summary)summary.textContent=Object.keys(storeKitPlanIds).filter(plan=>storeKitPlanCopy(plan).available).map(plan=>storeKitPlanCopy(plan).price).join(' · ')||'View App Store pricing in Pro Plans';
+  const button=document.getElementById('proStartTrialBtn');
+  if(button&&!button.dataset.purchaseBusy){
+    const copy=storeKitPlanCopy(selectedProPlan);
+    button.disabled=isBenzaNativeRuntime()&&!copy.available;
+    button.textContent=copy.available?copy.action:'Continue';
+  }
+}
+async function refreshStoreKitProducts(){
+  const plugin=nativeStoreKitPlugin();
+  if(!isBenzaNativeRuntime()||!plugin?.getProducts){renderStoreKitProducts();return}
+  if(storeKitProductsRequest)return storeKitProductsRequest;
+  storeKitProductsRequest=(async()=>{
+    try{
+      const result=await plugin.getProducts();
+      storeKitProducts={};
+      for(const product of result?.products||[]){
+        if(Object.values(storeKitPlanIds).includes(product.productId)&&typeof product.displayPrice==='string'&&product.displayPrice.trim())storeKitProducts[product.productId]=product;
+      }
+    }catch(error){storeKitProducts={};console.warn('App Store pricing unavailable:',error);}
+    finally{storeKitProductsRequest=null;renderStoreKitProducts();}
+  })();
+  return storeKitProductsRequest;
+}
+function pendingPurchaseKey(userId,productId){return `benzaPendingPurchase:${userId}:${productId}`;}
+function setPendingPurchase(userId,productId,pending){
+  const key=pendingPurchaseKey(userId,productId);
+  if(pending)pendingPurchaseIntents.add(key);else pendingPurchaseIntents.delete(key);
+  try{if(pending)localStorage.setItem(key,'pending');else localStorage.removeItem(key);}catch(_){}
+}
+const pendingPurchaseIntents=new Set();
+const pendingPurchaseVerifications=new Set();
+let pendingPurchaseListener=null;
+async function handlePendingPurchase(transaction){
+  const userId=currentUser?.id;
+  if(!userId||String(transaction?.appAccountToken||'').toLowerCase()!==userId.toLowerCase()||!Object.values(storeKitPlanIds).includes(transaction?.productId))return;
+  const key=pendingPurchaseKey(userId,transaction.productId);
+  let pending=pendingPurchaseIntents.has(key);
+  try{pending=pending||localStorage.getItem(key)==='pending';}catch(_){}
+  if(!pending||pendingPurchaseVerifications.has(key))return;
+  pendingPurchaseVerifications.add(key);
+  try{
+    await verifyNativeStoreTransaction(transaction);
+    setPendingPurchase(userId,transaction.productId,false);
+    if(currentUser?.id===userId)alert('Your approved Apple purchase is verified. Benza Bullion Pro is now active.');
+  }catch(error){console.warn('Pending purchase verification will retry when connected:',error);}
+  finally{pendingPurchaseVerifications.delete(key);}
+}
+async function replayPendingPurchases(){
+  const plugin=nativeStoreKitPlugin();
+  const userId=currentUser?.id;
+  if(!isBenzaNativeRuntime()||!userId||!plugin?.getPendingTransactions)return;
+  const result=await plugin.getPendingTransactions({appAccountToken:userId});
+  if(currentUser?.id!==userId)return;
+  for(const transaction of result?.transactions||[])await handlePendingPurchase(transaction);
+}
+async function initializePendingPurchases(){
+  const plugin=nativeStoreKitPlugin();
+  if(!isBenzaNativeRuntime()||!plugin?.addListener)return;
+  try{
+    if(!pendingPurchaseListener)pendingPurchaseListener=await plugin.addListener('transactionUpdated',handlePendingPurchase);
+    await replayPendingPurchases();
+  }catch(error){console.warn('Pending purchase listener unavailable:',error);}
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible')replayPendingPurchases().catch(error=>console.warn('Pending purchase retry unavailable:',error));
+});
+async function openAppleSubscriptionManagement(){
+  const plugin=nativeStoreKitPlugin();
+  try{
+    if(isBenzaNativeRuntime()&&plugin)await plugin.manageSubscriptions();
+    else window.open('https://apps.apple.com/account/subscriptions','_blank','noopener,noreferrer');
+  }catch(error){alert(error?.message||'Apple subscription management could not be opened.');}
+}
 async function verifyNativeStoreTransaction(result){
+  const purchaseUserId=currentUser?.id;
   const signedTransaction=String(result?.signedTransaction||'');
   if(!signedTransaction)throw new Error('Apple did not return a signed transaction.');
   if(!supabaseClient||!currentUser)throw new Error('Please sign in before purchasing Benza Bullion Pro.');
@@ -9496,15 +9594,19 @@ async function verifyNativeStoreTransaction(result){
   try{data=await response.json();}catch(_){}
   if(!response.ok)throw new Error(data?.error||`StoreKit verification failed (${response.status}).`);
 
+  if(currentUser?.id!==purchaseUserId)throw new Error('The signed-in account changed. Please restore purchases on the purchasing account.');
   const plugin=nativeStoreKitPlugin();
   if(plugin&&result?.transactionId){
     await plugin.finishTransaction({transactionId:String(result.transactionId)});
   }
 
+  if(currentUser?.id!==purchaseUserId)throw new Error('The signed-in account changed.');
   await loadBenzaEntitlement();
+  if(currentUser?.id!==purchaseUserId)throw new Error('The signed-in account changed.');
   if(!isProActive())throw new Error(data?.error||'The purchase was verified, but Pro access has not refreshed yet.');
   renderProAnalytics();
   updateProIntegratedUI();
+  if(Object.values(storeKitPlanIds).includes(result?.productId))setPendingPurchase(purchaseUserId,result.productId,false);
   return data;
 }
 function sortStoreKitTransactionsForVerification(transactions){
@@ -9562,16 +9664,22 @@ async function startNativeProPurchase(){
       ?'benza_pro_founder_lifetime'
       :'benza_pro_monthly';
 
+  const purchaseUserId=currentUser.id;
+  if(!storeKitProducts[productId]){alert('App Store pricing is unavailable. Please try opening Pro Plans again.');return}
   const button=document.getElementById('proStartTrialBtn');
+  if(button?.disabled)return;
   const previousText=button?.textContent||'Continue';
-  if(button){button.disabled=true;button.textContent='Opening App Store…';}
+  if(button){button.dataset.purchaseBusy='true';button.disabled=true;button.textContent='Opening App Store…';}
 
   try{
-    const result=await plugin.purchase({productId,appAccountToken:currentUser.id});
+    const result=await plugin.purchase({productId,appAccountToken:purchaseUserId});
+    if(result?.state==='pending')setPendingPurchase(purchaseUserId,productId,true);
+    if(currentUser?.id!==purchaseUserId)return;
     if(result?.state==='cancelled')return;
     if(result?.state==='pending'){
       closeProUpgrade();
-      alert('Your purchase is pending with Apple. Pro will activate after Apple approves the transaction.');
+      alert('Your purchase is pending with Apple. Pro will activate after approval when this account is signed in and connected. You can also use Restore Purchases.');
+      replayPendingPurchases().catch(error=>console.warn('Pending purchase recovery unavailable:',error));
       return;
     }
     if(result?.state!=='purchased')throw new Error('The App Store purchase did not complete.');
@@ -9586,7 +9694,7 @@ async function startNativeProPurchase(){
     console.error('StoreKit purchase failed:',error);
     alert(error?.message||'The App Store purchase could not be completed.');
   }finally{
-    if(button){button.disabled=false;button.textContent=previousText;}
+    if(button){delete button.dataset.purchaseBusy;button.disabled=false;button.textContent=previousText;renderStoreKitProducts();}
   }
 }
 function isFounderPro(){
@@ -9604,9 +9712,9 @@ function getProPlanType(){
 function getProPlanPresentation(){
   const type=getProPlanType();
   const state=benzaEntitlement?.status==='trial'?'TRIAL':benzaEntitlement?.status==='grace'?'GRACE':'ACTIVE';
-  if(type==='founder')return {title:'Founder Lifetime Pro',status:'LIFETIME · ACTIVE',meta:'$25 ONE TIME · NEVER RENEWS',manage:'Founder Access Details',sub:'Permanent Founder Pro access, including current tools and future features released as part of Pro, is active on this account.'};
-  if(type==='monthly')return {title:'Monthly Pro',status:`MONTHLY · ${state}`,meta:'$4.99/MONTH · AUTO-RENEWS',manage:'Manage Monthly Subscription',sub:'Your monthly Pro subscription renews at $4.99 per month unless canceled and includes future features released as part of Pro.'};
-  if(type==='annual')return {title:'Annual Pro',status:`ANNUAL · ${state}`,meta:'$39.99/YEAR · AUTO-RENEWS',manage:'Manage Annual Subscription',sub:'Your annual Pro subscription renews at $39.99 per year unless canceled and includes future features released as part of Pro.'};
+  if(type==='founder')return {title:'Founder Lifetime Pro',status:'LIFETIME · ACTIVE',meta:'ONE TIME · NEVER RENEWS',manage:'Founder Access Details',sub:'Permanent Founder Pro access, including current tools and future features released as part of Pro, is active on this account.'};
+  if(type==='monthly')return {title:'Monthly Pro',status:`MONTHLY · ${state}`,meta:'MONTHLY · AUTO-RENEWS',manage:'Manage Monthly Subscription',sub:'Your monthly Pro subscription renews monthly unless canceled. View your renewal price in Apple subscription settings and includes future features released as part of Pro.'};
+  if(type==='annual')return {title:'Annual Pro',status:`ANNUAL · ${state}`,meta:'ANNUAL · AUTO-RENEWS',manage:'Manage Annual Subscription',sub:'Your annual Pro subscription renews annually unless canceled. View your renewal price in Apple subscription settings and includes future features released as part of Pro.'};
   if(type==='internal')return {title:'Pro Access',status:`PRO · ${state}`,meta:'REGULAR PRO · NON-FOUNDER',manage:'Pro Access Details',sub:'Regular Pro access is active on this account. It includes Pro tools without Founder status or Founder lifetime-purchase recognition.'};
   if(type==='pro')return {title:'Benza Bullion Pro',status:`PRO · ${state}`,meta:'ACTIVE PRO ACCESS',manage:'Manage Subscription',sub:'Pro access is active, including deeper analytics, realized sales, unlimited alerts, private inventory, detailed reports, and future Pro releases.'};
   return {title:'More control over your stack',status:'INACTIVE',meta:'',manage:'Manage Subscription',sub:'Go beyond the Free performance snapshot with deeper analytics, realized sales, unlimited alerts, private inventory, detailed reports, and future Pro releases.'};
@@ -10594,10 +10702,7 @@ async function saveHolding(){
   if(!product){alert('Choose a bullion product.');return}
   if(year!==null&&(!Number.isInteger(year)||year<1000||year>9999)){alert('Enter a four-digit bullion year, or leave it blank.');return}
   if(!supabaseClient||!currentUser){alert('Please log in before saving a holding.');return}
-  if(!proActive&&originalHolding&&(originalHolding.year||originalHolding.purity||originalHolding.mint||originalHolding.serial||originalHolding.notes||originalHolding.photoPath||originalHolding.receiptPath||(originalHolding.scannerPhotoPaths||[]).length)){
-    alert('This holding contains Pro inventory records. Renew Pro to edit it while keeping those records.');
-    return;
-  }
+
 
   setButtonBusy(button,true,editingHoldingIndex!==null?'Saving changes…':'Adding…');
 
@@ -10611,8 +10716,8 @@ async function saveHolding(){
       p_purchase_date:date||null,
       p_serial_number:serial||null,
       p_notes:notes||null,
-      p_photo_path:pendingHoldingPhotoPath,
-      p_receipt_path:pendingHoldingReceiptPath,
+      p_photo_path:proActive?pendingHoldingPhotoPath:null,
+      p_receipt_path:proActive?pendingHoldingReceiptPath:null,
       p_year:year,p_purity:purity||null,p_mint:mint||null
     };
 
@@ -11556,15 +11661,18 @@ async function saveAccountProfile(){
   const email=(document.getElementById('accountEmail')?.value||'').trim();
   if(name.length>60){setAccountSettingsStatus('Display Name must be 60 characters or fewer.',true);return}
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){setAccountSettingsStatus('Please enter a valid email address.',true);return}
+  const profileUserId=currentUser.id;
   setButtonBusy(button,true,'Saving…');setAccountSettingsStatus('Saving…');
   try{
     const oldEmail=currentUser.email||'';const emailChanged=email!==oldEmail;const attrs={data:{name}};if(emailChanged)attrs.email=email;
     const {data,error}=await supabaseClient.auth.updateUser(attrs);
+    if(currentUser?.id!==profileUserId)return;
     if(error){setAccountSettingsStatus(friendlyErrorMessage(error,'We could not save your profile. Please try again.'),true);return}
     if(data?.user)currentUser=data.user;updateWelcomeBack();
-    setAccountSettingsStatus(emailChanged?'Profile saved. Check your new email address for a confirmation link.':'Profile saved.');
     populateAccountSettings();
-  }finally{setButtonBusy(button,false);}
+    setAccountSettingsStatus(emailChanged?'Profile saved. Check your new email address for a confirmation link.':'Profile saved.');
+  }catch(error){if(currentUser?.id===profileUserId)setAccountSettingsStatus(friendlyErrorMessage(error,'We could not save your profile. Please try again.'),true);}
+  finally{setButtonBusy(button,false);}
 }
 
 async function changeAccountPassword(){
@@ -11573,12 +11681,15 @@ async function changeAccountPassword(){
   const password=document.getElementById('accountPassword')?.value||'';const confirm=document.getElementById('accountPasswordConfirm')?.value||'';
   if(password.length<8){setAccountSettingsStatus('Use at least 8 characters for your new password.',true);return}
   if(password!==confirm){setAccountSettingsStatus('Passwords do not match.',true);return}
+  const passwordUserId=currentUser.id;
   setButtonBusy(button,true,'Updating…');setAccountSettingsStatus('Updating password…');
   try{
     const {error}=await supabaseClient.auth.updateUser({password});
+    if(currentUser?.id!==passwordUserId)return;
     if(error){setAccountSettingsStatus(friendlyErrorMessage(error,'We could not update your password. Please try again.'),true);return}
     document.getElementById('accountPassword').value='';document.getElementById('accountPasswordConfirm').value='';setAccountSettingsStatus('Password updated.');
-  }finally{setButtonBusy(button,false);}
+  }catch(error){if(currentUser?.id===passwordUserId)setAccountSettingsStatus(friendlyErrorMessage(error,'We could not update your password. Please try again.'),true);}
+  finally{setButtonBusy(button,false);}
 }
 
 async function exportBenzaData(){
@@ -11666,7 +11777,7 @@ async function exportBenzaData(){
 async function deleteBenzaAccount(){
   if(!supabaseClient||!currentUser) return;
 
-  const first=confirm('Delete your Benza Bullion account?\n\nThis permanently deletes your account and associated portfolio data. This cannot be undone.');
+  const first=confirm('Delete your Benza Bullion account?\n\nThis permanently deletes your account and associated portfolio data. This cannot be undone.\n\nDeleting your account does not cancel Apple subscriptions. Billing continues until you cancel through Apple. Choose Cancel to manage subscriptions first, or OK to delete now.');
   if(!first) return;
 
   const typed=prompt('To confirm permanent account deletion, type DELETE');
@@ -11960,27 +12071,32 @@ async function loadNotificationPreferences(){
   }
   renderNotificationPreferences();
 }
+const notificationPreferenceRequests=new Set();
 async function toggleNotificationPreference(key){
   if(!(key in NOTIFICATION_PREF_UI))return;
   const status=document.getElementById('notificationPrefsStatus');
   if(!currentUser||!supabaseClient){if(status)status.textContent='Log in to change notification preferences.';return}
+  const userId=currentUser.id;
+  const requestKey=userId+':'+key;
+  if(notificationPreferenceRequests.has(requestKey))return;
   const previous=!!benzaNotificationPrefs[key];
+  notificationPreferenceRequests.add(requestKey);
   benzaNotificationPrefs[key]=!previous;renderNotificationPreferences();
   if(status)status.textContent='Saving…';
-  const payload={
-    user_id:currentUser.id,
-    price_targets:!!benzaNotificationPrefs.price_targets,
-    daily_summary:!!benzaNotificationPrefs.daily_summary,
-    big_market_moves:!!benzaNotificationPrefs.big_market_moves,
-    portfolio_milestones:!!benzaNotificationPrefs.portfolio_milestones,
-    daily_summary_hour:Number(benzaNotificationPrefs.daily_summary_hour)||8,
-    big_move_percent:Number(benzaNotificationPrefs.big_move_percent)||3,
-    timezone:detectedBenzaTimezone(),
-    updated_at:new Date().toISOString()
-  };
-  const {error}=await supabaseClient.from('notification_preferences').upsert(payload,{onConflict:'user_id'});
-  if(error){benzaNotificationPrefs[key]=previous;renderNotificationPreferences();if(status)status.textContent='Could not save this setting.';console.warn(error);return}
-  if(status){status.textContent='Saved';setTimeout(()=>{if(status.textContent==='Saved')status.textContent=''},1400)}
+  try{
+    // Save only this preference so concurrent toggles cannot overwrite one another.
+    const {error}=await supabaseClient.from('notification_preferences').update({
+      [key]:!previous,timezone:detectedBenzaTimezone(),updated_at:new Date().toISOString()
+    }).eq('user_id',userId).select('user_id').single();
+    if(error)throw error;
+    if(currentUser?.id!==userId)return;
+    if(status){status.textContent='Saved';setTimeout(()=>{if(currentUser?.id===userId&&status.textContent==='Saved')status.textContent=''},1400)}
+  }catch(error){
+    if(currentUser?.id!==userId)return;
+    benzaNotificationPrefs[key]=previous;renderNotificationPreferences();
+    if(status)status.textContent='Could not save this setting. Please try again.';
+    console.warn('Notification preference save failed:',error);
+  }finally{notificationPreferenceRequests.delete(requestKey);}
 }
 let benzaVapidPublicKey='';
 function urlBase64ToUint8Array(base64String){
@@ -12252,8 +12368,8 @@ loadBenzaWatchlist();
       <div class="proUpgradeBenefit"><i>✓</i><span>Future Pro releases included with an active subscription or permanent Founder access</span></div>
     </div>
     <div class="proFutureFine">Planned additions include Future Potential historical scenarios with optional contributions, richer premium analysis, expanded alerts, reports, and new stack tools. Timing and availability may change.</div>
-    <div class="proUpgradePrices"><button class="proUpgradePrice selected" id="proPlanMonthly" type="button" onclick="selectProPlan('monthly')"><strong>$4.99/month</strong><span>7-day free trial · then $4.99/month</span></button><button class="proUpgradePrice" id="proPlanAnnual" type="button" onclick="selectProPlan('annual')"><strong>$39.99/year</strong><span>7-day free trial · then $39.99/year</span></button><button class="proUpgradePrice founder" id="proPlanFounder" type="button" onclick="selectProPlan('founder')"><span class="founderOfferBadge">LIMITED LAUNCH OFFER</span><strong>$25 one time</strong><span>Lifetime Pro access</span><span class="founderValue">Comparable to $119.97 over 3 years · save nearly $95</span><span class="founderBadgeBonus">Includes the exclusive Founding Member badge on Home</span></button></div>
-    <div class="proUpgradeActions"><button class="primary" id="proStartTrialBtn" type="button" onclick="startNativeProPurchase()">Start 7-Day Free Trial</button><button class="secondary" type="button" onclick="closeProUpgrade()">Not now</button></div>
+    <div class="proUpgradePrices"><button class="proUpgradePrice selected" id="proPlanMonthly" type="button" onclick="selectProPlan('monthly')"><strong data-store-price="monthly">Monthly subscription</strong><span data-store-offer="monthly">View App Store pricing</span></button><button class="proUpgradePrice" id="proPlanAnnual" type="button" onclick="selectProPlan('annual')"><strong data-store-price="annual">Annual subscription</strong><span data-store-offer="annual">View App Store pricing</span></button><button class="proUpgradePrice founder" id="proPlanFounder" type="button" onclick="selectProPlan('founder')"><span class="founderOfferBadge">LIMITED LAUNCH OFFER</span><strong data-store-price="founder">Founder lifetime access</strong><span data-store-offer="founder">One-time purchase · never renews</span><span class="founderBadgeBonus">Includes the exclusive Founding Member badge on Home</span></button></div>
+    <div class="proUpgradeActions"><button class="primary" id="proStartTrialBtn" type="button" onclick="startNativeProPurchase()">Continue</button><button class="secondary" type="button" onclick="closeProUpgrade()">Not now</button></div>
   </div>
 </div>
 </body>
