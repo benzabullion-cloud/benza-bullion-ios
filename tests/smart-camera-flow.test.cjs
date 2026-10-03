@@ -61,26 +61,26 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
  await test('Missing model asset status remains visible in diagnostics',async()=>{queued.push({text:'Fine silver',confidence:.9,designStatus:'asset-pack-unavailable'});await context.runSmartCameraScan();assert.equal(vm.runInContext('smartCameraLastDiagnostic.designStatus',context),'asset-pack-unavailable')});
  await test('Readable two-side OCR skips expensive design refinement',async()=>{
    let refinements=0;plugin.refine=async()=>{refinements++;throw Error('Should not run')};
-   queued.push({text:'ELIZABETH II 5 DOLLARS 2022',confidence:.9},{text:'CANADA 9999 FINE SILVER 1 OZ ARGENT PUR',confidence:.95});
+   queued.push({text:'CANADA 9999 FINE SILVER 1 OZ ARGENT PUR',confidence:.95},{text:'ELIZABETH II 5 DOLLARS 2022',confidence:.9});
    await context.runSmartCameraScan();await context.runSmartCameraScan(true);
    assert.equal(refinements,0);assert.equal(pending().product,'Canadian Silver Maple Leaf');assert.equal(pending().weight,1);
    delete plugin.refine;
  });
- await test('First side never waits for visual refinement',async()=>{
-   let refinements=0;plugin.refine=async()=>{refinements++;return {text:'fine silver'}};
-   queued.push({lines:[],confidence:0});await context.runSmartCameraScan();assert.equal(refinements,0);assert.equal(pending().sides,1);
+ await test('Incomplete first side requests one bounded refinement',async()=>{
+   let refinements=0;plugin.refine=async()=>{refinements++;return {lines:['fine silver'],confidence:.95}};
+   queued.push({lines:[],confidence:0});await context.runSmartCameraScan();assert.equal(refinements,1);assert.equal(pending().sides,1);assert.equal(pending().metal,'silver');
    delete plugin.refine;
  });
  await test('Unresolved second side requests one refinement and adds processing times',async()=>{
-   let refinements=0;plugin.refine=async()=>{refinements++;return {text:'CANADA FINE SILVER 1 OZ 9999',confidence:.95,elapsedMs:500}};
+   let refinements=0;plugin.refine=async()=>{refinements++;return refinements===1?{text:'2022',confidence:.9}:{text:'CANADA FINE SILVER 1 OZ 9999',confidence:.95,elapsedMs:500}};
    queued.push({text:'2022',confidence:.9},{text:'FINE SILVER',confidence:.95,elapsedMs:120});
    await context.runSmartCameraScan();await context.runSmartCameraScan(true);
-   assert.equal(refinements,1);assert.equal(pending().product,'Canadian Silver Maple Leaf');
+   assert.equal(refinements,2);assert.equal(pending().product,'Canadian Silver Maple Leaf');
    assert.equal(vm.runInContext('smartCameraLastDiagnostic.elapsedMs',context),620);
    delete plugin.refine;
  });
  await test('Closing during refinement discards the late callback',async()=>{
-   let done;plugin.refine=()=>new Promise(resolve=>done=resolve);
+   let done;let firstRefinement=true;plugin.refine=()=>{if(firstRefinement){firstRefinement=false;return Promise.resolve({text:'2022',confidence:.9})}return new Promise(resolve=>done=resolve)};
    queued.push({text:'2022',confidence:.9},{text:'FINE SILVER',confidence:.95});
    await context.runSmartCameraScan();const before=pending();const second=context.runSmartCameraScan(true);
    await new Promise(resolve=>setImmediate(resolve));context.closeSmartCamera();
@@ -125,12 +125,12 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
    const observed={id:3,confidence:.7666667302449545,observations:[
      {text:'CANADA 9999 FINE SILVER',confidence:1},{text:'666 G ARGENT PUR',confidence:.30000001192092896}
    ]};
-   plugin.refine=async()=>{refinements++;return {passes:[{id:4,confidence:.95,observations:[
+   plugin.refine=async()=>{refinements++;if(refinements===1)return {lines:['CHARLES III 2026'],confidence:.95};return {passes:[{id:4,confidence:.95,observations:[
      {text:'CANADA 9999 FINE SILVER 1 OZ ARGENT PUR',confidence:.95}
    ]}],elapsedMs:1200}};
    queued.push({lines:['CHARLES III 2026'],confidence:.95},{passes:[observed],appBuild:'87',confidence:.95,elapsedMs:722});
    await context.runSmartCameraScan();await context.runSmartCameraScan(true);
-   assert.equal(refinements,1);assert.equal(pending().weight,1);assert.equal(context.canUseSmartCameraSuggestion(pending()),true);
+   assert.equal(refinements,2);assert.equal(pending().weight,1);assert.equal(context.canUseSmartCameraSuggestion(pending()),true);
    assert.equal(vm.runInContext('smartCameraLastDiagnostic.elapsedMs',context),1922);
    delete plugin.refine;
  });
@@ -144,6 +144,72 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
    assert.equal(diagnostic.weightPasses[0].rejectedReasons.lowConfidence,1);
    assert.equal(diagnostic.weightPasses[0].weightsOz.length,0);assert.equal(diagnostic.weightPasses[0].direct.length,0);
    assert.equal(context.applySmartCameraSuggestion(pending()),true);assert.equal(get('weight').value,'');
+ });
+ // Synthetic bridge responses test orchestration, not Buffalo camera accuracy.
+ await test('Weak Buffalo reverse is refined before a distinct portrait, in either order',async()=>{
+  for(const reverseFirst of [true,false]){
+   reset();vm.runInContext('smartCameraScanning=false',context);let refinementCalls=0,currentSide='';
+   const originalScan=plugin.scan;
+   plugin.scan=async options=>{const photo=await originalScan(options);currentSide=photo.testSide;return photo};
+   plugin.refine=async()=>{
+    refinementCalls++;
+    return currentSide==='reverse'
+     ?{lines:['UNITED STATES OF AMERICA 1 OZ .9999 FINE GOLD 50 DOLLARS'],confidence:.95,designSuggestion:{id:'american_buffalo',source:'local-catalogue-v1'},elapsedMs:500}
+     :{lines:['LIBERTY 2012'],confidence:.95,elapsedMs:500};
+   };
+   const reverse={lines:['.9999'],confidence:.95,testSide:'reverse'};
+   const portrait={lines:['LIBERTY 2012'],confidence:.95,testSide:'portrait'};
+   queued.push(...(reverseFirst?[reverse,portrait]:[portrait,reverse]));
+   await context.runSmartCameraScan();assert.equal(refinementCalls,1);
+   if(reverseFirst){assert.equal(pending().product,'American Gold Buffalo');assert.equal(pending().weight,1)}
+   await context.runSmartCameraScan(true);
+   assert.equal(pending().product,'American Gold Buffalo');assert.equal(pending().metal,'gold');
+   assert.equal(pending().weight,1);assert.equal(pending().year,2012);assert.equal(pending().sides,2);
+   assert.equal(context.canUseSmartCameraSuggestion(pending()),true);
+   assert.equal(refinementCalls,reverseFirst?1:2);
+   plugin.scan=originalScan;delete plugin.refine;
+  }
+ });
+ await test('Failed first-photo refinement retains partial evidence and one-photo count',async()=>{
+  reset();vm.runInContext('smartCameraScanning=false',context);plugin.refine=async()=>{throw Error('Design unavailable')};
+  const originalConsole=context.console;context.console={...console,warn(){}};
+  queued.push({lines:['FINE GOLD .9999'],confidence:.95});await context.runSmartCameraScan();
+  context.console=originalConsole;delete plugin.refine;
+  assert.equal(pending().metal,'gold');assert.equal(pending().purity.trim(),'.9999 gold');
+  assert.equal(pending().sides,1);assert.equal(views(),1);assert.equal(pending().weight,0);
+  assert.equal(context.canUseSmartCameraSuggestion(pending()),false);
+ });
+ await test('First-photo refinement still blocks conflicting purity and weights',async()=>{
+  for(const markings of ['AMERICAN GOLD BUFFALO .9999 .900 1 OZ','AMERICAN GOLD BUFFALO .9999 1 OZ 91 OZ']){
+   reset();vm.runInContext('smartCameraScanning=false',context);plugin.refine=async()=>({lines:[markings],confidence:.95});
+   queued.push({lines:['.9999'],confidence:.95});await context.runSmartCameraScan();
+   assert.equal(context.canUseSmartCameraSuggestion(pending()),false);assert.ok(pending().warnings.length);
+   assert.equal(pending().sides,1);delete plugin.refine;
+  }
+ });
+ await test('Closing during first-photo refinement cannot publish a late result',async()=>{
+  reset();vm.runInContext('smartCameraScanning=false',context);let done;plugin.refine=()=>new Promise(resolve=>done=resolve);
+  queued.push({lines:['.9999'],confidence:.95});const scan=context.runSmartCameraScan();
+  await new Promise(resolve=>setImmediate(resolve));context.closeSmartCamera();
+  done({lines:['AMERICAN GOLD BUFFALO .9999 1 OZ'],confidence:.95});await scan;
+  assert.equal(pending(),null);assert.equal(views(),0);delete plugin.refine;
+ });
+ await test('Recorded Palladium Maple Apple OCR still resolves with first-photo refinement in both orders',async()=>{
+  const pair=JSON.parse(fs.readFileSync('tests/fixtures/palladium-maple-ocr.json','utf8'));
+  for(const reversed of [false,true]){
+   reset();vm.runInContext('smartCameraScanning=false',context);
+   const originalScan=plugin.scan;let current;
+   plugin.scan=async options=>{const photo=await originalScan(options);current=photo.testPhoto;return photo};
+   plugin.refine=async()=>({passes:current.passes,confidence:.95});
+   for(const photo of reversed?[...pair].reverse():pair){
+    queued.push({passes:photo.passes.slice(0,4),testPhoto:photo,confidence:.95});
+   }
+   await context.runSmartCameraScan();await context.runSmartCameraScan(true);
+   assert.equal(pending().product,'Canadian Palladium Maple Leaf');assert.equal(pending().mint,'Royal Canadian Mint');
+   assert.equal(pending().weight,1);assert.equal(pending().year,null);assert.equal(pending().warnings.length,0);
+   assert.equal(context.canUseSmartCameraSuggestion(pending()),true);
+   plugin.scan=originalScan;delete plugin.refine;
+  }
  });
  console.log(count+' scanner flow checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1});
