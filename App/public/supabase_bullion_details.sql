@@ -176,9 +176,6 @@ begin
     raise exception 'Benza Bullion Pro is required for advanced inventory records';
   end if;
 
-  if not v_has_pro and exists(select 1 from public.holdings where id=p_holding_id and user_id=v_user_id and (bullion_year is not null or purity is not null or mint is not null or serial_number is not null or notes is not null or photo_path is not null or receipt_path is not null or cardinality(scanner_photo_paths)>0)) then
-    raise exception 'Renew Pro to edit this holding while keeping inventory records';
-  end if;
   update public.holdings
   set metal=p_metal,
       product=p_product,
@@ -187,11 +184,13 @@ begin
       total_oz=p_quantity*p_weight_oz,
       cost_basis=p_cost_basis,
       purchase_date=p_purchase_date,
-      serial_number=nullif(trim(p_serial_number),''),
-      notes=nullif(trim(p_notes),''),
-      photo_path=p_photo_path,
-      receipt_path=p_receipt_path,
-      bullion_year=p_year,purity=nullif(trim(p_purity),''),mint=nullif(trim(p_mint),'')
+      serial_number=case when v_has_pro then nullif(trim(p_serial_number),'') else serial_number end,
+      notes=case when v_has_pro then nullif(trim(p_notes),'') else notes end,
+      photo_path=case when v_has_pro then p_photo_path else photo_path end,
+      receipt_path=case when v_has_pro then p_receipt_path else receipt_path end,
+      bullion_year=case when v_has_pro then p_year else bullion_year end,
+      purity=case when v_has_pro then nullif(trim(p_purity),'') else purity end,
+      mint=case when v_has_pro then nullif(trim(p_mint),'') else mint end
   where id=p_holding_id and user_id=v_user_id
   returning * into v_holding;
 

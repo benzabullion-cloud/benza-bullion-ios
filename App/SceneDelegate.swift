@@ -784,6 +784,8 @@ final class BenzaStoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
     let identifier = "BenzaStoreKitPlugin"
     let jsName = "BenzaStoreKit"
     let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "getProducts", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getPendingTransactions", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "purchase", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "restorePurchases", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "finishTransaction", returnType: CAPPluginReturnPromise),
@@ -795,6 +797,74 @@ final class BenzaStoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
         "benza_pro_annual",
         "benza_pro_founder_lifetime"
     ]
+
+    private var transactionUpdatesTask: Task<Void, Never>?
+
+    override func load() {
+        transactionUpdatesTask = Task { @MainActor [weak self] in
+            for await verification in Transaction.updates {
+                guard !Task.isCancelled else { return }
+                guard let self, case .verified(let transaction) = verification,
+                      self.allowedProducts.contains(transaction.productID),
+                      transaction.revocationDate == nil else { continue }
+                self.notifyListeners("transactionUpdated", data: [
+                    "productId": transaction.productID,
+                    "transactionId": String(transaction.id),
+                    "appAccountToken": transaction.appAccountToken?.uuidString.lowercased() ?? "",
+                    "signedTransaction": verification.jwsRepresentation
+                ], retainUntilConsumed: true)
+            }
+        }
+    }
+
+    deinit { transactionUpdatesTask?.cancel() }
+
+    @objc func getProducts(_ call: CAPPluginCall) {
+        Task { @MainActor in
+            do {
+                var result: [[String: Any]] = []
+                for product in try await Product.products(for: Array(allowedProducts)) {
+                    var row: [String: Any] = ["productId": product.id, "displayPrice": product.displayPrice]
+                    if let subscription = product.subscription,
+                       await subscription.isEligibleForIntroOffer,
+                       let offer = subscription.introductoryOffer, offer.paymentMode == .freeTrial {
+                        let unit: String
+                        switch offer.period.unit {
+                        case .day: unit = "day"
+                        case .week: unit = "week"
+                        case .month: unit = "month"
+                        case .year: unit = "year"
+                        @unknown default: unit = ""
+                        }
+                        if !unit.isEmpty {
+                            row["trialUnit"] = unit
+                            row["trialValue"] = offer.period.value * offer.periodCount
+                        }
+                    }
+                    result.append(row)
+                }
+                call.resolve(["products": result])
+            } catch { call.reject(error.localizedDescription) }
+        }
+    }
+
+    @objc func getPendingTransactions(_ call: CAPPluginCall) {
+        guard let token = call.getString("appAccountToken").flatMap(UUID.init(uuidString:)) else {
+            call.reject("A signed-in account is required.")
+            return
+        }
+        Task { @MainActor in
+            var result: [[String: Any]] = []
+            for await verification in Transaction.unfinished {
+                guard case .verified(let transaction) = verification,
+                      allowedProducts.contains(transaction.productID), transaction.appAccountToken == token,
+                      transaction.revocationDate == nil else { continue }
+                result.append(["productId": transaction.productID, "transactionId": String(transaction.id),
+                               "appAccountToken": token.uuidString.lowercased(), "signedTransaction": verification.jwsRepresentation])
+            }
+            call.resolve(["transactions": result])
+        }
+    }
 
     @objc func purchase(_ call: CAPPluginCall) {
         guard let productId = call.getString("productId"), allowedProducts.contains(productId) else {

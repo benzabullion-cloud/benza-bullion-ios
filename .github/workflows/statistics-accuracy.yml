@@ -5,6 +5,10 @@ on:
       - 'App/public/index.html'
       - 'App/public/supabase_sale_restore.sql'
       - 'tests/statistics-accuracy.test.cjs'
+      - 'tests/launch-account-purchases.test.cjs'
+      - 'tests/holding-base-edits.cjs'
+      - 'App/public/supabase_bullion_details.sql'
+      - 'supabase/migrations/**'
       - '.github/workflows/statistics-accuracy.yml'
 permissions:
   contents: read
@@ -17,4 +21,8 @@ jobs:
         with:
           persist-credentials: false
       - name: Run statistics regression suite
-        run: node --test tests/statistics-accuracy.test.cjs
+        run: node --test tests/statistics-accuracy.test.cjs tests/launch-account-purchases.test.cjs
+      - name: Verify basic holding edits against PostgreSQL
+        run: |
+          npm install --no-save --ignore-scripts @electric-sql/pglite@0.5.8
+          node tests/holding-base-edits.cjs
