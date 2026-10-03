@@ -5882,7 +5882,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
       </div>
       <div class="smartCameraActions">
         <button id="smartCameraProButton" class="smartCameraPrimary" type="button" onclick="handleSmartCameraProAction()">Scan Bullion</button>
-        <button id="smartCameraLibraryButton" class="smartCameraSecondary" data-scan-control type="button" onclick="runSmartCameraScan(smartCameraAwaitingReverse,'library')">Choose Bullion Photo</button>
+        <button id="smartCameraLibraryButton" class="smartCameraSecondary" data-scan-control type="button" onclick="captureSmartCameraSide('library')">Choose Bullion Photo</button>
         <button class="smartCameraSecondary" type="button" onclick="closeSmartCamera();openManualAdd();">Enter manually</button>
         <button id="smartCameraResetButton" class="smartCameraSecondary" data-scan-control type="button" onclick="resetSmartCameraScan()">Reset scan</button>
       </div>
@@ -7628,12 +7628,12 @@ function renderSmartCameraAnalysis(suggestion){
   document.getElementById('smartScanEditor').hidden=true;
   document.getElementById('smartScanEditButton').setAttribute('aria-expanded','false');
   const ready=canUseSmartCameraSuggestion(suggestion);
-  smartCameraAwaitingReverse=!ready&&suggestion.sides<2;
+  smartCameraAwaitingReverse=suggestion.sides===1;
   const panel=document.getElementById('smartCameraAnalysis');
   if(!panel)return;
   document.getElementById('smartAnalysisTitle').textContent=suggestion.userReviewed?'Your reviewed details':ready?'Your scan is ready':smartCameraAwaitingReverse?'One more photo':'More details needed';
   document.getElementById('smartAnalysisSub').textContent=suggestion.userReviewed?'You confirmed these details. Review once more, then continue to your holding.':ready
-    ? 'Review the details below, then continue to your holding.'
+    ? (smartCameraAwaitingReverse?'Review these details or add the opposite side to complete missing information.':'Review the details below, then continue to your holding.')
     : smartCameraAwaitingReverse
       ? 'First photo received. Photograph or choose a photo of the opposite side of the same item.'
       : smartCameraFailureReason(suggestion);
@@ -7751,6 +7751,47 @@ async function resetSmartCameraScan(silent=false,releaseModels=false){
     }
   }
 }
+// A capture source is independent of the item session and recognition readiness.
+function captureSmartCameraSide(source='camera'){
+  return runSmartCameraScan(smartCameraPhotoCount===1,source);
+}
+function mergeSmartCameraReadings(previous,current,combined){
+  if(!previous)return combined;
+  const merged={...combined};
+  const warnings=new Set([...(previous.warnings||[]),...(combined.warnings||[])]);
+  const identityConflict=(previous.metal&&current.metal&&previous.metal!==current.metal)||
+    (previous.product&&current.product&&previous.product!==current.product);
+  const fields=['metal','product','weight','year','purity','mint','serial','denomination','designID'];
+  const present=(field,value)=>field==='weight'?Number.isFinite(value)&&value>0:!!value;
+  for(const field of fields){
+    if(present(field,previous[field])){
+      // Retain the established value when the union is blank or contradictory.
+      // A compatible, directly read value can confirm a catalogue inference.
+      merged[field]=previous[field];
+      const inferred='inferred'+field[0].toUpperCase()+field.slice(1);
+      if(inferred in previous)merged[inferred]=previous[inferred];
+      if(present(field,current[field])&&current[field]===previous[field]&&!current[inferred]&&!identityConflict){
+        if(inferred in previous)merged[inferred]=false;
+      }
+      if(present(field,current[field])&&current[field]!==previous[field]){
+        const sameWeight=field==='weight'&&Math.abs(current[field]-previous[field])<=Math.max(current[field],previous[field])*.002;
+        if(!sameWeight)warnings.add('The two photos disagree on '+field+'. Confirm this detail.');
+      }
+    }else if(identityConflict){
+      // Never enrich one item's result with fields from a different product.
+      merged[field]=previous[field];
+    }else if(!present(field,merged[field])&&present(field,current[field])){
+      merged[field]=current[field];
+      const inferred='inferred'+field[0].toUpperCase()+field.slice(1);
+      if(inferred in current)merged[inferred]=current[inferred];
+    }
+  }
+  merged.warnings=[...warnings];
+  merged.confidence=Math.max(previous.confidence||0,combined.confidence||0);
+  if(merged.warnings.length)merged.confidence=Math.min(merged.confidence,.40);
+  merged.usable=!!merged.metal&&!merged.warnings.length&&merged.confidence>=.42;
+  return merged;
+}
 async function runSmartCameraScan(append=false,source='camera'){
   if(smartCameraScanning)return;
   // Clear BEFORE opening the picker, even when it fails or is cancelled.
@@ -7865,13 +7906,13 @@ async function runSmartCameraScan(append=false,source='camera'){
       if(status)status.textContent='';
       return;
     }
-    smartCameraScans.push(result);
+    smartCameraScans.push({...result,reading});
     const combined={lines:smartCameraScans.flatMap(scan=>Array.isArray(scan.lines)?scan.lines:[scan.text||'']),
       confidence:Math.max(...smartCameraScans.map(scan=>Number(scan.confidence)||0)),sides:smartCameraPhotoCount,
       photoEvidence:smartCameraScans.map(scan=>({lines:Array.isArray(scan.lines)?scan.lines:[scan.text||''],weightLines:scan.weightLines,
         confidence:Number(scan.confidence)||0,designSuggestion:scan.designSuggestion||null})),
       designSuggestions:smartCameraScans.flatMap(scan=>Array.isArray(scan.designSuggestions)?scan.designSuggestions:scan.designSuggestion?[scan.designSuggestion]:[])};
-    const suggestion=interpretSmartCameraScan(combined);
+    const suggestion=mergeSmartCameraReadings(pendingSmartCameraSuggestion,reading,interpretSmartCameraScan(combined));
     renderSmartCameraAnalysis(suggestion);
     if(status)status.textContent='';
   }catch(error){
@@ -7923,7 +7964,7 @@ function closeSmartCamera(){
   screen.setAttribute('aria-hidden','true');
 }
 function handleSmartCameraProAction(){
-  if(isProActive()){runSmartCameraScan(smartCameraAwaitingReverse,'camera');return;}
+  if(isProActive()){captureSmartCameraSide('camera');return;}
   closeSmartCamera();
   openProUpgrade('smart-camera');
 }
