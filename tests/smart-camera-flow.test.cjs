@@ -390,5 +390,54 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
    assert.equal(context.applySmartCameraSuggestion(pending()),false);
   }
  });
+ await test('A generic opposite-side design cannot hide confirmation for a named Gold Eagle, in either order',async()=>{
+  const render=context.renderSmartCameraAnalysis;
+  vm.runInContext(html.slice(html.indexOf('function renderSmartCameraAnalysis('),html.indexOf('function applySmartCameraSuggestion(')),context);
+  for(const genericFirst of [false,true]){
+   reset();vm.runInContext('smartCameraScanning=false',context);
+   const named={lines:['AMERICAN GOLD EAGLE 1 OZ FINE GOLD'],confidence:.95,designSuggestion:{id:'american_gold_eagle',source:'local-catalogue-v1'}};
+   const generic={lines:['LIBERTY'],confidence:.9,designSuggestion:{id:'generic_coin',source:'local-catalogue-v1'}};
+   queued.push(...(genericFirst?[generic,named]:[named,generic]));
+   await context.captureSmartCameraSide('camera');await context.captureSmartCameraSide('library');
+   assert.equal(pending().product,'American Gold Eagle');assert.equal(pending().metal,'gold');assert.equal(pending().weight,1);
+   assert.equal(pending().purity,'22K gold');assert.equal(pending().mint,'United States Mint');
+   assert.equal(pending().warnings.length,0);assert.equal(context.canUseSmartCameraSuggestion(pending()),true);
+   assert.equal(get('smartAnalysisUseButton').hidden,false);assert.equal(get('smartAnalysisUseButton').disabled,false);
+   assert.equal(get('smartAnalysisTitle').textContent,'Your scan is ready');
+   get('product').options=[{value:'American Gold Eagle'}];
+   context.useSmartCameraAnalysis();
+   assert.equal(get('product').value,'American Gold Eagle');assert.equal(get('weight').value,1);
+   await new Promise(resolve=>setImmediate(resolve));
+  }
+  context.renderSmartCameraAnalysis=render;
+ });
+ await test('Compatible generic designs keep confirmation visible across metals and genuine design conflicts still block it',async()=>{
+  const render=context.renderSmartCameraAnalysis;
+  vm.runInContext(html.slice(html.indexOf('function renderSmartCameraAnalysis('),html.indexOf('function applySmartCameraSuggestion(')),context);
+  for(const [metal,product,design,shape] of [
+   ['gold','American Gold Eagle','american_gold_eagle','generic_coin'],
+   ['silver','American Silver Eagle','american_silver_eagle','generic_coin'],
+   ['platinum','American Platinum Eagle','american_platinum_eagle','generic_coin'],
+   ['palladium','American Palladium Eagle','american_palladium_eagle','generic_coin'],
+   ['copper','Copper Bullion Bar','generic_bar','unknown']]){
+   for(const genericFirst of [true,false]){
+    reset();vm.runInContext('smartCameraScanning=false',context);
+    const known={text:product+' 1 OZ FINE '+metal,confidence:.95,designSuggestion:{id:design,source:'local-catalogue-v1'}};
+    const generic={lines:[],confidence:.9,designSuggestion:{id:shape,source:'local-catalogue-v1'}};
+    queued.push(...(genericFirst?[generic,known]:[known,generic]));
+    await context.captureSmartCameraSide('library');await context.captureSmartCameraSide('camera');
+    assert.equal(pending().product,product);assert.equal(pending().warnings.length,0);
+    assert.equal(get('smartAnalysisUseButton').hidden,false);assert.equal(get('smartAnalysisUseButton').disabled,false);
+   }
+  }
+  reset();vm.runInContext('smartCameraScanning=false',context);
+  queued.push({text:'American Gold Eagle 1 OZ FINE GOLD',confidence:.95,designSuggestion:{id:'american_gold_eagle',source:'local-catalogue-v1'}},
+   {lines:[],confidence:.95,designSuggestion:{id:'american_buffalo',source:'local-catalogue-v1'}});
+  await context.captureSmartCameraSide('camera');await context.captureSmartCameraSide('library');
+  assert.ok(pending().warnings.length);assert.equal(context.canUseSmartCameraSuggestion(pending()),false);
+  assert.equal(get('smartAnalysisUseButton').hidden,true);assert.equal(context.applySmartCameraSuggestion(pending()),false);
+  assert.doesNotMatch(get('smartAnalysisSub').textContent,/designID/);
+  context.renderSmartCameraAnalysis=render;
+ });
  console.log(count+' scanner flow checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1});
