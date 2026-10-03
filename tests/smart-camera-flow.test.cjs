@@ -314,5 +314,81 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
   await context.captureSmartCameraSide('camera');await context.captureSmartCameraSide('library');
   assert.equal(pending().product,'American Gold Eagle');assert.equal(pending().warnings.length,0);
  });
+ await test('Every catalogue title retains the same reading in both orders and all camera/library transitions',async()=>{
+  const map=vm.runInContext('PRODUCT_MAP',context),catalog=vm.runInContext('SMART_CAMERA_CATALOG',context);
+  let products=0,scenarios=0;
+  for(const [metal,titles] of Object.entries(map))for(const product of titles){
+   products++;
+   const profile=catalog.find(item=>item.product===product&&item.metal===metal);
+   const year=product==='U.S. Copper Cents'?1980:profile.yearMin||2026;
+   const text=product+' '+year+' fine '+metal+' 1 oz';
+   const expected=context.interpretSmartCameraScan({text,confidence:.95});
+   assert.equal(expected.product,product);assert.equal(expected.metal,metal);
+   for(const blankFirst of [false,true])for(const sources of [['camera','camera'],['camera','library'],['library','camera'],['library','library']]){
+    reset();vm.runInContext('smartCameraScanning=false',context);
+    const photos=[{text,confidence:.95},{lines:[],confidence:0}];
+    queued.push(...(blankFirst?photos.reverse():photos));
+    await context.captureSmartCameraSide(sources[0]);const session=vm.runInContext('smartCameraSession',context),resets=resetCalls;
+    await context.captureSmartCameraSide(sources[1]);
+    assert.equal(vm.runInContext('smartCameraSession',context),session);assert.equal(resetCalls,resets);
+    assert.equal(pending().sides,2);
+    for(const field of ['product','metal','weight','year','purity','mint','serial','denomination']){
+     assert.equal(pending()[field],expected[field],product+' / '+sources.join('→')+' / '+field);
+    }
+    scenarios++;
+   }
+  }
+  console.log('Covered '+products+' product titles and '+scenarios+' two-photo source/order scenarios');
+ });
+ await test('All generic catalogue labels including size-labelled copper share the refinement rule',async()=>{
+  const map=vm.runInContext('PRODUCT_MAP',context);let count=0;
+  for(const [metal,products] of Object.entries(map))for(const product of products){
+   if(context.smartCameraGenericProduct(product)){
+    count++;assert.equal(context.shouldRefineSmartCameraSuggestion({metal,product,weight:1,usable:true,warnings:[]}),true,product);
+   }
+  }
+  for(const product of ['1 oz Copper Round','1 lb Copper Bar','5 lb Copper Bar','10 lb Copper Bar','Copper Coin Collection'])assert.equal(context.smartCameraGenericProduct(product),true,product);
+  assert.equal(count,20);
+ });
+ await test('Equivalent fineness and specific design aliases confirm fields without false conflicts',async()=>{
+  const first=context.interpretSmartCameraScan({text:'AMERICAN SILVER EAGLE 1 OZ FINE SILVER .999 2022',confidence:.95});
+  const merged=context.mergeSmartCameraReadings({...first,purity:'.999 fine silver',designID:'american_eagle'},
+   {...first,purity:'.999 silver',designID:'american_silver_eagle'},first);
+  assert.equal(merged.warnings.length,0);assert.equal(context.canUseSmartCameraSuggestion(merged),true);
+  assert.equal(context.smartCameraSameField('purity','22K gold','.9167 gold'),true);
+  assert.equal(context.smartCameraSameField('purity','.9999 gold','.999 gold'),false);
+ });
+ await test('Generic shape upgrades use the same kind check across all metals',async()=>{
+  for(const [metal,product] of [['gold','American Gold Eagle'],['silver','American Silver Eagle'],['platinum','American Platinum Eagle'],['palladium','American Palladium Eagle'],['copper','U.S. Copper Cents']]){
+   const specific={metal,product,weight:1,year:2022,purity:'',mint:'',serial:'',denomination:'',warnings:[],confidence:.95,usable:true,designID:''};
+   const label=metal[0].toUpperCase()+metal.slice(1);
+   const generic={...specific,product:label+' Bullion Coin',designID:'generic_coin'};
+   const named={...specific,designID:metal==='copper'?'':'american_'+metal+'_eagle'};
+   const upgrade=context.mergeSmartCameraReadings(generic,named,named);
+   assert.equal(upgrade.product,product);assert.equal(upgrade.designID,named.designID||'generic_coin');assert.equal(upgrade.warnings.length,0);
+   const wrongKind=context.mergeSmartCameraReadings({...generic,product:label+' Bar',designID:'generic_bar'},named,named);
+   assert.equal(wrongKind.product,label+' Bar');assert.ok(wrongKind.warnings.length);assert.equal(context.canUseSmartCameraSuggestion(wrongKind),false);
+  }
+ });
+ await test('Weight, year, purity and metal conflicts retain established values under the same rule for every metal',async()=>{
+  for(const metal of ['gold','silver','platinum','palladium','copper']){
+   const label=metal[0].toUpperCase()+metal.slice(1);
+   for(const reverse of ['1 OZ .999 2021','2 OZ .999 2022','1 OZ .900 2022']){
+    reset();vm.runInContext('smartCameraScanning=false',context);
+    queued.push({text:label+' BULLION COIN FINE '+metal+' 1 OZ .999 2022',confidence:.95},
+      {text:'FINE '+metal+' '+reverse,confidence:.95});
+    await context.captureSmartCameraSide('camera');const first=pending();
+    await context.captureSmartCameraSide('library');
+    for(const field of ['product','metal','weight','year','purity'])assert.equal(pending()[field],first[field],metal+' '+field);
+    assert.ok(pending().warnings.length);assert.equal(context.canUseSmartCameraSuggestion(pending()),false);
+   }
+   reset();vm.runInContext('smartCameraScanning=false',context);
+   queued.push({text:label+' BULLION COIN FINE '+metal+' 1 OZ',confidence:.95},
+    {text:'FINE '+(metal==='gold'?'silver':'gold')+' 1 OZ',confidence:.95});
+   await context.captureSmartCameraSide('library');await context.captureSmartCameraSide('camera');
+   assert.equal(pending().metal,metal);assert.equal(context.canUseSmartCameraSuggestion(pending()),false);
+   assert.equal(context.applySmartCameraSuggestion(pending()),false);
+  }
+ });
  console.log(count+' scanner flow checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1});
