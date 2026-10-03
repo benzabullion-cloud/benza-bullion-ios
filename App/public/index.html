@@ -7784,9 +7784,10 @@ async function runSmartCameraScan(append=false,source='camera'){
     let captured=await plugin.scan({source});
     if(run!==smartCameraRunId||session!==smartCameraSession)return;
     let result=selectSmartCameraPhotoEvidence(captured);
-    // First side: collect evidence promptly. After the opposite side, only run
-    // expensive fallbacks if the shared catalogue/specification gates still fail.
-    if(append&&!result?.cancelled&&typeof plugin.refine==='function'){
+    // Either side may arrive first. Give an incomplete first photo the same
+    // bounded refinement used for an unresolved two-photo result. Complete
+    // first readings still skip it; identity/weight/conflict gates are unchanged.
+    if(!result?.cancelled&&typeof plugin.refine==='function'){
       const trial=interpretSmartCameraScan({
         photoEvidence:[...smartCameraScans,result].map(scan=>({lines:scan.lines||[scan.text||''],weightLines:scan.weightLines,
           confidence:Number(scan.confidence)||0,designSuggestion:scan.designSuggestion||null})),
@@ -7797,12 +7798,20 @@ async function runSmartCameraScan(append=false,source='camera'){
       });
       if(!canUseSmartCameraSuggestion(trial)){
         if(status)status.textContent='Checking the design and harder-to-read markings…';
-        const refined=await plugin.refine();
+        let refined;
+        try{refined=await plugin.refine();}
+        catch(error){
+          // An optional deeper check must not discard the captured photo or
+          // usable partial OCR when its engine is unavailable or fails.
+          console.warn('Additional bullion scan check unavailable:',error);
+        }
         if(run!==smartCameraRunId||session!==smartCameraSession)return;
         if(refined?.cancelled)return;
-        const totalProcessingMs=(Number(captured.elapsedMs)||0)+(Number(refined.elapsedMs)||0);
-        captured={...captured,...refined,elapsedMs:totalProcessingMs};
-        result=selectSmartCameraPhotoEvidence(captured);
+        if(refined&&typeof refined==='object'){
+          const totalProcessingMs=(Number(captured.elapsedMs)||0)+(Number(refined.elapsedMs)||0);
+          captured={...captured,...refined,elapsedMs:totalProcessingMs};
+          result=selectSmartCameraPhotoEvidence(captured);
+        }
       }
     }
     if(run!==smartCameraRunId||session!==smartCameraSession)return;
