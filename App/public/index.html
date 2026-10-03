@@ -7755,27 +7755,60 @@ async function resetSmartCameraScan(silent=false,releaseModels=false){
 function captureSmartCameraSide(source='camera'){
   return runSmartCameraScan(smartCameraPhotoCount===1,source);
 }
+function smartCameraGenericProduct(product){
+  // A size is a specification, not a named mint/product identity.
+  return /^(?:\d+(?:\.\d+)?\s*(?:oz|lb|g|kg)\s+)?(?:Gold|Silver|Platinum|Palladium|Copper) (?:Bullion )?(?:Coin(?: Collection)?|Bar|Round)$/.test(product||'');
+}
+function smartCameraProductKind(product){
+  return /\bbar$/i.test(product||'')?'bar':/\bround$/i.test(product||'')?'round':'coin';
+}
+function smartCameraSameField(field,a,b,product){
+  if(a===b)return true;
+  if(field==='weight')return Math.abs(a-b)<=Math.max(a,b)*.002;
+  if(field==='purity'){
+    const value=text=>{
+      const decimal=String(text).match(/\.(\d{3,4})/);
+      const karat=String(text).match(/\b(22|24)\s*k/i);
+      return decimal?Number('0.'+decimal[1]):karat?Number(karat[1])/24:null;
+    };
+    const x=value(a),y=value(b);
+    return x!==null&&y!==null&&Math.abs(x-y)<.0001;
+  }
+  if(field==='designID')return smartCameraDesignCompatibleProduct(a,product)&&smartCameraDesignCompatibleProduct(b,product);
+  return false;
+}
+function shouldRefineSmartCameraSuggestion(suggestion){
+  // Being usable for manual review does not mean a generic shape has identified
+  // the named coin. Give those results the same bounded deeper check.
+  return !canUseSmartCameraSuggestion(suggestion)||smartCameraGenericProduct(suggestion.product);
+}
 function mergeSmartCameraReadings(previous,current,combined){
   if(!previous)return combined;
   const merged={...combined};
   const warnings=new Set([...(previous.warnings||[]),...(combined.warnings||[])]);
+  const sameMetal=previous.metal&&previous.metal===current.metal;
+  const sameKind=smartCameraProductKind(previous.product)===smartCameraProductKind(current.product);
+  const productUpgrade=sameMetal&&sameKind&&smartCameraGenericProduct(previous.product)&&current.product&&!smartCameraGenericProduct(current.product);
+  const productDowngrade=sameMetal&&sameKind&&previous.product&&!smartCameraGenericProduct(previous.product)&&smartCameraGenericProduct(current.product);
   const identityConflict=(previous.metal&&current.metal&&previous.metal!==current.metal)||
-    (previous.product&&current.product&&previous.product!==current.product);
+    (previous.product&&current.product&&previous.product!==current.product&&!productUpgrade&&!productDowngrade);
   const fields=['metal','product','weight','year','purity','mint','serial','denomination','designID'];
   const present=(field,value)=>field==='weight'?Number.isFinite(value)&&value>0:!!value;
   for(const field of fields){
-    if(present(field,previous[field])){
+    const inferred='inferred'+field[0].toUpperCase()+field.slice(1);
+    if(productUpgrade&&present(field,current[field])&&(field==='product'||previous[inferred]||(field==='designID'&&previous.designID==='generic_'+smartCameraProductKind(previous.product)))){
+      merged[field]=current[field];
+      if(inferred in current)merged[inferred]=current[inferred];
+    }else if(present(field,previous[field])){
       // Retain the established value when the union is blank or contradictory.
       // A compatible, directly read value can confirm a catalogue inference.
       merged[field]=previous[field];
-      const inferred='inferred'+field[0].toUpperCase()+field.slice(1);
       if(inferred in previous)merged[inferred]=previous[inferred];
-      if(present(field,current[field])&&current[field]===previous[field]&&!current[inferred]&&!identityConflict){
+      if(present(field,current[field])&&smartCameraSameField(field,current[field],previous[field],merged.product)&&!current[inferred]&&!identityConflict){
         if(inferred in previous)merged[inferred]=false;
       }
-      if(present(field,current[field])&&current[field]!==previous[field]){
-        const sameWeight=field==='weight'&&Math.abs(current[field]-previous[field])<=Math.max(current[field],previous[field])*.002;
-        if(!sameWeight)warnings.add('The two photos disagree on '+field+'. Confirm this detail.');
+      if(present(field,current[field])&&!smartCameraSameField(field,current[field],previous[field],merged.product)&&!((field==='product'||field==='designID')&&productDowngrade)){
+        warnings.add('The two photos disagree on '+field+'. Confirm this detail.');
       }
     }else if(identityConflict){
       // Never enrich one item's result with fields from a different product.
@@ -7837,7 +7870,7 @@ async function runSmartCameraScan(append=false,source='camera'){
         sides:smartCameraPhotoCount+1,
         designSuggestions:[...smartCameraScans,result].flatMap(scan=>scan.designSuggestions|| (scan.designSuggestion?[scan.designSuggestion]:[]))
       });
-      if(!canUseSmartCameraSuggestion(trial)){
+      if(shouldRefineSmartCameraSuggestion(trial)){
         if(status)status.textContent='Checking the design and harder-to-read markings…';
         let refined;
         try{refined=await plugin.refine();}
