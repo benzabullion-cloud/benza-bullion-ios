@@ -43,6 +43,23 @@ window.supabase={createClient:()=>({
     states++;
    }
   }
+  console.log('Check compact market status in '+engineName);
+  for(const width of [320,390,768])for(const theme of ['dark','light']){
+   await page.setViewportSize({width,height:844});
+   await page.evaluate(theme=>{
+    closeSmartCamera();hideMainOverlays();goPortfolio();applyTheme(theme);
+    renderLiveFeedStatus({fetched_at:'2026-10-02T21:00:00Z'},{date:new Date('2026-10-02T23:10:00Z')});
+   },theme);
+   assert.equal(await page.locator('#marketPauseNote').isVisible(),true);
+   assert.match(await page.locator('#marketPauseNote').textContent(),/Weekend.*Expected.*CT/);
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);
+   const style=await page.locator('#marketRefreshButton').evaluate(el=>({background:getComputedStyle(el).backgroundColor,width:el.getBoundingClientRect().width}));
+   assert.equal(style.background,'rgba(0, 0, 0, 0)');assert.equal(style.width,32);
+   await page.evaluate(()=>renderLiveFeedStatus({fetched_at:'2026-10-05T18:00:00Z'},{date:new Date('2026-10-05T18:00:00Z')}));
+   assert.equal(await page.locator('#marketPauseNote').isVisible(),false);
+  }
+  await page.locator('#marketRefreshButton').click();
+  await page.waitForFunction(()=>!document.getElementById('marketRefreshButton').disabled);
   console.log('Check scanner assistant editor in '+engineName);
   for(const width of [320,390,768])for(const theme of ['dark','light']){
    await page.setViewportSize({width,height:844});

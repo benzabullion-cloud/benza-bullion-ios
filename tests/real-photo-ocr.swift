@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import CoreImage
 import ImageIO
 import Vision
 
@@ -38,7 +39,7 @@ import Vision
             context.draw(raw,in:CGRect(x:0,y:0,width:raw.width,height:raw.height))
             guard let image=context.makeImage() else { throw NSError(domain:"PhotoFixture",code:2) }
             let started=Date()
-            let rims=BenzaCoinRim.readingImages(image,maximumCandidates:1)
+            let rims=BenzaCoinRim.readingImages(image,maximumCandidates:3)
             guard !rims.isEmpty else { throw NSError(domain:"RimLocalization",code:3,userInfo:[NSLocalizedDescriptionKey:side+" found no coin outline"]) }
             let rimElapsedMs=Int(Date().timeIntervalSince(started)*1000)
             // Optional diagnostics contain only approved coin-only fixture pixels.
@@ -54,17 +55,38 @@ import Vision
             }
             }
             var readings:[[String:Any]]=[]
-            for (index,photo) in ([image]+rims).enumerated() {
+            // Same full OCR pass plan as SceneDelegate's refinement path.
+            // No 12-second device deadline here: collect all passes for diagnosis.
+            let ciContext=CIContext(options:nil)
+            let input=CIImage(cgImage:image)
+            let extent=input.extent
+            let enhanced=input.applyingFilter("CIColorControls",parameters:[kCIInputSaturationKey:0,kCIInputContrastKey:1.7,kCIInputBrightnessKey:0.04])
+                .applyingFilter("CISharpenLuminance",parameters:[kCIInputSharpnessKey:0.65])
+            var passes:[(CGImage,CGImagePropertyOrientation,Bool)]=[(image,.up,true)]
+            passes.append(contentsOf:rims.map { ($0,.up,false) })
+            func append(_ rect:CGRect,_ orientations:[CGImagePropertyOrientation]) {
+                guard let crop=ciContext.createCGImage(enhanced,from:rect.intersection(extent)) else { return }
+                passes.append(contentsOf:orientations.map { (crop,$0,false) })
+            }
+            append(extent,[.up])
+            append(extent.insetBy(dx:extent.width*0.08,dy:extent.height*0.08),[.up])
+            append(CGRect(x:extent.minX,y:extent.maxY-extent.height*0.42,width:extent.width,height:extent.height*0.42),[.up,.down])
+            append(CGRect(x:extent.minX,y:extent.minY,width:extent.width,height:extent.height*0.42),[.up,.down])
+            append(CGRect(x:extent.minX,y:extent.minY,width:extent.width*0.42,height:extent.height),[.right])
+            append(CGRect(x:extent.maxX-extent.width*0.42,y:extent.minY,width:extent.width*0.42,height:extent.height),[.left])
+            passes.append(contentsOf:[(image,.right,true),(image,.left,true),(image,.down,true)])
+            for (index,pass) in passes.enumerated() {
+                let (photo,orientation,correction)=pass
                 let request=VNRecognizeTextRequest()
                 request.recognitionLevel = .accurate
-                request.usesLanguageCorrection=index==0
+                request.usesLanguageCorrection=correction
                 let supported=(try? request.supportedRecognitionLanguages()) ?? ["en-US"]
                 request.recognitionLanguages=["en-US","fr-FR","es-ES","de-DE"].filter { supported.contains($0) }
                 if #available(macOS 13.0, *) { request.automaticallyDetectsLanguage = true }
                 request.minimumTextHeight=0.002
                 request.customWords=vocabulary
                 let passStarted=Date()
-                try VNImageRequestHandler(cgImage:photo).perform([request])
+                try VNImageRequestHandler(cgImage:photo,orientation:orientation).perform([request])
                 let observations=(request.results ?? []).compactMap { observation -> [String:Any]? in
                     guard let text=observation.topCandidates(1).first,text.confidence>=0.25 else {return nil}
                     let line=text.string.trimmingCharacters(in:.whitespacesAndNewlines)

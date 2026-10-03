@@ -56,3 +56,21 @@ release; an unreadable year or uncommon name can be completed in review.
 Do not describe 143 passing text cases or one photo pair as a catalog-wide
 camera accuracy rate. Broader camera coverage remains unverified until more
 authorized real photo pairs or phone trials are recorded.
+
+### Palladium Maple regression
+
+The approved coin-only front/reverse pair in `tests/fixtures/palladium-maple-*.b64`
+reproduced the missing product, weight and mint under Apple Vision on macOS.
+The baseline readings are retained in `palladium-maple-ocr.json`, including
+CANIADA, separate 50 / DOLLARS observations and weak conflicting ounce crops.
+The photo runner now includes the app's full refinement crop/orientation sequence;
+it collects all passes without the phone's deadline. This does not establish iOS
+OCR equivalence or general camera accuracy.
+
+The interpreter repairs only the observed CANIADA country spelling and rejoins
+adjacent denomination observations within one pass for identity only. A matched
+$50 .9995 palladium Maple can use its labelled one-troy-ounce mint specification
+when two sides are present and no trusted weight or rejection conflicts with it.
+Wrong country, denomination, fineness, replicas, bars and rounds cannot use this
+specification. Trusted contradictory ounce readings remain blocked. The existing
+weight observation confidence threshold and native scan passes are unchanged.

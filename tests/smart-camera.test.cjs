@@ -325,9 +325,9 @@ test('Palladium Maple recognition keeps the diagnostic 1 and 91 ounce conflict b
  assert.equal(r.product,'Canadian Palladium Maple Leaf');assert.equal(r.mint,'Royal Canadian Mint');
  assert.equal(r.weight,0);assert.ok(r.warnings.some(w=>/Different weights/.test(w)));assert.equal(context.canUseSmartCameraSuggestion(r),false);
 });
-test('Palladium Maple with denomination but absent weight never manufactures an ounce',()=>{
+test('Two-sided $50 palladium Maple uses labelled fixed mint specification when no trusted weight is read',()=>{
  const r=scan('CANADA 9995 FINE PALLADIUM ELIZABETH II 50 DOLLARS',{sides:2});
- assert.equal(r.product,'Canadian Palladium Maple Leaf');assert.equal(r.weight,0);assert.equal(r.year,null);
+ assert.equal(r.product,'Canadian Palladium Maple Leaf');assert.equal(r.weight,1);assert.equal(r.inferredWeight,true);assert.equal(r.year,null);
 });
 test('Canadian palladium bars and rounds remain generic, with real large bar weight intact',()=>{
  for(const kind of ['BAR','ROUND']){
@@ -339,4 +339,36 @@ test('Palladium purity alone and wrong-country coins do not identify a Canadian 
  assert.notEqual(scan('9995 FINE PALLADIUM 1 OZ').product,'Canadian Palladium Maple Leaf');
  assert.notEqual(scan('RUSSIA 9995 FINE PALLADIUM 1 OZ').product,'Canadian Palladium Maple Leaf');
  assert.notEqual(scan('CANADA 9995 FINE PALLADIUM').product,'Canadian Palladium Maple Leaf');
+});
+
+// Actual Apple Vision readings from the approved photos, captured before the fix.
+// Exercise the app's four-pass front and complete reverse refinement path.
+test('Actual failed palladium photo OCR now identifies the fixed $50 issue',()=>{
+ const pair=JSON.parse(fs.readFileSync('tests/fixtures/palladium-maple-ocr.json','utf8'));
+ const photos=pair.map(photo=>context.selectSmartCameraPhotoEvidence({passes:photo.side==='obverse'?photo.passes.slice(0,4):photo.passes}));
+ const r=context.interpretSmartCameraScan({lines:photos.flatMap(p=>p.lines),photoEvidence:photos,sides:2});
+ assert.equal(r.product,'Canadian Palladium Maple Leaf');assert.equal(r.mint,'Royal Canadian Mint');
+ assert.equal(r.weight,1);assert.equal(r.inferredWeight,true);assert.equal(r.year,null);
+ assert.equal(r.warnings.length,0);assert.equal(context.canUseSmartCameraSuggestion(r),true);
+});
+test('Palladium standard requires two sides, face value, fineness and country',()=>{
+ for(const text of ['CANADA PALLADIUM 50 DOLLARS','CANADA 9995 PALLADIUM','RUSSIA 9995 PALLADIUM 50 DOLLARS']){
+  assert.equal(scan(text,{sides:2}).weight,0,text);
+ }
+ assert.equal(scan('CANADA 9995 PALLADIUM 50 DOLLARS',{sides:1}).weight,0);
+ assert.equal(scan('CANADA 9995 PALLADIUM 25 DOLLARS',{sides:2}).weight,0);
+ assert.equal(scan('CANADA 9995 PALLADIUM 50 DOLLARS 25 DOLLARS',{sides:2}).weight,0);
+});
+test('Trusted contradictory weight still blocks the fixed palladium standard',()=>{
+ const r=scan('CANIADA 9995 PALLADIUM 50 DOLLARS',{sides:2,weightLines:['91 oz palladium']});
+ assert.equal(r.weight,0);assert.equal(r.inferredWeight,false);assert.ok(r.warnings.length);
+ assert.equal(context.canUseSmartCameraSuggestion(r),false);
+ assert.equal(scan('CANIADA 9995 PALLADIUM 91 OZ BAR').weight,91);
+ assert.equal(scan('CANIADA 9995 PALLADIUM 1 OZ REPLICA',{sides:2}).usable,false);
+});
+test('Split denomination joins within one pass and never enters weight evidence',()=>{
+ const p=context.selectSmartCameraPhotoEvidence({passes:[pass('50\nDOLLARS')]});
+ assert.ok(p.lines.includes('50 dollars'));assert.ok(!p.weightLines.includes('50 dollars'));
+ const isolated=context.selectSmartCameraPhotoEvidence({passes:[pass('50'),pass('DOLLARS')]});
+ assert.ok(!isolated.lines.includes('50 dollars'));
 });
