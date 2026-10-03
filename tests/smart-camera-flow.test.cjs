@@ -20,7 +20,7 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
  await test('Closing prevents late result from being applied',async()=>{let done;const before=context.lastSuggestion;queued.push(new Promise(resolve=>done=resolve));const first=context.runSmartCameraScan();await new Promise(resolve=>setImmediate(resolve));context.closeSmartCamera();done({text:'Fine gold',confidence:.9});await first;assert.equal(context.lastSuggestion,before)});
  await test('Metal-only scan opens review with missing fields blank',async()=>{get('weight').value='1';get('product').selectedIndex=0;const scan=context.interpretSmartCameraScan({text:'Fine silver',confidence:.9});assert.equal(context.canUseSmartCameraSuggestion(scan),false);assert.equal(context.applySmartCameraSuggestion(scan),true);assert.equal(get('weight').value,'');assert.equal(get('product').selectedIndex,-1);assert.match(get('holdingDetailsHint').textContent,/Partial scan/)});
  await test('Unsupported suggestion cannot open or fill form',async()=>{get('weight').value='sentinel';assert.equal(context.applySmartCameraSuggestion(context.interpretSmartCameraScan({text:'',visualColor:{tone:'golden'}})),false);assert.equal(get('weight').value,'sentinel')});
- await test('Reverse metal contradiction blocks suggestion',async()=>{reset();queued.push({text:'Fine silver',confidence:.9},{text:'Fine gold',confidence:.9});await context.runSmartCameraScan();await context.runSmartCameraScan(true);assert.equal(context.lastSuggestion.usable,false);assert.equal(get('smartAnalysisUseButton').disabled,true)});
+ await test('Reverse metal contradiction blocks suggestion',async()=>{reset();queued.push({text:'Fine silver',confidence:.9},{text:'Fine gold',confidence:.9});await context.runSmartCameraScan();await context.runSmartCameraScan(true);assert.equal(context.lastSuggestion.usable,false);assert.equal(get('smartAnalysisUseButton').disabled,false)});
 
  await test('New item clears existing details before camera opens',async()=>{queued.push({text:'fine silver 2011 1 oz',confidence:.9});await context.runSmartCameraScan();let done;queued.push(new Promise(resolve=>done=resolve));const next=context.runSmartCameraScan();assert.equal(pending(),null);assert.equal(views(),0);await new Promise(resolve=>setImmediate(resolve));done({cancelled:true});await next;assert.equal(pending(),null);assert.equal(get('smartAnalysisUseButton').disabled,true)});
  await test('Failed fresh scan cannot resurrect old suggestion',async()=>{queued.push({text:'fine gold 1 oz',confidence:.9});await context.runSmartCameraScan();const oldConsole=context.console;context.console={...console,error(){}};queued.push(Promise.reject(Error('Camera failure')));await context.runSmartCameraScan();context.console=oldConsole;assert.equal(pending(),null);assert.equal(views(),0);assert.equal(get('smartAnalysisUseButton').disabled,true)});
@@ -435,7 +435,7 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
    {lines:[],confidence:.95,designSuggestion:{id:'american_buffalo',source:'local-catalogue-v1'}});
   await context.captureSmartCameraSide('camera');await context.captureSmartCameraSide('library');
   assert.ok(pending().warnings.length);assert.equal(context.canUseSmartCameraSuggestion(pending()),false);
-  assert.equal(get('smartAnalysisUseButton').hidden,true);assert.equal(context.applySmartCameraSuggestion(pending()),false);
+  assert.equal(get('smartAnalysisUseButton').hidden,false);assert.equal(get('smartAnalysisUseButton').disabled,false);assert.equal(context.applySmartCameraSuggestion(pending()),false);
   assert.doesNotMatch(get('smartAnalysisSub').textContent,/designID/);
   context.renderSmartCameraAnalysis=render;
  });
@@ -489,6 +489,74 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
    {id:2,confidence:.9,observations:[{text:'999 FINE SILVER',confidence:.9}]}]});
   const reading=context.interpretSmartCameraScan(selected);
   assert.ok(reading.warnings.some(w=>/Conflicting metal/.test(w)));assert.equal(context.canUseSmartCameraSuggestion(reading),false);
+ });
+ await test('Refinement preserves the original ounce inscription instead of replacing it with blank or noisy crops',async()=>{
+  const pass=(text,confidence=.95)=>({confidence,observations:[{text,confidence}]});
+  const original={passes:[pass('1 OZ .999 SILVER')],designSuggestion:{id:'generic_coin',source:'local-catalogue-v1'}};
+  for(const refined of [
+   {passes:[pass('LIBERTY IN GOD WE TRUST COPY')]},
+   {passes:[pass('LIBERTY IN GOD WE TRUST'),pass('66 G',.3)]},
+   {passes:[]},
+   {lines:[],confidence:0}]){
+   reset();plugin.refine=async()=>refined;queued.push(original);
+   await context.runSmartCameraScan();
+   assert.equal(pending().weight,1);assert.equal(pending().metal,'silver');
+   assert.notEqual(pending().weight,66/31.1034768);
+  }
+  delete plugin.refine;
+ });
+ await test('Conflicting trusted ounce and gram reads during refinement stay unresolved even with a replica warning',async()=>{
+  reset();const pass=text=>({confidence:.95,observations:[{text,confidence:.95}]});
+  plugin.refine=async()=>({passes:[pass('66 G .999 SILVER COPY')],designSuggestion:{id:'generic_coin',source:'local-catalogue-v1'}});
+  queued.push({passes:[pass('1 OZ .999 SILVER COPY')],designSuggestion:{id:'generic_coin',source:'local-catalogue-v1'}});
+  await context.runSmartCameraScan();delete plugin.refine;
+  assert.equal(pending().weight,0);assert.ok(pending().warnings.some(w=>/Different weights/.test(w)));
+  assert.equal(context.canUseSmartCameraSuggestion(pending()),false);
+ });
+ await test('Every metal can correct blocking warnings and explicitly confirm through the real review controls',async()=>{
+  const render=context.renderSmartCameraAnalysis;
+  vm.runInContext(html.slice(html.indexOf('function renderSmartCameraAnalysis('),html.indexOf('function applySmartCameraSuggestion(')),context);
+  for(const [metal,product] of [['gold','Gold Bullion Coin'],['silver','Silver Bullion Coin'],['platinum','Platinum Bullion Coin'],['palladium','Palladium Bullion Coin'],['copper','Copper Bullion Coin']]){
+   for(const warning of ['Plated, replica, or layered marking detected. Fine-metal content needs manual verification.',
+    'Artwork and inscriptions disagree. Confirm the product.','Conflicting metal markings. Confirm the metal manually.',
+    'Conflicting purity markings. Confirm the fine-metal content.','More than one possible year was read. Confirm the year.']){
+    reset();vm.runInContext('smartCameraScanning=false',context);
+    const suggestion={metal,product,weight:66/31.1034768,year:null,purity:'',mint:'',raw:'OCR',warnings:[warning],usable:false,sides:2};
+    context.renderSmartCameraAnalysis(suggestion);
+    assert.equal(get('smartAnalysisUseButton').hidden,false);assert.equal(get('smartAnalysisUseButton').disabled,false);
+    assert.equal(get('smartAnalysisUseButton').textContent,'Review and correct details');
+    assert.equal(context.applySmartCameraSuggestion(suggestion),false);
+    context.useSmartCameraAnalysis();assert.equal(get('smartScanEditor').hidden,false);
+    assert.equal(get('smartAnalysisUseButton').disabled,true);
+    get('smartEditWeight').value='1';
+    assert.equal(context.saveSmartScanReview(),true);
+    assert.equal(pending().userReviewed,true);assert.equal(pending().warnings.length,0);
+    assert.deepEqual(Array.from(pending().originalScanWarnings),[warning]);
+    assert.equal(get('smartAnalysisUseButton').hidden,false);assert.equal(get('smartAnalysisUseButton').disabled,false);
+    get('product').options=[{value:product}];context.useSmartCameraAnalysis();
+    assert.equal(get('weight').value,1);assert.equal(get('product').value,product);
+   }
+  }
+  context.renderSmartCameraAnalysis=render;
+ });
+ await test('Diagnostics retain the first photo weight source when the opposite photo has no weight',async()=>{
+  const render=context.renderSmartCameraAnalysis;
+  vm.runInContext(html.slice(html.indexOf('function renderSmartCameraAnalysis('),html.indexOf('function applySmartCameraSuggestion(')),context);
+  reset();vm.runInContext('smartCameraScanning=false',context);
+  queued.push({passes:[{id:1,confidence:.95,observations:[{text:'66 G .999 SILVER',confidence:.95}]}],
+    designSuggestion:{id:'generic_coin',source:'local-catalogue-v1'}},
+   {lines:['LIBERTY IN GOD WE TRUST COPY'],confidence:.95,designSuggestion:{id:'generic_coin',source:'local-catalogue-v1'}});
+  await context.runSmartCameraScan();await context.runSmartCameraScan(true);
+  const diagnostic=JSON.parse(get('smartCameraDiagnosticText').textContent);
+  assert.equal(diagnostic.photoCount,2);assert.equal(diagnostic.weightPasses.length,0);
+  assert.equal(diagnostic.photoWeights[0].photo,1);assert.equal(diagnostic.photoWeights[0].readings[0].amount,66);
+  assert.equal(diagnostic.photoWeights[0].readings[0].unit,'g');
+  assert.equal(diagnostic.photoWeights[0].weightOz,66/31.1034768);
+  assert.doesNotMatch(get('smartCameraDiagnosticText').textContent,/LIBERTY|TRUST|COPY|SILVER/);
+  context.useSmartCameraAnalysis();get('smartEditWeight').value='0';
+  assert.equal(context.saveSmartScanReview(),false);assert.equal(pending().userReviewed,undefined);
+  get('smartEditWeight').value='1';assert.equal(context.saveSmartScanReview(),true);
+  context.renderSmartCameraAnalysis=render;
  });
  console.log(count+' scanner flow checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1});

@@ -7442,9 +7442,10 @@ function selectSmartCameraPhotoEvidence(result){
     (a.purity&&b.purity&&a.purity!==b.purity));
   // Equally complete, confident alternatives are ambiguous, not permission to guess.
   const fieldCount=r=>[r.metal,r.product,r.weight>0,r.purity].filter(Boolean).length;
-  const competing=candidates.filter(c=>c!==primary&&c.reading.usable&&
+  const competing=candidates.filter(c=>c!==primary&&c.reading.metal&&
     c.photo.confidence>=primary.photo.confidence*.9&&
-    fieldCount(c.reading)>=fieldCount(primary.reading)&&!compatible(primary.reading,c.reading));
+    fieldCount(c.reading)>=fieldCount(primary.reading)&&(!compatible(primary.reading,c.reading)||
+      c.reading.warnings.some(w=>/Different weights|Conflicting purity|Conflicting metal/.test(w))));
   if(competing.length){
     const lines=[...new Set(candidates.flatMap(c=>c.photo.lines))];
     return {...result,lines,weightLines:candidates.flatMap(c=>c.photo.weightLines),text:lines.join('\n'),confidence:primary.photo.confidence,
@@ -7535,9 +7536,14 @@ function renderSmartCameraDiagnostics(suggestion){
   const text=document.getElementById('smartCameraDiagnosticText');
   if(!panel||!text)return;
   panel.hidden=!smartCameraLastDiagnostic;
-  // Counts and field-presence flags only. Never include images, OCR text, or serials.
+  // Numeric weight evidence stays local. Never include images, OCR text, or serials.
   if(!panel.hidden)text.textContent=JSON.stringify({...smartCameraLastDiagnostic,weightParserVersion:SMART_CAMERA_WEIGHT_PARSER_VERSION,
-    photoCount:smartCameraPhotoCount,metalRead:!!suggestion.metal,weightRead:suggestion.weight>0,
+    photoCount:smartCameraPhotoCount,
+    photoWeights:smartCameraScans.map(scan=>({photo:scan.photoNumber,
+      weightOz:scan.reading?.weight||0,inferred:!!scan.reading?.inferredWeight,
+      readings:(scan.weightLines||[]).flatMap(line=>smartCameraWeightTokens(line,scan.reading?.metal||''))
+        .filter(token=>!token.reason).map(token=>({amount:token.amount,unit:token.unit,weightOz:token.value}))})),
+    metalRead:!!suggestion.metal,weightRead:suggestion.weight>0,
     productMatched:!!suggestion.product,conflictCount:suggestion.warnings?.length||0},null,2);
 }
 function smartCameraConfidenceLabel(value){
@@ -7553,6 +7559,12 @@ function canUseSmartCameraSuggestion(suggestion){
     (PRODUCT_MAP[suggestion.metal]||[]).includes(suggestion.product)&&
     Number.isFinite(suggestion.weight)&&suggestion.weight>0&&
     Array.isArray(suggestion.warnings)&&!suggestion.warnings.length);
+}
+function canCorrectSmartCameraSuggestion(suggestion){
+  // Warnings block automatic handoff, not the user's correction form.
+  return !!(suggestion&&Object.hasOwn(PRODUCT_MAP,suggestion.metal)&&
+    (!suggestion.product||(PRODUCT_MAP[suggestion.metal]||[]).includes(suggestion.product))&&
+    Array.isArray(suggestion.warnings));
 }
 function canReviewSmartCameraSuggestion(suggestion){
   return !!(suggestion&&Object.hasOwn(PRODUCT_MAP,suggestion.metal)&&
@@ -7664,7 +7676,7 @@ function renderSmartCameraAnalysis(suggestion){
   document.getElementById('smartScanPurity').textContent=suggestion.purity||'Not identified';
   document.getElementById('smartScanMint').textContent=suggestion.mint||'Not identified';
   const use=document.getElementById('smartAnalysisUseButton');
-  if(use){const review=canReviewSmartCameraSuggestion(suggestion);use.hidden=!review;use.disabled=!review;use.textContent=suggestion.userReviewed?'Use reviewed details':ready?'Use scan details':'Review and complete holding';}
+  if(use){const review=canCorrectSmartCameraSuggestion(suggestion);use.hidden=!review;use.disabled=!review;use.textContent=!canReviewSmartCameraSuggestion(suggestion)?'Review and correct details':suggestion.userReviewed?'Use reviewed details':ready?'Use scan details':'Review and complete holding';}
   panel.classList.add('show');
   renderSmartCameraDiagnostics(suggestion.scanEvidence||suggestion);
   setSmartCameraBusy(smartCameraScanning);
@@ -7697,6 +7709,10 @@ function applySmartCameraSuggestion(suggestion){
   return true;
 }
 function useSmartCameraAnalysis(){
+  if(document.getElementById('smartScanEditor').hidden&&canCorrectSmartCameraSuggestion(pendingSmartCameraSuggestion)&&!canReviewSmartCameraSuggestion(pendingSmartCameraSuggestion)){
+    openSmartScanEditor();
+    return;
+  }
   if(!document.getElementById('smartScanEditor').hidden||!canReviewSmartCameraSuggestion(pendingSmartCameraSuggestion)){
     const status=document.getElementById('smartCameraStatus');
     if(status)status.textContent='Choose a metal manually or try another scan before continuing.';
@@ -7744,7 +7760,7 @@ function setSmartCameraBusy(busy){
   const libraryButton=document.getElementById('smartCameraLibraryButton');
   if(libraryButton){libraryButton.disabled=busy;libraryButton.textContent=smartCameraAwaitingReverse?'Choose Opposite Side Photo':'Choose Bullion Photo';}
   const useButton=document.getElementById('smartAnalysisUseButton');
-  if(useButton)useButton.disabled=busy||!document.getElementById('smartScanEditor').hidden||!canReviewSmartCameraSuggestion(pendingSmartCameraSuggestion);
+  if(useButton)useButton.disabled=busy||!document.getElementById('smartScanEditor').hidden||!canCorrectSmartCameraSuggestion(pendingSmartCameraSuggestion);
 }
 async function resetSmartCameraScan(silent=false,releaseModels=false){
   const run=++smartCameraRunId;
@@ -7865,6 +7881,19 @@ function mergeSmartCameraReadings(previous,current,combined){
   merged.usable=!!merged.metal&&!merged.warnings.length&&merged.confidence>=.42;
   return merged;
 }
+function mergeSmartCameraRefinement(initial,refined){
+  const passes=result=>Array.isArray(result.passes)?result.passes:[{
+    confidence:Number(result.confidence)||0,
+    observations:(Array.isArray(result.lines)?result.lines:[result.text||''])
+      .filter(line=>typeof line==='string'&&line.trim())
+      .map(text=>({text,confidence:Number(result.confidence)||0}))
+  }];
+  // Refinement reads the same photo. Keep the original observations with their
+  // confidence; neither a blank refine nor a noisier crop may erase a good weight.
+  const combinedPasses=[...passes(initial),...passes(refined)].map((pass,id)=>({...pass,id}));
+  return {...initial,...refined,passes:combinedPasses,ocrPasses:combinedPasses.length,
+    elapsedMs:(Number(initial.elapsedMs)||0)+(Number(refined.elapsedMs)||0)};
+}
 async function runSmartCameraScan(append=false,source='camera'){
   if(smartCameraScanning)return;
   // Clear BEFORE opening the picker, even when it fails or is cancelled.
@@ -7922,8 +7951,7 @@ async function runSmartCameraScan(append=false,source='camera'){
         if(run!==smartCameraRunId||session!==smartCameraSession)return;
         if(refined?.cancelled)return;
         if(refined&&typeof refined==='object'){
-          const totalProcessingMs=(Number(captured.elapsedMs)||0)+(Number(refined.elapsedMs)||0);
-          captured={...captured,...refined,elapsedMs:totalProcessingMs};
+          captured=mergeSmartCameraRefinement(captured,refined);
           result=selectSmartCameraPhotoEvidence(captured);
         }
       }
@@ -7979,7 +8007,7 @@ async function runSmartCameraScan(append=false,source='camera'){
       if(status)status.textContent='';
       return;
     }
-    smartCameraScans.push({...result,reading});
+    smartCameraScans.push({...result,reading,photoNumber:smartCameraPhotoCount});
     const combined={lines:smartCameraScans.flatMap(scan=>Array.isArray(scan.lines)?scan.lines:[scan.text||'']),
       confidence:Math.max(...smartCameraScans.map(scan=>Number(scan.confidence)||0)),sides:smartCameraPhotoCount,
       photoEvidence:smartCameraScans.map(scan=>({lines:Array.isArray(scan.lines)?scan.lines:[scan.text||''],weightLines:scan.weightLines,
