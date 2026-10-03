@@ -7792,11 +7792,15 @@ function mergeSmartCameraReadings(previous,current,combined){
   const productDowngrade=sameMetal&&sameKind&&previous.product&&!smartCameraGenericProduct(previous.product)&&smartCameraGenericProduct(current.product);
   const identityConflict=(previous.metal&&current.metal&&previous.metal!==current.metal)||
     (previous.product&&current.product&&previous.product!==current.product&&!productUpgrade&&!productDowngrade);
-  const fields=['metal','product','weight','year','purity','mint','serial','denomination','designID'];
+  // Artwork labels are metadata, not another independently editable holding field.
+  // The combined interpreter already resolves generic/specific designs and
+  // reports genuine artwork conflicts. Do not re-litigate that decision here.
+  merged.designID=combined.designID||current.designID||previous.designID||'';
+  const fields=['metal','product','weight','year','purity','mint','serial','denomination'];
   const present=(field,value)=>field==='weight'?Number.isFinite(value)&&value>0:!!value;
   for(const field of fields){
     const inferred='inferred'+field[0].toUpperCase()+field.slice(1);
-    if(productUpgrade&&present(field,current[field])&&(field==='product'||previous[inferred]||(field==='designID'&&previous.designID==='generic_'+smartCameraProductKind(previous.product)))){
+    if(productUpgrade&&present(field,current[field])&&(field==='product'||previous[inferred])){
       merged[field]=current[field];
       if(inferred in current)merged[inferred]=current[inferred];
     }else if(present(field,previous[field])){
@@ -7807,7 +7811,7 @@ function mergeSmartCameraReadings(previous,current,combined){
       if(present(field,current[field])&&smartCameraSameField(field,current[field],previous[field],merged.product)&&!current[inferred]&&!identityConflict){
         if(inferred in previous)merged[inferred]=false;
       }
-      if(present(field,current[field])&&!smartCameraSameField(field,current[field],previous[field],merged.product)&&!((field==='product'||field==='designID')&&productDowngrade)){
+      if(present(field,current[field])&&!smartCameraSameField(field,current[field],previous[field],merged.product)&&!(field==='product'&&productDowngrade)){
         warnings.add('The two photos disagree on '+field+'. Confirm this detail.');
       }
     }else if(identityConflict){
