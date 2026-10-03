@@ -475,6 +475,14 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
   assert.equal(pending().purity,' .999 silver');assert.equal(pending().mint,'');assert.equal(pending().warnings.length,0);
   assert.equal(context.canUseSmartCameraSuggestion(pending()),true);
  });
+ await test('Shared metal rules reject incompatible visual candidates before resolving two-side artwork',()=>{
+  const reading=context.interpretSmartCameraScan({lines:['ONE TROY OUNCE 999 FINE SILVER'],confidence:.95,sides:2,
+   designSuggestions:[{id:'american_buffalo',source:'local-catalogue-v1'},{id:'american_silver_eagle',source:'local-catalogue-v1'}]});
+  assert.equal(reading.metal,'silver');assert.equal(reading.product,'American Silver Eagle');assert.equal(reading.warnings.length,0);
+  const generic=context.interpretSmartCameraScan({lines:['ONE TROY OUNCE 999 FINE SILVER'],confidence:.95,sides:2,
+   designSuggestions:[{id:'american_buffalo',source:'local-catalogue-v1'},{id:'american_gold_eagle',source:'local-catalogue-v1'}]});
+  assert.equal(generic.metal,'silver');assert.equal(generic.product,'Silver Bullion Coin');assert.equal(generic.mint,'');assert.equal(generic.warnings.length,0);
+ });
  await test('Contradictory directly read metals remain blocked within one photo',()=>{
   const selected=context.selectSmartCameraPhotoEvidence({designSuggestion:{id:'american_buffalo',source:'local-catalogue-v1'},passes:[
    {id:1,confidence:.95,observations:[{text:'1 OZ FINE GOLD',confidence:.95}]},

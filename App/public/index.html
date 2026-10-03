@@ -7262,13 +7262,16 @@ function interpretSmartCameraScan(result){
   let visualMetal=!metal&&!design.invalid&&!design.conflict?smartCameraDesignUniqueMetal(design.id):'';
   if(visualMetal){metal=visualMetal;inferredMetal=true;}
   let catalogMatch=metals.length>1?null:smartCameraCatalogMatch(text,metal);
-  design=smartCameraResolveDesignConflict(design,text,metal,catalogMatch);
   // Named artwork can be reused on rounds in other metals. A readable metal
-  // inscription rules out the metal-specific visual identity, not the inscription.
-  if(metals.length===1&&smartCameraDesignUniqueMetal(design.id)&&
-     smartCameraDesignUniqueMetal(design.id)!==metal){
-    design={...design,id:'generic_coin',ids:['generic_coin'],conflict:false};
+  // inscription rules out metal-specific visual identities, not the inscription.
+  if(metals.length===1){
+    const compatibleIDs=design.ids.filter(id=>!smartCameraDesignUniqueMetal(id)||smartCameraDesignUniqueMetal(id)===metal);
+    if(compatibleIDs.length!==design.ids.length){
+      const ids=compatibleIDs.length?compatibleIDs:['generic_coin'];
+      design={...design,id:ids.length===1?ids[0]:'',ids,conflict:ids.length>1};
+    }
   }
+  design=smartCameraResolveDesignConflict(design,text,metal,catalogMatch);
   if(design.conflict)warnings.push('The two photos suggest different designs. Scan this item again.');
   if(!metal&&!design.invalid&&!design.conflict){
     visualMetal=smartCameraDesignUniqueMetal(design.id);
