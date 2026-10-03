@@ -262,5 +262,57 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
   queued.push({lines:[],confidence:0});await context.captureSmartCameraSide('library');
   assert.equal(pending().product,first.product);assert.equal(pending().sides,2);
  });
+ await test('Generic gold reverse cannot skip the named-product refinement',async()=>{
+  reset();vm.runInContext('smartCameraScanning=false',context);
+  let refinements=0,currentSide='';const originalScan=plugin.scan;
+  plugin.scan=async options=>{const result=await originalScan(options);currentSide=result.testSide;return result};
+  plugin.refine=async()=>{refinements++;return currentSide==='front'
+    ?{lines:['LIBERTY'],confidence:.9}
+    :{lines:['UNITED STATES OF AMERICA 1 OZ FINE GOLD 50 DOLLARS'],confidence:.95,
+      designSuggestion:{id:'american_gold_eagle',source:'local-catalogue-v1'}}};
+  queued.push({lines:['LIBERTY'],confidence:.9,testSide:'front'},
+    {lines:['COIN 1 OZ FINE GOLD'],confidence:.95,testSide:'reverse'});
+  await context.captureSmartCameraSide('library');await context.captureSmartCameraSide('library');
+  plugin.scan=originalScan;delete plugin.refine;
+  assert.equal(refinements,2);assert.equal(pending().product,'American Gold Eagle');
+  assert.equal(pending().metal,'gold');assert.equal(pending().weight,1);
+  assert.equal(pending().mint,'United States Mint');assert.equal(pending().warnings.length,0);
+ });
+ await test('A compatible named second side upgrades a generic first side without a product conflict',async()=>{
+  reset();vm.runInContext('smartCameraScanning=false',context);
+  queued.push({lines:['COIN 1 OZ FINE GOLD'],confidence:.95},
+    {lines:['AMERICAN GOLD EAGLE 1 OZ FINE GOLD 2012'],confidence:.95});
+  await context.captureSmartCameraSide('camera');assert.equal(pending().product,'Gold Bullion Coin');
+  await context.captureSmartCameraSide('library');
+  assert.equal(pending().product,'American Gold Eagle');assert.equal(pending().year,2012);
+  assert.equal(pending().warnings.length,0);assert.equal(context.canUseSmartCameraSuggestion(pending()),true);
+ });
+ await test('Generic categories for all five metals request refinement while named results remain fast',async()=>{
+  for(const metal of ['gold','silver','platinum','palladium','copper']){
+   const label=metal[0].toUpperCase()+metal.slice(1);
+   for(const kind of ['Bullion Coin','Bar','Round']){
+    assert.equal(context.shouldRefineSmartCameraSuggestion({usable:true,metal,product:label+' '+kind,weight:1,warnings:[]}),true);
+   }
+  }
+  assert.equal(context.shouldRefineSmartCameraSuggestion(context.interpretSmartCameraScan({text:'AMERICAN GOLD EAGLE 1 OZ FINE GOLD',confidence:.95})),false);
+ });
+ await test('Generic first-side inference can improve to named purity but directly observed conflicts remain blocked',async()=>{
+  const first={...context.interpretSmartCameraScan({text:'GOLD BULLION COIN 1 OZ FINE GOLD',confidence:.95}),purity:'.9999 gold',inferredPurity:true};
+  const named=context.interpretSmartCameraScan({text:'AMERICAN GOLD EAGLE 1 OZ FINE GOLD',confidence:.95});
+  const combined=context.interpretSmartCameraScan({text:'GOLD BULLION COIN AMERICAN GOLD EAGLE 1 OZ FINE GOLD',confidence:.95,sides:2});
+  const merged=context.mergeSmartCameraReadings(first,named,combined);
+  assert.equal(first.inferredPurity,true);assert.equal(merged.product,'American Gold Eagle');
+  assert.equal(merged.purity,named.purity);assert.equal(merged.warnings.length,0);
+  const direct=context.interpretSmartCameraScan({text:'GOLD BULLION COIN 1 OZ FINE GOLD .9999',confidence:.95});
+  const conflict=context.mergeSmartCameraReadings(direct,named,combined);
+  assert.equal(conflict.purity,direct.purity);assert.ok(conflict.warnings.length);
+ });
+ await test('Specific product survives a generic second reading without a false product disagreement',async()=>{
+  reset();vm.runInContext('smartCameraScanning=false',context);
+  queued.push({lines:['AMERICAN GOLD EAGLE 1 OZ FINE GOLD'],confidence:.95},
+    {lines:['COIN 1 OZ FINE GOLD'],confidence:.95});
+  await context.captureSmartCameraSide('camera');await context.captureSmartCameraSide('library');
+  assert.equal(pending().product,'American Gold Eagle');assert.equal(pending().warnings.length,0);
+ });
  console.log(count+' scanner flow checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1});
