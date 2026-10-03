@@ -558,5 +558,40 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
   get('smartEditWeight').value='1';assert.equal(context.saveSmartScanReview(),true);
   context.renderSmartCameraAnalysis=render;
  });
+ await test('Refinement preserves explicit weight exclusions instead of promoting identity text into mass',async()=>{
+  reset();plugin.refine=async()=>({lines:['LIBERTY'],confidence:.95});
+  queued.push({lines:['66 G .999 SILVER'],weightLines:[],confidence:.95,
+   designSuggestion:{id:'generic_coin',source:'local-catalogue-v1'}});
+  await context.runSmartCameraScan();delete plugin.refine;
+  assert.equal(pending().metal,'silver');assert.equal(pending().weight,0);
+  assert.equal(vm.runInContext('smartCameraLastDiagnostic.weightPasses.length',context),0);
+  assert.equal(context.canUseSmartCameraSuggestion(pending()),false);
+ });
+ await test('Explicit review removes inference flags so a later generic-to-named upgrade cannot overwrite confirmed metadata',()=>{
+  const render=context.renderSmartCameraAnalysis;
+  vm.runInContext(html.slice(html.indexOf('function renderSmartCameraAnalysis('),html.indexOf('function applySmartCameraSuggestion(')),context);
+  reset();vm.runInContext('smartCameraScanning=false',context);
+  const original=context.interpretSmartCameraScan({lines:['1 OZ'],confidence:.95,designSuggestion:{id:'american_buffalo',source:'local-catalogue-v1'}});
+  assert.equal(original.inferredMetal,true);assert.equal(original.inferredProduct,true);assert.equal(original.inferredMint,true);
+  context.renderSmartCameraAnalysis(original);context.openSmartScanEditor();
+  get('smartEditProduct').value='Gold Bullion Coin';get('smartEditPurity').value='.999 gold';get('smartEditMint').value='Confirmed mint';
+  assert.equal(context.saveSmartScanReview(),true);
+  for(const field of ['Metal','Product','Weight','Purity','Mint'])assert.equal(pending()['inferred'+field],false);
+  const named=context.interpretSmartCameraScan({text:'AMERICAN GOLD EAGLE 1 OZ FINE GOLD',confidence:.95});
+  const merged=context.mergeSmartCameraReadings(pending(),named,named);
+  assert.equal(merged.mint,'Confirmed mint');assert.equal(merged.purity,'.999 gold');
+  assert.ok(merged.warnings.length);assert.equal(context.canUseSmartCameraSuggestion(merged),false);
+  context.renderSmartCameraAnalysis=render;
+ });
+ await test('A late review-action invocation cannot open or apply details while scanning',()=>{
+  const render=context.renderSmartCameraAnalysis;
+  vm.runInContext(html.slice(html.indexOf('function renderSmartCameraAnalysis('),html.indexOf('function applySmartCameraSuggestion(')),context);
+  reset();vm.runInContext('smartCameraScanning=false',context);
+  const original=context.interpretSmartCameraScan({text:'FINE SILVER 1 OZ COPY',confidence:.95});
+  context.renderSmartCameraAnalysis(original);context.setSmartCameraBusy(true);
+  context.useSmartCameraAnalysis();assert.equal(get('smartScanEditor').hidden,true);assert.equal(pending().userReviewed,undefined);
+  context.setSmartCameraBusy(false);context.useSmartCameraAnalysis();assert.equal(get('smartScanEditor').hidden,false);
+  context.renderSmartCameraAnalysis=render;
+ });
  console.log(count+' scanner flow checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1});

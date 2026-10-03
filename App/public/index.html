@@ -7423,7 +7423,8 @@ function selectSmartCameraPhotoEvidence(result){
     const lines=rawLines.concat(metalLines);
     // Weight is a financial input. A pass average must never promote a weak
     // number/unit observation because unrelated identity lines are confident.
-    const weightLines=smartCameraWeightReadingLines(observations.filter(o=>typeof o?.text==='string'&&Number(o.confidence)>=SMART_CAMERA_WEIGHT_MIN_CONFIDENCE).map(o=>o.text));
+    const weightLines=Array.isArray(pass?.weightLines)?smartCameraWeightReadingLines(pass.weightLines):
+      smartCameraWeightReadingLines(observations.filter(o=>typeof o?.text==='string'&&Number(o.confidence)>=SMART_CAMERA_WEIGHT_MIN_CONFIDENCE).map(o=>o.text));
     const photo={lines,weightLines,confidence:Number(pass?.confidence)||0,designSuggestion:result.designSuggestion,designSuggestions:result.designSuggestions};
     const reading=interpretSmartCameraScan(photo);
     const score=(reading.usable?3:0)+(reading.metal?3:0)+(reading.product?4:0)+(reading.weight>0?3:0)+
@@ -7567,9 +7568,7 @@ function canCorrectSmartCameraSuggestion(suggestion){
     Array.isArray(suggestion.warnings));
 }
 function canReviewSmartCameraSuggestion(suggestion){
-  return !!(suggestion&&Object.hasOwn(PRODUCT_MAP,suggestion.metal)&&
-    (!suggestion.product||(PRODUCT_MAP[suggestion.metal]||[]).includes(suggestion.product))&&
-    Array.isArray(suggestion.warnings)&&suggestion.warnings.every(w=>/weight/i.test(w)));
+  return canCorrectSmartCameraSuggestion(suggestion)&&suggestion.warnings.every(w=>/weight/i.test(w));
 }
 function closeSmartScanFeedback(){
   document.getElementById('smartScanFeedback').hidden=true;
@@ -7647,7 +7646,8 @@ function saveSmartScanReview(){
   const reviewed={...original,metal,product,weight,year,
     purity:document.getElementById('smartEditPurity').value.trim().slice(0,80),
     mint:document.getElementById('smartEditMint').value.trim().slice(0,120),
-    warnings:[],usable:true,inferredWeight:false,userReviewed:true,
+    warnings:[],usable:true,inferredWeight:false,inferredMetal:false,inferredProduct:false,
+    inferredMint:false,inferredPurity:false,userReviewed:true,
     scanEvidence:original.scanEvidence||original,
     originalScanWarnings:original.originalScanWarnings||[...(original.warnings||[])]};
   renderSmartCameraAnalysis(reviewed);
@@ -7676,7 +7676,13 @@ function renderSmartCameraAnalysis(suggestion){
   document.getElementById('smartScanPurity').textContent=suggestion.purity||'Not identified';
   document.getElementById('smartScanMint').textContent=suggestion.mint||'Not identified';
   const use=document.getElementById('smartAnalysisUseButton');
-  if(use){const review=canCorrectSmartCameraSuggestion(suggestion);use.hidden=!review;use.disabled=!review;use.textContent=!canReviewSmartCameraSuggestion(suggestion)?'Review and correct details':suggestion.userReviewed?'Use reviewed details':ready?'Use scan details':'Review and complete holding';}
+  if(use){
+    const correctable=canCorrectSmartCameraSuggestion(suggestion);
+    use.hidden=!correctable;
+    use.disabled=!correctable;
+    use.textContent=!canReviewSmartCameraSuggestion(suggestion)?'Review and correct details':
+      suggestion.userReviewed?'Use reviewed details':ready?'Use scan details':'Review and complete holding';
+  }
   panel.classList.add('show');
   renderSmartCameraDiagnostics(suggestion.scanEvidence||suggestion);
   setSmartCameraBusy(smartCameraScanning);
@@ -7709,6 +7715,7 @@ function applySmartCameraSuggestion(suggestion){
   return true;
 }
 function useSmartCameraAnalysis(){
+  if(smartCameraScanning)return;
   if(document.getElementById('smartScanEditor').hidden&&canCorrectSmartCameraSuggestion(pendingSmartCameraSuggestion)&&!canReviewSmartCameraSuggestion(pendingSmartCameraSuggestion)){
     openSmartScanEditor();
     return;
@@ -7884,6 +7891,7 @@ function mergeSmartCameraReadings(previous,current,combined){
 function mergeSmartCameraRefinement(initial,refined){
   const passes=result=>Array.isArray(result.passes)?result.passes:[{
     confidence:Number(result.confidence)||0,
+    ...(Array.isArray(result.weightLines)?{weightLines:result.weightLines}:{}),
     observations:(Array.isArray(result.lines)?result.lines:[result.text||''])
       .filter(line=>typeof line==='string'&&line.trim())
       .map(text=>({text,confidence:Number(result.confidence)||0}))
@@ -7977,7 +7985,8 @@ async function runSmartCameraScan(append=false,source='camera'){
         const metals=smartCameraMetalEvidence(normalizeSmartCameraText(lines.join(' ')));
         const metal=metals.length===1?metals[0]:'';
         const trusted=observations.filter(o=>Number(o.confidence)>=SMART_CAMERA_WEIGHT_MIN_CONFIDENCE);
-        const tokens=smartCameraWeightReadingLines(trusted.map(o=>o.text)).flatMap(line=>smartCameraWeightTokens(line,metal));
+        const weightLines=Array.isArray(pass.weightLines)?smartCameraWeightReadingLines(pass.weightLines):smartCameraWeightReadingLines(trusted.map(o=>o.text));
+        const tokens=weightLines.flatMap(line=>smartCameraWeightTokens(line,metal));
         const weakWeightCount=observations.filter(o=>Number(o.confidence)<SMART_CAMERA_WEIGHT_MIN_CONFIDENCE)
           .reduce((count,o)=>count+smartCameraWeightTokens(normalizeSmartCameraText(o.text,false),metal).length,0);
         const weights=[...new Set(tokens.filter(token=>!token.reason).map(token=>token.value))];
@@ -7988,7 +7997,8 @@ async function runSmartCameraScan(append=false,source='camera'){
         if(!tokens.length&&!weakWeightCount)return [];
         return [{pass:pass.id,weightsOz:weights,rejectedReasons,confidence:Number(pass.confidence)||0,
           direct:observations.flatMap((o,lineIndex)=>{
-            const weights=Number(o.confidence)>=SMART_CAMERA_WEIGHT_MIN_CONFIDENCE
+            const included=!Array.isArray(pass.weightLines)||pass.weightLines.some(line=>normalizeSmartCameraWeightText(line)===normalizeSmartCameraWeightText(o.text));
+            const weights=included&&Number(o.confidence)>=SMART_CAMERA_WEIGHT_MIN_CONFIDENCE
               ?smartCameraWeightCandidates(normalizeSmartCameraText(o.text,false),metal):[];
             return weights.length?[{lineIndex,weightsOz:weights,confidence:Number(o.confidence)||0}]:[];
           })}];
