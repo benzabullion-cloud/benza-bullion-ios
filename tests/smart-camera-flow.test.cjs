@@ -439,5 +439,56 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
   assert.doesNotMatch(get('smartAnalysisSub').textContent,/designID/);
   context.renderSmartCameraAnalysis=render;
  });
+ await test('Readable metal overrides visual defaults across all metals, both photo orders and crop orders',async()=>{
+  const designs=[['american_buffalo','gold'],['american_gold_eagle','gold'],['american_silver_eagle','silver'],
+   ['american_platinum_eagle','platinum'],['american_palladium_eagle','palladium'],['kookaburra','silver'],
+   ['koala','silver'],['noahs_ark','silver'],['somali_elephant','silver'],['platinum_noble','platinum'],['palladium_ballerina','palladium']];
+  for(const [id,visualMetal] of designs)for(const metal of ['gold','silver','platinum','palladium','copper']){
+   if(metal===visualMetal)continue;
+   const portrait={lines:['LIBERTY'],confidence:.95,designSuggestion:{id,source:'local-catalogue-v1'}};
+   const reverse={lines:['ONE TROY OUNCE','999 FINE '+metal.toUpperCase()],confidence:.95,designSuggestion:{id,source:'local-catalogue-v1'}};
+   for(const reverseFirst of [false,true]){
+    reset();queued.push(...(reverseFirst?[reverse,portrait]:[portrait,reverse]));
+    await context.runSmartCameraScan();await context.runSmartCameraScan(true);
+    assert.equal(pending().metal,metal,id+' '+metal);assert.equal(pending().inferredMetal,false);
+    assert.equal(pending().weight,1,id+' '+metal+' reverseFirst '+reverseFirst+' '+JSON.stringify(pending()));assert.equal(pending().mint,'');
+    assert.doesNotMatch(pending().product,/American Gold Buffalo/);assert.equal(pending().warnings.length,0);
+    assert.equal(context.canUseSmartCameraSuggestion(pending()),true);
+   }
+   const passes=[{id:1,confidence:.98,observations:[{text:'LIBERTY',confidence:.98},{text:'ONE TROY OUNCE',confidence:.98}]},
+    {id:2,confidence:.8,observations:[{text:'999 FINE '+metal.toUpperCase(),confidence:.8}]}];
+   for(const reverseFirst of [false,true]){
+    const selected=context.selectSmartCameraPhotoEvidence({...portrait,passes:reverseFirst?[...passes].reverse():passes});
+    const reading=context.interpretSmartCameraScan(selected);
+    assert.equal(reading.metal,metal,id+' crop '+metal);assert.equal(reading.inferredMetal,false);
+    assert.equal(reading.weight,1);assert.equal(reading.mint,'');assert.equal(reading.warnings.length,0);
+   }
+  }
+ });
+ await test('A copied Buffalo portrait cannot reject the silver reverse or import gold catalogue defaults',async()=>{
+  reset();queued.push({lines:['LIBERTY'],confidence:.95,designSuggestion:{id:'american_buffalo',source:'local-catalogue-v1'}},
+   {passes:[{id:1,confidence:.98,observations:[{text:'ONE TROY OUNCE',confidence:1}]},
+    {id:2,confidence:.85,observations:[{text:'999 FINE',confidence:.85},{text:'SILVER',confidence:.85}]}],
+    designSuggestion:{id:'american_buffalo',source:'local-catalogue-v1'}});
+  await context.runSmartCameraScan();await context.runSmartCameraScan(true);
+  assert.equal(pending().metal,'silver');assert.equal(pending().product,'Silver Bullion Coin');assert.equal(pending().weight,1);
+  assert.equal(pending().purity,' .999 silver');assert.equal(pending().mint,'');assert.equal(pending().warnings.length,0);
+  assert.equal(context.canUseSmartCameraSuggestion(pending()),true);
+ });
+ await test('Shared metal rules reject incompatible visual candidates before resolving two-side artwork',()=>{
+  const reading=context.interpretSmartCameraScan({lines:['ONE TROY OUNCE 999 FINE SILVER'],confidence:.95,sides:2,
+   designSuggestions:[{id:'american_buffalo',source:'local-catalogue-v1'},{id:'american_silver_eagle',source:'local-catalogue-v1'}]});
+  assert.equal(reading.metal,'silver');assert.equal(reading.product,'American Silver Eagle');assert.equal(reading.warnings.length,0);
+  const generic=context.interpretSmartCameraScan({lines:['ONE TROY OUNCE 999 FINE SILVER'],confidence:.95,sides:2,
+   designSuggestions:[{id:'american_buffalo',source:'local-catalogue-v1'},{id:'american_gold_eagle',source:'local-catalogue-v1'}]});
+  assert.equal(generic.metal,'silver');assert.equal(generic.product,'Silver Bullion Coin');assert.equal(generic.mint,'');assert.equal(generic.warnings.length,0);
+ });
+ await test('Contradictory directly read metals remain blocked within one photo',()=>{
+  const selected=context.selectSmartCameraPhotoEvidence({designSuggestion:{id:'american_buffalo',source:'local-catalogue-v1'},passes:[
+   {id:1,confidence:.95,observations:[{text:'1 OZ FINE GOLD',confidence:.95}]},
+   {id:2,confidence:.9,observations:[{text:'999 FINE SILVER',confidence:.9}]}]});
+  const reading=context.interpretSmartCameraScan(selected);
+  assert.ok(reading.warnings.some(w=>/Conflicting metal/.test(w)));assert.equal(context.canUseSmartCameraSuggestion(reading),false);
+ });
  console.log(count+' scanner flow checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1});

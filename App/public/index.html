@@ -7255,22 +7255,32 @@ function interpretSmartCameraScan(result){
   const plated=/\b(?:plated|clad|filled|replica|copy|tribute|layered)\b/.test(text);
   if(plated)warnings.push('Plated, replica, or layered marking detected. Fine-metal content needs manual verification.');
   const historicalSpec=metals.length<=1?smartCameraHistoricalSilverSpec(text,metal):null;
-  const inferredMetal=!metal&&!!historicalSpec;
+  let inferredMetal=!metal&&!!historicalSpec;
   if(inferredMetal)metal='silver';
   let design=smartCameraDesignEvidence(result);
   if(design.invalid)warnings.push('The artwork result was invalid. Scan again.');
   let visualMetal=!metal&&!design.invalid&&!design.conflict?smartCameraDesignUniqueMetal(design.id):'';
-  if(visualMetal)metal=visualMetal;
+  if(visualMetal){metal=visualMetal;inferredMetal=true;}
   let catalogMatch=metals.length>1?null:smartCameraCatalogMatch(text,metal);
+  // Named artwork can be reused on rounds in other metals. A readable metal
+  // inscription rules out metal-specific visual identities, not the inscription.
+  if(metals.length===1){
+    const compatibleIDs=design.ids.filter(id=>!smartCameraDesignUniqueMetal(id)||smartCameraDesignUniqueMetal(id)===metal);
+    if(compatibleIDs.length!==design.ids.length){
+      const ids=compatibleIDs.length?compatibleIDs:['generic_coin'];
+      design={...design,id:ids.length===1?ids[0]:'',ids,conflict:ids.length>1};
+    }
+  }
   design=smartCameraResolveDesignConflict(design,text,metal,catalogMatch);
   if(design.conflict)warnings.push('The two photos suggest different designs. Scan this item again.');
   if(!metal&&!design.invalid&&!design.conflict){
     visualMetal=smartCameraDesignUniqueMetal(design.id);
     if(visualMetal){
-      metal=visualMetal;
+      metal=visualMetal;inferredMetal=true;
       catalogMatch=metals.length>1?null:smartCameraCatalogMatch(text,metal);
     }
   }
+  const inscriptionMatch=catalogMatch;
   const artworkMatch=!design.invalid&&!design.conflict?smartCameraDesignCatalogMatch(design.id,text,metal):null;
   if(artworkMatch&&catalogMatch&&artworkMatch.item.product!==catalogMatch.item.product){
     // Auto-generated baseline profiles are intentionally weak. A generic visual
@@ -7379,10 +7389,10 @@ function interpretSmartCameraScan(result){
   if(warnings.length)confidence=Math.min(confidence,.40);
   const matchedTerms=[...(catalogMatch?.strongHits||[]),...(catalogMatch?.supportHits||[])];
   if(metals.length===1)matchedTerms.unshift('metal inscription: '+METAL_NAMES[metal]);
-  if(inferredMetal)matchedTerms.unshift('silver from U.S. denomination and date — confirm');
+  if(inferredMetal)matchedTerms.unshift(historicalSpec?'silver from U.S. denomination and date — confirm':'metal from on-device artwork — confirm');
   if(inferredWeight)matchedTerms.push('weight from standard product specification — confirm');
   return {metal,product,weight,year,mint,serial,purity,denomination,text,raw,confidence,warnings,
-    matchedTerms,designID:design.id,inferredWeight,inferredMetal,inferredMint:!!mint&&!detectedMint,inferredPurity:!!purity&&!observedPurity,
+    matchedTerms,designID:design.id,inferredWeight,inferredMetal,inferredProduct:!!product&&!inscriptionMatch&&!historicalSpec,inferredMint:!!mint&&!detectedMint,inferredPurity:!!purity&&!observedPurity,
     sides:result?.sides||1,usable:!!metal&&!plated&&metals.length<=1&&confidence>=.42};
 }
 // Rejoin a denomination split across adjacent observations in ONE OCR pass.
@@ -7399,9 +7409,18 @@ function smartCameraIdentityReadingLines(lines){
 // OCR passes are alternative readings of ONE photo, not additional inscriptions.
 function selectSmartCameraPhotoEvidence(result){
   if(!Array.isArray(result?.passes))return result;
+  // A crop without metal text must not win by inventing a metal from artwork
+  // and then reject another crop that actually reads the metal. Share confident
+  // metal observations within this photo; never share them as weight readings.
+  const metalLines=[...new Set(result.passes.flatMap(pass=>
+    (Array.isArray(pass?.observations)?pass.observations:[])
+      .filter(o=>typeof o?.text==='string'&&Number(o.confidence)>=SMART_CAMERA_WEIGHT_MIN_CONFIDENCE&&
+        smartCameraMetalEvidence(normalizeSmartCameraText(o.text)).length)
+      .flatMap(o=>smartCameraMetalEvidence(normalizeSmartCameraText(o.text)))))];
   const candidates=result.passes.map(pass=>{
     const observations=Array.isArray(pass?.observations)?pass.observations:[];
-    const lines=smartCameraIdentityReadingLines(observations.filter(o=>typeof o?.text==='string'&&Number(o.confidence)>=.25).map(o=>o.text));
+    const rawLines=smartCameraIdentityReadingLines(observations.filter(o=>typeof o?.text==='string'&&Number(o.confidence)>=.25).map(o=>o.text));
+    const lines=rawLines.concat(metalLines);
     // Weight is a financial input. A pass average must never promote a weak
     // number/unit observation because unrelated identity lines are confident.
     const weightLines=smartCameraWeightReadingLines(observations.filter(o=>typeof o?.text==='string'&&Number(o.confidence)>=SMART_CAMERA_WEIGHT_MIN_CONFIDENCE).map(o=>o.text));
@@ -7409,8 +7428,8 @@ function selectSmartCameraPhotoEvidence(result){
     const reading=interpretSmartCameraScan(photo);
     const score=(reading.usable?3:0)+(reading.metal?3:0)+(reading.product?4:0)+(reading.weight>0?3:0)+
       (reading.purity?1:0)+(reading.year ? .25 : 0)+photo.confidence-reading.warnings.length*12;
-    return {photo,reading,score,id:pass?.id};
-  }).filter(c=>c.photo.lines.length&&!(c.photo.weightLines.length===0&&c.photo.lines.every(line=>
+    return {photo,rawLines,reading,score,id:pass?.id};
+  }).filter(c=>c.rawLines.length&&!(c.photo.weightLines.length===0&&c.rawLines.every(line=>
     /^(?:\d+(?:\.\d+)?(?:\s*\/\s*\d+)?)\s*(?:troy\s*)?(?:oz|ounces?|onzas?|kg|kilograms?|g|grams?|gr|lbs?|pounds?)$/.test(normalizeSmartCameraText(line,false)))))
     .sort((a,b)=>b.score-a.score);
   if(!candidates.length)return {...result,lines:[],weightLines:[],text:'',confidence:0,selectedPasses:0,rejectedPasses:result.passes.length};
@@ -7784,14 +7803,26 @@ function shouldRefineSmartCameraSuggestion(suggestion){
 }
 function mergeSmartCameraReadings(previous,current,combined){
   if(!previous)return combined;
+  // A later portrait crop can repeat a rejected visual metal. Resolve its
+  // inferred defaults against the combined inscriptions before comparing sides.
+  if(previous.metal&&!previous.inferredMetal&&current.inferredMetal&&
+     current.metal!==previous.metal&&combined.metal===previous.metal){
+    current={...current};
+    for(const field of ['metal','product','purity','mint']){
+      const inferred='inferred'+field[0].toUpperCase()+field.slice(1);
+      if(current[inferred]){current[field]=combined[field];current[inferred]=combined[inferred];}
+    }
+  }
   const merged={...combined};
   const warnings=new Set([...(previous.warnings||[]),...(combined.warnings||[])]);
   const sameMetal=previous.metal&&previous.metal===current.metal;
   const sameKind=smartCameraProductKind(previous.product)===smartCameraProductKind(current.product);
   const productUpgrade=sameMetal&&sameKind&&smartCameraGenericProduct(previous.product)&&current.product&&!smartCameraGenericProduct(current.product);
   const productDowngrade=sameMetal&&sameKind&&previous.product&&!smartCameraGenericProduct(previous.product)&&smartCameraGenericProduct(current.product);
-  const identityConflict=(previous.metal&&current.metal&&previous.metal!==current.metal)||
-    (previous.product&&current.product&&previous.product!==current.product&&!productUpgrade&&!productDowngrade);
+  const correctedVisualMetal=previous.inferredMetal&&current.metal&&!current.inferredMetal&&
+    previous.metal!==current.metal&&combined.metal===current.metal;
+  const identityConflict=!correctedVisualMetal&&((previous.metal&&current.metal&&previous.metal!==current.metal)||
+    (previous.product&&current.product&&previous.product!==current.product&&!productUpgrade&&!productDowngrade));
   // Artwork labels are metadata, not another independently editable holding field.
   // The combined interpreter already resolves generic/specific designs and
   // reports genuine artwork conflicts. Do not re-litigate that decision here.
@@ -7800,7 +7831,12 @@ function mergeSmartCameraReadings(previous,current,combined){
   const present=(field,value)=>field==='weight'?Number.isFinite(value)&&value>0:!!value;
   for(const field of fields){
     const inferred='inferred'+field[0].toUpperCase()+field.slice(1);
-    if(productUpgrade&&present(field,current[field])&&(field==='product'||previous[inferred])){
+    if(correctedVisualMetal&&(field==='metal'||previous[inferred])){
+      // Replace artwork/catalogue defaults together, including clearing metadata
+      // belonging to the rejected identity. Directly read values remain checked.
+      merged[field]=combined[field];
+      if(inferred in combined)merged[inferred]=combined[inferred];
+    }else if(productUpgrade&&present(field,current[field])&&(field==='product'||previous[inferred])){
       merged[field]=current[field];
       if(inferred in current)merged[inferred]=current[inferred];
     }else if(present(field,previous[field])){
