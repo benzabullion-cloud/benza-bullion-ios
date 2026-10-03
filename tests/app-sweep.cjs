@@ -65,7 +65,7 @@ window.supabase={createClient:()=>({
     nativeStoreKitPlugin().getProducts=async()=>{throw Error('Offline')};await refreshStoreKitProducts();
    });
    assert.equal(await page.locator('#proStartTrialBtn').isDisabled(),true);
-   await page.evaluate(()=>{closeProUpgrade();window.Capacitor=null;});
+   await page.evaluate(()=>{closeProUpgrade();window.Capacitor=null;benzaEntitlement={tier:'pro',status:'active'};updateProIntegratedUI();});
   }
   console.log('Check compact market status in '+engineName);
   for(const width of [320,390,768])for(const theme of ['dark','light']){
