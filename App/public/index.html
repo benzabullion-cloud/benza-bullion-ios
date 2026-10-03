@@ -4815,6 +4815,18 @@ nav > div{
 }
 .liveFeedStatus.marketPaused{color:#c88719}
 .liveFeedStatus.feedProblem{color:#ef6262}
+.liveFeedRow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:7px 0 2px}
+.liveFeedRow .liveFeedStatus{margin:0}
+.marketRefresh{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;padding:7px;border:0;border-radius:50%;background:transparent;color:var(--muted);cursor:pointer;flex:0 0 auto}
+.marketRefresh svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.marketRefresh:hover{background:var(--card)}
+.marketRefresh:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.marketRefresh:disabled{opacity:.5;cursor:wait}
+.marketRefresh[aria-busy="true"] svg{animation:marketRefreshSpin 1s linear infinite}
+.marketPauseNote{flex-basis:100%;margin:0;font-size:10px;line-height:1.5;color:var(--muted);font-weight:400}
+.marketPauseNote[hidden]{display:none}
+@keyframes marketRefreshSpin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.marketRefresh[aria-busy="true"] svg{animation:none}}
 </style>
 
 
@@ -5726,7 +5738,11 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
     <div class="label">Total portfolio value</div>
     <div class="total"><span id="portfolioValue">$18,742.50</span></div>
     <div class="change"><span id="portfolioChange">+$214.30 (+1.16%) today</span></div>
-    <div id="liveFeedStatus" class="liveFeedStatus" role="status" aria-live="polite">Connecting to live market…</div>
+    <div class="liveFeedRow">
+      <div id="liveFeedStatus" class="liveFeedStatus" role="status" aria-live="polite">Connecting to live market…</div>
+      <button id="marketRefreshButton" class="marketRefresh" type="button" aria-label="Refresh market prices" title="Refresh market prices" aria-busy="false" onclick="fetchLivePrices()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 7a7 7 0 0 1 11.5-1L20 9M4 15l2.4 3A7 7 0 0 0 17.9 17"/></svg></button>
+      <p id="marketPauseNote" class="marketPauseNote" hidden></p>
+    </div>
 
     <div class="chart" id="portfolioChart">
       <div class="chartTooltip" id="chartTooltip"><strong id="chartTipValue">$0.00</strong><span id="chartTipTime">—</span></div>
@@ -8168,6 +8184,8 @@ document.getElementById('date').value=new Date().toISOString().slice(0,10);
 <script>
 const livePrices={gold:4424.50,silver:67.02,platinum:1840,palladium:1380,copper:0.30};
 let lastMarketFeedData=null;
+let lastMarketFeedStatusState={};
+let marketRefreshInFlight=null;
 let holdings=[];
 let holdingsLoaded=false;
 let activities=[];
@@ -8238,6 +8256,21 @@ function metalsMarketPausedCentral(date=new Date()){
   }
 }
 
+// Regular-session estimate, not a provider or holiday reopening guarantee.
+// Existing schedule: https://www.cmegroup.com/market-regulation/files/gold-futures-and-options-fact-card.pdf
+function marketPauseExplanation(date=new Date()){
+  if(!metalsMarketPausedCentral(date))return '';
+  const weekday=new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',weekday:'short'}).format(date);
+  const reason=['Fri','Sat','Sun'].includes(weekday)?'Weekend trading break':'Daily trading break';
+  let next=new Date(Math.floor(date.getTime()/3600000)*3600000+3600000);
+  for(let hours=0;hours<72&&metalsMarketPausedCentral(next);hours++)next=new Date(next.getTime()+3600000);
+  const mins=Math.max(1,Math.ceil((next-date)/60000));
+  const days=Math.floor(mins/1440),hours=Math.floor(mins%1440/60),minutes=mins%60;
+  const duration=[days?days+'d':'',hours?hours+'h':'',minutes?minutes+'m':''].filter(Boolean).join(' ');
+  const reopening=new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',weekday:'short',hour:'numeric',minute:'2-digit'}).format(next);
+  return reason+' · Expected '+reopening+' CT (about '+duration+'). Holidays or feed delays may extend this.';
+}
+
 function latestMarketSourceTime(data){
   const sourceTimes=Object.values(data?.source_updated_at||{})
     .map(v=>v?new Date(v):null)
@@ -8248,7 +8281,7 @@ function latestMarketSourceTime(data){
   }
 
   const fetched=data?.fetched_at?new Date(data.fetched_at):null;
-  return fetched && !Number.isNaN(fetched.getTime()) ? fetched : new Date();
+  return fetched && !Number.isNaN(fetched.getTime()) ? fetched : null;
 }
 
 function formatLiveUpdateTime(date){
@@ -8258,29 +8291,44 @@ function formatLiveUpdateTime(date){
   });
 }
 
-function renderLiveFeedStatus(data,{problem=false,offline=false}={}){
+function renderLiveFeedStatus(data,{problem=false,offline=false,date=new Date()}={}){
+  lastMarketFeedStatusState={problem,offline};
   const el=document.getElementById('liveFeedStatus');
   if(!el)return;
 
   el.classList.remove('marketPaused','feedProblem');
 
   const updated=latestMarketSourceTime(data||{});
-  const timeText=formatLiveUpdateTime(updated);
+  const timeText=updated?formatLiveUpdateTime(updated):'not yet available';
+  const note=document.getElementById('marketPauseNote');
+  function explain(message=''){
+    if(note){note.textContent=message;note.hidden=!message;}
+  }
+  explain();
 
   if(offline){
-    el.textContent='Offline • Last update '+timeText;
+    el.textContent='Offline • Last quote '+timeText;
+    explain('No internet connection. Prices update when you reconnect.');
     el.classList.add('feedProblem');
     return;
   }
 
   if(problem){
-    el.textContent='Live feed unavailable • Last update '+timeText;
+    el.textContent='Live feed unavailable • Last quote '+timeText;
+    explain('Quote service unavailable. Retrying every 30s; recovery time is unknown.');
     el.classList.add('feedProblem');
     return;
   }
 
-  if(metalsMarketPausedCentral()){
-    el.textContent='Market paused • Updated live at '+timeText;
+  if(Array.isArray(data?.stale_metals)&&data.stale_metals.length){
+    el.textContent='Quotes delayed • Last quote '+timeText;
+    el.classList.add('feedProblem');
+    explain('Some quotes are cached. Retrying every 30s; recovery time is unknown.');
+    return;
+  }
+  if(metalsMarketPausedCentral(date)){
+    el.textContent='Market paused • Last quote '+timeText;
+    explain(marketPauseExplanation(date));
     el.classList.add('marketPaused');
     return;
   }
@@ -8309,6 +8357,7 @@ function updateNetworkState(){
     }
   }else{
     setConnectionBanner('You’re offline. Showing saved data.');
+    renderLiveFeedStatus(lastMarketFeedData||{}, {offline:true});
     const statusEl=document.getElementById('priceStatus');
     if(statusEl)statusEl.textContent='Offline • showing last known prices';
   }
@@ -10106,6 +10155,17 @@ function updatePortfolio(){
   renderAnalytics();
 }
 async function fetchLivePrices(){
+  if(marketRefreshInFlight)return marketRefreshInFlight;
+  const button=document.getElementById('marketRefreshButton');
+  if(button){button.disabled=true;button.setAttribute('aria-busy','true');}
+  marketRefreshInFlight=performMarketPriceRefresh();
+  try{return await marketRefreshInFlight;}
+  finally{
+    marketRefreshInFlight=null;
+    if(button){button.disabled=false;button.setAttribute('aria-busy','false');}
+  }
+}
+async function performMarketPriceRefresh(){
   const statusEl=document.getElementById('priceStatus');
   if(!navigator.onLine){
     restoreCachedPrices();
@@ -11565,7 +11625,7 @@ window.addEventListener('DOMContentLoaded',()=>{
 },{once:true});
 setInterval(fetchLivePrices,30000);
 setInterval(()=>{
-  if(lastMarketFeedData)renderLiveFeedStatus(lastMarketFeedData);
+  if(lastMarketFeedData)renderLiveFeedStatus(lastMarketFeedData,lastMarketFeedStatusState);
 },60000); 
 initChartInteraction();
 setInterval(()=>{if(document.getElementById('newsScreen')?.classList.contains('show'))loadMarketNews(true)},30*60*1000);
