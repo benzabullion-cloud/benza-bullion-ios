@@ -7389,7 +7389,7 @@ function interpretSmartCameraScan(result){
   if(warnings.length)confidence=Math.min(confidence,.40);
   const matchedTerms=[...(catalogMatch?.strongHits||[]),...(catalogMatch?.supportHits||[])];
   if(metals.length===1)matchedTerms.unshift('metal inscription: '+METAL_NAMES[metal]);
-  if(inferredMetal)matchedTerms.unshift('silver from U.S. denomination and date — confirm');
+  if(inferredMetal)matchedTerms.unshift(historicalSpec?'silver from U.S. denomination and date — confirm':'metal from on-device artwork — confirm');
   if(inferredWeight)matchedTerms.push('weight from standard product specification — confirm');
   return {metal,product,weight,year,mint,serial,purity,denomination,text,raw,confidence,warnings,
     matchedTerms,designID:design.id,inferredWeight,inferredMetal,inferredProduct:!!product&&!inscriptionMatch&&!historicalSpec,inferredMint:!!mint&&!detectedMint,inferredPurity:!!purity&&!observedPurity,
