@@ -43,6 +43,30 @@ window.supabase={createClient:()=>({
     states++;
    }
   }
+  console.log('Check localized Pro plans and trial eligibility in '+engineName);
+  for(const width of [320,390,768]){
+   await page.setViewportSize({width,height:844});
+   await page.evaluate(async()=>{
+    closeSmartCamera();closeAdd();hideMainOverlays();
+    window.Capacitor={isNativePlatform:()=>true,Plugins:{BenzaStoreKit:{getProducts:async()=>({products:[
+     {productId:'benza_pro_monthly',displayPrice:'€5,99'},
+     {productId:'benza_pro_annual',displayPrice:'€44,99',trialValue:7,trialUnit:'day'},
+     {productId:'benza_pro_founder_lifetime',displayPrice:'€29,99'}
+    ]})}}};
+    benzaEntitlement={tier:'free',status:'inactive'};openProUpgrade('settings');await refreshStoreKitProducts();selectProPlan('monthly');
+   });
+   assert.equal(await page.locator('#proPlanMonthly strong').textContent(),'€5,99/month');
+   assert.doesNotMatch(await page.locator('#proPlanMonthly').textContent(),/free trial/);
+   assert.equal(await page.locator('#proStartTrialBtn').textContent(),'Subscribe');
+   await page.evaluate(()=>selectProPlan('annual'));
+   assert.match(await page.locator('#proStartTrialBtn').textContent(),/7-day free trial/);
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);
+   await page.evaluate(async()=>{
+    nativeStoreKitPlugin().getProducts=async()=>{throw Error('Offline')};await refreshStoreKitProducts();
+   });
+   assert.equal(await page.locator('#proStartTrialBtn').isDisabled(),true);
+   await page.evaluate(()=>{closeProUpgrade();window.Capacitor=null;});
+  }
   console.log('Check compact market status in '+engineName);
   for(const width of [320,390,768])for(const theme of ['dark','light']){
    await page.setViewportSize({width,height:844});

@@ -8516,6 +8516,7 @@ function updateNetworkState(){
     setConnectionBanner('Back online. Refreshing data…',true,true);
     try{fetchLivePrices();}catch(_){}
     if(currentUser){
+      replayPendingPurchases().catch(error=>console.warn('Pending purchase reconnect unavailable:',error));
       loadHoldingsFromSupabase().catch(()=>{});
       loadPortfolioSnapshots(activeChartRange).catch(()=>{});
     }
@@ -9469,6 +9470,7 @@ function closeProUpgrade(){
 }
 let selectedProPlan='monthly';
 function selectProPlan(plan){
+  if(document.getElementById('proStartTrialBtn')?.dataset.purchaseBusy)return;
   selectedProPlan=['monthly','annual','founder'].includes(plan)?plan:'monthly';
   document.getElementById('proPlanMonthly')?.classList.toggle('selected',selectedProPlan==='monthly');
   document.getElementById('proPlanAnnual')?.classList.toggle('selected',selectedProPlan==='annual');
@@ -9510,6 +9512,7 @@ async function refreshStoreKitProducts(){
   const plugin=nativeStoreKitPlugin();
   if(!isBenzaNativeRuntime()||!plugin?.getProducts){renderStoreKitProducts();return}
   if(storeKitProductsRequest)return storeKitProductsRequest;
+  storeKitProducts={};renderStoreKitProducts();
   storeKitProductsRequest=(async()=>{
     try{
       const result=await plugin.getProducts();
