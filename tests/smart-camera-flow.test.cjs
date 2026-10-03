@@ -211,5 +211,56 @@ let count=0;async function test(name,fn){await fn();count++;console.log('PASS',n
    plugin.scan=originalScan;delete plugin.refine;
   }
  });
+ await test('Ready first photo keeps the real camera and library controls on the opposite side',async()=>{
+  reset();vm.runInContext('smartCameraScanning=false',context);
+  const render=context.renderSmartCameraAnalysis;
+  // Run the actual renderer here: readiness previously disabled append mode.
+  vm.runInContext(html.slice(html.indexOf('function renderSmartCameraAnalysis('),html.indexOf('function applySmartCameraSuggestion(')),context);
+  for(const firstSource of ['camera','library']){
+   await context.resetSmartCameraScan(true);
+   const resetsBefore=resetCalls;
+   queued.push({lines:['AMERICAN GOLD BUFFALO 1 OZ FINE GOLD .9999'],confidence:.95});
+   await context.captureSmartCameraSide(firstSource);
+   assert.equal(context.canUseSmartCameraSuggestion(pending()),true);assert.equal(pending().year,null);
+   assert.equal(get('smartCameraProButton').textContent,'Scan Opposite Side');
+   assert.equal(get('smartCameraLibraryButton').textContent,'Choose Opposite Side Photo');
+   const session=vm.runInContext('smartCameraSession',context);
+   queued.push({lines:['LIBERTY 2012'],confidence:.95});
+   await context.captureSmartCameraSide(firstSource==='camera'?'library':'camera');
+   assert.equal(resetCalls,resetsBefore+1);assert.equal(vm.runInContext('smartCameraSession',context),session);
+   assert.equal(pending().sides,2);assert.equal(pending().year,2012);
+   assert.equal(pending().product,'American Gold Buffalo');assert.equal(pending().weight,1);
+   assert.equal(views(),2);assert.equal(context.canUseSmartCameraSuggestion(pending()),true);
+  }
+  context.renderSmartCameraAnalysis=render;
+ });
+ await test('Contradictory reverse retains established fields while blocking automatic use',async()=>{
+  reset();vm.runInContext('smartCameraScanning=false',context);
+  queued.push({lines:['AMERICAN GOLD BUFFALO 1 OZ FINE GOLD .9999 2012'],confidence:.95},
+    {lines:['FINE SILVER 2 OZ .999 2021'],confidence:.9});
+  await context.captureSmartCameraSide('camera');const first=pending();
+  await context.captureSmartCameraSide('library');
+  for(const field of ['metal','product','weight','year','purity','mint'])assert.equal(pending()[field],first[field],field);
+  assert.equal(pending().sides,2);assert.ok(pending().warnings.length);
+  assert.equal(context.canUseSmartCameraSuggestion(pending()),false);
+  assert.equal(context.applySmartCameraSuggestion(pending()),false);
+  assert.equal(vm.runInContext('smartCameraScans[0].reading.product',context),'American Gold Buffalo');
+ });
+ await test('Opposite-side picker cancellation and failure keep first result and photo',async()=>{
+  reset();vm.runInContext('smartCameraScanning=false',context);
+  queued.push({lines:['AMERICAN GOLD BUFFALO 1 OZ FINE GOLD .9999'],confidence:.95});
+  await context.captureSmartCameraSide('camera');
+  vm.runInContext('smartCameraCapturedFiles=[{name:"front.jpg"}]',context);
+  const first=pending(),session=vm.runInContext('smartCameraSession',context),resets=resetCalls;
+  queued.push({cancelled:true});await context.captureSmartCameraSide('library');
+  assert.equal(pending(),first);assert.equal(vm.runInContext('smartCameraPhotoCount',context),1);
+  const originalScan=plugin.scan,originalConsole=context.console;
+  plugin.scan=async()=>{throw Error('Picker failed')};context.console={...console,error(){}};
+  await context.captureSmartCameraSide('library');plugin.scan=originalScan;context.console=originalConsole;
+  assert.equal(pending(),first);assert.equal(vm.runInContext('smartCameraCapturedFiles[0].name',context),'front.jpg');
+  assert.equal(vm.runInContext('smartCameraSession',context),session);assert.equal(resetCalls,resets);
+  queued.push({lines:[],confidence:0});await context.captureSmartCameraSide('library');
+  assert.equal(pending().product,first.product);assert.equal(pending().sides,2);
+ });
  console.log(count+' scanner flow checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1});
