@@ -200,7 +200,7 @@ async function fetchMetalPrice(metal: string) {
   const data = await response.json();
   let value = Number(data.price);
 
-  if (!Number.isFinite(value)) {
+  if (!Number.isFinite(value) || value <= 0) {
     throw new Error(`Invalid ${metal} price`);
   }
 
@@ -423,7 +423,7 @@ async function getPortfolioValue(
   for (const holding of holdings ?? []) {
     const price = Number(prices[holding.metal]);
 
-    if (!Number.isFinite(price)) continue;
+    if (!Number.isFinite(price) || price <= 0) continue;
 
     let ounces = Number(holding.total_oz);
 
@@ -454,7 +454,7 @@ async function processPriceTargets(
 
     const current = Number(prices[alert.metal]);
 
-    if (!Number.isFinite(current)) continue;
+    if (!Number.isFinite(current) || current <= 0) continue;
 
     const target = Number(alert.target);
 
@@ -514,7 +514,7 @@ async function processMarketBaselines(
   marketDate: string,
 ) {
   for (const [metal, current] of Object.entries(prices)) {
-    if (!Number.isFinite(current)) continue;
+    if (!Number.isFinite(current) || current <= 0) continue;
 
     const { data } = await supabase
       .from("market_notification_baselines")

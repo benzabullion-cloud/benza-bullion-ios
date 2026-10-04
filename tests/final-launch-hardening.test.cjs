@@ -30,3 +30,11 @@ test('all edited inline scripts and deployed worker scripts parse',()=>{
  for(const script of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))if(script[1].trim())new vm.Script(script[1]);
  for(const name of ['benza-price-alerts','benza-portfolio-snapshots','benza-delete-account']){const src=fs.readFileSync('supabase/functions/'+name+'/index.ts','utf8').replace(/^import .*;\n/gm,'');new vm.Script(stripTypeScriptTypes(src));}
 });
+
+test('verified renewal refreshes an existing Pro account without restoring old Free purchases',async()=>{
+ let verified=0,pending=0;
+ const c=run({console:{warn(){}},currentUser:{id:'account-a'},benzaEntitlement:{tier:'pro'},verifyNativeStoreTransaction:async()=>verified++,handlePendingPurchase:async()=>pending++,reconcileAppleAccountEntitlement:async()=>{}},html,['handleStoreKitTransactionUpdate']);
+ await c.handleStoreKitTransactionUpdate({appAccountToken:'account-a'});assert.equal(verified,1);
+ c.benzaEntitlement={tier:'free'};await c.handleStoreKitTransactionUpdate({appAccountToken:'account-a'});assert.equal(verified,1);assert.equal(pending,1);
+ await c.handleStoreKitTransactionUpdate({appAccountToken:'account-b',revoked:true});assert.equal(verified,1);
+});

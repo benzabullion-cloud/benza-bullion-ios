@@ -9586,6 +9586,16 @@ async function handleStoreKitTransactionUpdate(transaction){
     try{await verifyNativeStoreTransaction(transaction,{allowInactive:true});}catch(error){console.warn('Revocation reconciliation will retry:',error);}
     return;
   }
+  // Renewals and expirations update an already-Pro account without requiring
+  // a pending checkout marker. A Free account still needs explicit intent.
+  if(benzaEntitlement?.tier==='pro'&&currentUser){
+    const token=String(transaction?.appAccountToken||'').toLowerCase();
+    try{
+      if(token===currentUser.id.toLowerCase())await verifyNativeStoreTransaction(transaction,{allowInactive:true});
+      else if(!token)await reconcileAppleAccountEntitlement();
+    }catch(error){console.warn('Apple status update will retry when connected:',error);}
+    return;
+  }
   await handlePendingPurchase(transaction);
 }
 async function replayPendingPurchases(){
