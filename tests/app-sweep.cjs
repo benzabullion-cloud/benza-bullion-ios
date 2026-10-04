@@ -43,6 +43,42 @@ window.supabase={createClient:()=>({
     states++;
    }
   }
+  console.log('Check sale previews and quantity units in '+engineName);
+  await page.evaluate(()=>{
+   closeAdd();closeAddChoice();closeSmartCamera();hideMainOverlays();
+   benzaEntitlement={tier:'pro',status:'active'};
+   holdings=[{id:'sale-fixture',metal:'gold',product:'American Gold Eagle',qty:1,weight:1,oz:1,cost:4000,costKnown:true}];
+   openSaleModal(0);
+  });
+  assert.equal(await page.locator('#saleCostPreview').textContent(),'—');
+  await page.locator('#saleQuantity').fill('1');
+  await page.locator('#saleProceeds').fill('4000');
+  assert.equal(await page.locator('#saleCostPreview').textContent(),'$4,000.00');
+  assert.equal(await page.locator('#saleGainPreview').textContent(),'+$0.00');
+  assert.equal(await page.locator('#saleSaveBtn').isEnabled(),true);
+  await page.locator('#saleQuantity').fill('0.5');
+  await page.locator('#saleProceeds').fill('2500');
+  assert.equal(await page.locator('#saleCostPreview').textContent(),'$2,000.00');
+  assert.equal(await page.locator('#saleGainPreview').textContent(),'+$500.00');
+  await page.locator('#saleProceeds').fill('0');
+  assert.equal(await page.locator('#saleGainPreview').textContent(),'-$2,000.00');
+  await page.locator('#saleQuantity').fill('5');
+  assert.equal(await page.locator('#saleSaveBtn').isEnabled(),false);
+  assert.match(await page.locator('#saleValidation').textContent(),/Only 1 piece available/);
+  assert.equal(await page.locator('#saleGainPreview').textContent(),'—');
+  await page.evaluate(()=>{holdings[0].cost=0;openSaleModal(0);});
+  await page.locator('#saleQuantity').fill('1');
+  await page.locator('#saleProceeds').fill('1000');
+  assert.equal(await page.locator('#saleCostPreview').textContent(),'$0.00');
+  assert.equal(await page.locator('#saleGainPreview').textContent(),'+$1,000.00');
+  assert.match(await page.evaluate(()=>proHoldingInsightHtml(holdings[0])),/No cost to recover/);
+  await page.evaluate(()=>{closeSaleModal();openManualAdd();selectMetal('copper');});
+  assert.match(await page.locator('#holdingWeightLabel').textContent(),/avoirdupois oz/);
+  await page.locator('#qty').fill('5');
+  await page.locator('#weight').fill('1');
+  assert.match(await page.locator('#holdingQuantityHint').textContent(),/Total entered: 5 avoirdupois oz/);
+  await page.evaluate(()=>{selectMetal('gold');closeAdd();});
+  assert.match(await page.locator('#holdingWeightLabel').textContent(),/troy oz/);
   console.log('Check password field controls in '+engineName);
   await page.evaluate(()=>{document.getElementById('authScreen').style.display='flex';});
   await page.locator('#authPassword').fill('example-password');

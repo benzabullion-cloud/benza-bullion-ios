@@ -6234,11 +6234,11 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
             <input id="calcSpot" type="text" readonly value="$0.00">
           </label>
           <label class="calcField">
-            <span>Quantity</span>
+            <span>Quantity (pieces)</span>
             <input id="calcQty" type="number" inputmode="decimal" min="0" step="1" value="1" oninput="updateBullionCalculator()">
           </label>
           <label class="calcField">
-            <span>Weight each (oz)</span>
+            <span id="calcWeightLabel">Weight per piece (troy oz)</span>
             <input id="calcWeight" type="number" inputmode="decimal" min="0" step="0.001" value="1" oninput="updateBullionCalculator()">
           </label>
           <label class="calcField calcWide">
@@ -6507,10 +6507,11 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
       </select>
 
       <div class="row">
-        <div><label>Quantity</label><input id="qty" type="number" min="0" step=".01" value="1"></div>
-        <div><label>Weight each (oz)</label><input id="weight" type="number" min="0" step=".001" value="1"></div>
+        <div><label for="qty">Quantity (pieces)</label><input id="qty" type="number" min="0" step=".01" value="1" aria-describedby="holdingQuantityHint"></div>
+        <div><label id="holdingWeightLabel" for="weight">Weight per piece (troy oz)</label><input id="weight" type="number" min="0" step=".001" value="1" aria-describedby="holdingQuantityHint"></div>
       </div>
 
+      <p id="holdingQuantityHint" class="holdingDetailHint" aria-live="polite">Quantity counts coins or bars, not ounces. Example: 5 one-ounce coins = 5 pieces × 1 oz each.</p>
       <div class="holdingSectionTitle">Purchase</div>
       <label for="purchaseCostMode">Purchase price entry</label>
       <select id="purchaseCostMode" onchange="changePurchaseCostMode()"><option value="each">Price per piece</option><option value="total">Total cost for this holding</option></select>
@@ -8320,6 +8321,9 @@ function changePurchaseCostMode(){
 }
 function update(){
   syncPurchaseDateDisplay();
+  const unit=metal==='copper'?'avoirdupois oz':'troy oz';
+  document.getElementById('holdingWeightLabel').textContent='Weight per piece ('+unit+')';
+  document.getElementById('holdingQuantityHint').textContent='Quantity counts coins or bars, not ounces. Example: 5 one-ounce coins = 5 pieces × 1 oz each. Total entered: '+((Number(qty.value)||0)*(Number(weight.value)||0)).toLocaleString(undefined,{maximumFractionDigits:4})+' '+unit+'.';
   const mode=document.getElementById('purchaseCostMode').value;
   previousPurchaseCostMode=mode;
   const q=Number(qty.value)||0, w=Number(weight.value)||0;
@@ -9438,6 +9442,7 @@ function updateBullionCalculator(){
   if(!metalEl)return;
 
   const metal=metalEl.value;
+  document.getElementById('calcWeightLabel').textContent='Weight per piece ('+(metal==='copper'?'avoirdupois oz':'troy oz')+')';
   const spot=Number(livePrices[metal])||0;
   const qty=Math.max(0,Number(document.getElementById('calcQty')?.value)||0);
   const weight=Math.max(0,Number(document.getElementById('calcWeight')?.value)||0);
@@ -9880,7 +9885,7 @@ function proHoldingInsightHtml(h){
   if(isProActive()){
     const needed=avg!==null&&spot>0?(avg/spot-1)*100:null;
     const unit=h.metal==='copper'?'av oz':'t oz';
-    return `<div class="proHoldingInsight"><div class="proHoldingInsightGrid"><div><span>Break-even spot / ${unit}</span><strong>${avg===null?'—':money(avg)}</strong></div><div><span>Spot move to break-even</span><strong>${needed===null?'—':(needed>=0?'+':'')+pct(needed)}</strong></div><div><span>Unrealized gain/loss</span><strong class="${gain===null?'':gain>=0?'pos':'neg'}">${gain===null?'—':signedMoney(gain)}</strong></div><div><span>Unrealized return</span><strong class="${ret===null?'':ret>=0?'pos':'neg'}">${ret===null?'—':(ret>=0?'+':'')+pct(ret)}</strong></div></div></div>`;
+    return `<div class="proHoldingInsight"><div class="proHoldingInsightGrid"><div><span>Break-even spot / ${unit}</span><strong>${avg===null?'—':money(avg)}</strong></div><div><span>Spot move to break-even</span><strong>${known&&h.cost===0?'No cost to recover':needed===null?'—':(needed>=0?'+':'')+pct(needed)}</strong></div><div><span>Unrealized gain/loss</span><strong class="${gain===null?'':gain>=0?'pos':'neg'}">${gain===null?'—':signedMoney(gain)}</strong></div><div><span>Unrealized return</span><strong class="${ret===null?'':ret>=0?'pos':'neg'}">${ret===null?'—':(ret>=0?'+':'')+pct(ret)}</strong></div></div></div>`;
   }
   return `<button class="proHoldingTeaser" type="button" onclick="event.stopPropagation();openProUpgrade('holding')"><span class="proHoldingTeaserLabel">Per-Holding Break-Even Details</span><span class="proMiniBadge">PRO</span></button>`;
 }
@@ -10021,6 +10026,7 @@ function renderProAnalytics(){
     const rows=METALS.filter(m=>stats[m].oz>0).map(m=>{
       const s=stats[m];
       if(s.avg===null)return `<div class="proMetricRow"><div><strong>${METAL_NAMES[m]}</strong><span>Cost basis unavailable · spot ${money(s.spot)}/oz</span></div><div class="proMetricRight"><strong>—</strong><span>Break-even unavailable</span></div></div>`;
+      if(s.cost===0)return `<div class="proMetricRow"><div><strong>${METAL_NAMES[m]}</strong><span>Recorded cost $0.00</span></div><div class="proMetricRight"><strong>No cost to recover</strong></div></div>`;
       const needed=s.spot>0?(s.avg/s.spot-1)*100:null;
       const unit=m==='copper'?'av oz':'t oz';
       return `<div class="proMetricRow"><div><strong>${METAL_NAMES[m]}</strong><span>Cost ${money(s.avg)}/${unit} · spot ${money(s.spot)}/${unit}</span></div><div class="proMetricRight ${needed===null?'':needed>0?'neg':'pos'}"><strong>${needed===null?'—':(needed>=0?'+':'')+needed.toFixed(2)+'%'}</strong><span>${needed===null?'Spot unavailable':needed>0?'Spot rise needed to recover cost':needed<0?'Spot can fall this much before break-even':'At break-even'}</span></div></div>`;
@@ -10366,21 +10372,28 @@ function setSaleAll(){
 }
 function updateSalePreview(){
   const base=saleBaseState();
-  if(!base){
-    document.getElementById('saleCostPreview').textContent='$0.00';
-    document.getElementById('saleGainPreview').textContent='$0.00';
-    return;
+  const quantity=document.getElementById('saleQuantity');
+  if(base){
+    const unit=(base.holding?.metal||base.sale?.metal)==='copper'?'avoirdupois oz':'troy oz';
+    document.getElementById('saleQuantityHint').textContent='Enter pieces sold, not ounces. Each piece weighs '+base.weight.toLocaleString(undefined,{maximumFractionDigits:4})+' '+unit+'. To sell one coin or bar, enter 1.';
   }
-  const q=Number(document.getElementById('saleQuantity').value)||0;
-  const proceeds=Number(document.getElementById('saleProceeds').value)||0;
-  const costRemoved=base.baseQty>0?Math.round(base.baseCost*(q/base.baseQty)*100)/100:0;
+  const received=document.getElementById('saleProceeds');
+  const q=Number(quantity.value),proceeds=Number(received.value);
+  let error='';
+  if(quantity.value!==''&&(!Number.isFinite(q)||q<=0))error='Enter a quantity greater than zero, in pieces.';
+  else if(base&&q>base.baseQty)error='Only '+base.baseQty.toLocaleString()+(base.baseQty===1?' piece':' pieces')+' available. Enter pieces sold, not ounces.';
+  else if(received.value!==''&&(!Number.isFinite(proceeds)||proceeds<0))error='Enter total sale proceeds of $0 or more.';
+  const validation=document.getElementById('saleValidation');
+  validation.textContent=error;validation.hidden=!error;
+  const valid=!!base&&quantity.value!==''&&received.value!==''&&!error&&q>0;
+  document.getElementById('saleSaveBtn').disabled=!valid;
+  quantity.setAttribute('aria-invalid',String(!!error&&(!Number.isFinite(q)||q<=0||q>base?.baseQty)));
+  const cost=document.getElementById('saleCostPreview'),gainEl=document.getElementById('saleGainPreview');
+  if(!valid){cost.textContent='—';gainEl.textContent='—';gainEl.className='';return;}
+  const costRemoved=Math.round(base.baseCost*(q/base.baseQty)*100)/100;
   const gain=proceeds-costRemoved;
-  document.getElementById('saleCostPreview').textContent=money(costRemoved);
-  const el=document.getElementById('saleGainPreview');
-  el.textContent=signedMoney(gain);
-  el.className=gain>=0?'pos':'neg';
+  cost.textContent=money(costRemoved);gainEl.textContent=signedMoney(gain);gainEl.className=gain>=0?'pos':'neg';
 }
-['saleQuantity','saleProceeds'].forEach(id=>document.getElementById(id)?.addEventListener('input',updateSalePreview));
 async function refreshAfterSaleCorrection(){
   await loadHoldingsFromSupabase();
   await loadActivityFromSupabase();
@@ -10397,7 +10410,7 @@ async function recordHoldingSale(){
   if(!Number.isFinite(proceeds)||proceeds<0){alert('Enter valid sale proceeds.');return;}
   const isFullSale=Math.abs(q-base.baseQty)<0.000001;
   if(isFullSale){
-    const ok=confirm('This is the full quantity available before this sale. The holding will not appear in Current Holdings, but the sale will remain in Activity and Realized Performance. Continue?');
+    const ok=confirm('This is the full quantity available before this sale. The holding will no longer appear in My Bullion. View the sale in Settings → History and Analytics → Pro → Realized performance. Continue?');
     if(!ok)return;
   }
   const btn=document.getElementById('saleSaveBtn');
@@ -10421,8 +10434,10 @@ async function recordHoldingSale(){
       alert(friendlyErrorMessage(error,editingSaleId?'We could not save this sale correction.':'We could not record this sale.'));
       return;
     }
+    const wasCorrection=!!editingSaleId;
     closeSaleModal();
     await refreshAfterSaleCorrection();
+    alert((wasCorrection?'Sale updated.':'Sale recorded.')+' View your sale in Settings → History and Analytics → Pro → Realized performance.');
   }finally{
     setButtonBusy(btn,false);
   }
@@ -12407,12 +12422,14 @@ loadBenzaWatchlist();
     <div class="saleHeader"><h2 id="saleTitle">Record sale</h2><button type="button" onclick="closeSaleModal()" aria-label="Close">×</button></div>
     <div class="saleSub" id="saleHoldingLabel">Record what you sold and what you received. Benza Bullion will preserve the realized gain/loss in Activity and Pro Analytics.</div>
     <div class="saleGrid">
-      <div class="saleNotice"><strong>Partial sales keep the remaining holding.</strong> A full sale removes the holding from Current Holdings, but the sale stays recorded in Activity and Realized Performance.</div>
+      <div class="saleNotice"><strong>Partial sales keep your remaining bullion.</strong> Full sales remove it from My Bullion. View recorded sales in Settings → History, and realized gains/losses in Analytics → Pro → Realized performance.</div>
       <div class="saleQtyRow">
-        <label>Quantity sold<input id="saleQuantity" type="number" min="0.01" step="0.01" placeholder="Enter quantity"></label>
+        <label for="saleQuantity">Quantity sold (pieces)<input id="saleQuantity" type="number" min="0.01" step="0.01" placeholder="Number of coins or bars" inputmode="decimal" aria-describedby="saleQuantityHint saleValidation" oninput="updateSalePreview()"></label>
         <button class="saleAllButton" type="button" onclick="setSaleAll()">Sell all</button>
       </div>
-      <label>Total sale proceeds<input id="saleProceeds" type="number" min="0" step="0.01" placeholder="Enter total received"></label>
+      <p id="saleQuantityHint" class="holdingDetailHint">Enter pieces sold, not ounces. To sell one 10 oz bar, enter 1.</p>
+      <label>Total sale proceeds ($ for all pieces sold)<input id="saleProceeds" type="number" min="0" step="0.01" placeholder="Total amount received" inputmode="decimal" oninput="updateSalePreview()" aria-describedby="saleValidation"></label>
+      <p id="saleValidation" class="holdingDetailHint neg" role="status" aria-live="polite" hidden></p>
       <label>Sale date<input id="saleDate" type="date"></label>
       <div class="salePreview">
         <div><span>Cost basis sold</span><strong id="saleCostPreview">$0.00</strong></div>
