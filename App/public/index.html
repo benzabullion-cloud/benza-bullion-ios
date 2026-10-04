@@ -62,7 +62,7 @@ select,input{width:100%;height:48px;border:1px solid var(--border);border-radius
 .authBrand{font-weight:800;font-size:28px;letter-spacing:-1px;margin-bottom:6px;color:#e7e9ec;background:linear-gradient(180deg,#ffffff 0%,#eef0f2 30%,#bfc4c9 58%,#f8f9fa 82%,#c9cdd1 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}.authBrand span{color:#c88719;background:none;-webkit-text-fill-color:#c88719}
 .authSub{color:var(--muted);font-size:14px;margin-bottom:22px;line-height:1.45}
 .authTitle{font-size:24px;margin:0 0 16px}.authLabel{display:block;font-size:13px;font-weight:650;color:var(--muted);margin:14px 0 7px}
-.authInput{width:100%;height:48px;border:1px solid var(--border);border-radius:12px;padding:0 13px;font-size:16px}
+.authPasswordWrap{position:relative}.authPasswordWrap .authInput{padding-right:100px}.authPasswordControls{position:absolute;right:4px;top:2px;display:flex;gap:2px}.authPasswordControls button{width:44px;height:44px;border:0;border-radius:9px;background:transparent;color:var(--text);display:flex;align-items:center;justify-content:center;cursor:pointer}.authPasswordControls button:focus-visible{outline:2px solid #c88719}.authPasswordControls svg{width:21px;height:21px}.authPasswordControls button:disabled{opacity:.35}.authInput{width:100%;height:48px;border:1px solid var(--border);border-radius:12px;padding:0 13px;font-size:16px}
 .authButton{width:100%;height:50px;border:0;border-radius:13px;background:var(--button);color:var(--buttonText);font-size:16px;font-weight:700;margin-top:18px}
 .authToggle{border:0;background:none;width:100%;margin-top:14px;color:#b26d00;font-weight:650;font-size:14px}
 .authNote{font-size:11px;color:var(--muted);line-height:1.45;margin-top:16px}
@@ -5672,7 +5672,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
       <label class="authLabel" for="authEmail">Email</label>
       <input id="authEmail" name="email" class="authInput" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="you@example.com">
       <label class="authLabel" for="authPassword">Password</label>
-      <input id="authPassword" name="password" class="authInput" type="password" minlength="8" autocomplete="current-password" placeholder="At least 8 characters">
+      <div class="authPasswordWrap"><input id="authPassword" name="password" class="authInput" type="password" minlength="8" autocomplete="current-password" placeholder="At least 8 characters" oninput="updateAuthPasswordControls()" onfocus="updateAuthPasswordControls()"><div class="authPasswordControls"><button id="authPasswordClear" type="button" onclick="clearAuthPassword()" aria-label="Clear password" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button><button id="authPasswordVisibility" type="button" onclick="toggleAuthPasswordVisibility()" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path id="authPasswordEyeSlash" d="m3 3 18 18" style="display:none"/></svg></button></div></div>
       <label class="authRememberRow">
         <input id="authRemember" type="checkbox" checked>
         <span>Remember me</span>
@@ -8560,7 +8560,27 @@ document.addEventListener('visibilitychange',()=>{
 window.addEventListener('pagehide',()=>{
   syncLiveChartToCloud(true);
 });
+function updateAuthPasswordControls(){
+  const input=document.getElementById('authPassword');
+  const clear=document.getElementById('authPasswordClear');
+  const visibility=document.getElementById('authPasswordVisibility');
+  if(clear)clear.disabled=!input?.value;
+  const visible=input?.type==='text';
+  if(visibility){visibility.setAttribute('aria-label',visible?'Hide password':'Show password');visibility.setAttribute('aria-pressed',String(visible));}
+  const slash=document.getElementById('authPasswordEyeSlash');if(slash)slash.style.display=visible?'':'none';
+}
+function clearAuthPassword(){
+  const input=document.getElementById('authPassword');if(!input)return;
+  input.value='';input.type='password';updateAuthPasswordControls();input.focus();
+}
+function toggleAuthPasswordVisibility(){
+  const input=document.getElementById('authPassword');if(!input)return;
+  const start=input.selectionStart,end=input.selectionEnd;
+  input.type=input.type==='password'?'text':'password';updateAuthPasswordControls();input.focus();
+  if(start!==null)try{input.setSelectionRange(start,end);}catch(_){}
+}
 function setAuthMode(mode){
+  const passwordInput=document.getElementById('authPassword');if(passwordInput)passwordInput.type='password';updateAuthPasswordControls();
   authMode=['login','signup','recovery'].includes(mode)?mode:'login';
   const title=document.getElementById('authTitle');
   const button=document.getElementById('authButton');
@@ -8644,7 +8664,7 @@ async function requestPasswordReset(){
   try{
     initSupabase();
     if(status)status.textContent='Sending password reset link…';
-    const redirectTo=location.origin+location.pathname;
+    const redirectTo=isBenzaNativeRuntime()?'https://benzabullion.com/index.html':location.origin+location.pathname;
     const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo});
     if(error)throw error;
     if(status)status.textContent='If an account exists for that email, a password reset link has been sent.';
@@ -8836,19 +8856,29 @@ function clearBenzaAccountState(){
   renderNotificationPreferences();updateProIntegratedUI();setActiveNav('portfolio');
 }
 async function signOut(){
-  try{
-    if(isBenzaNativeRuntime()&&supabaseClient&&currentUser){
-      await removeNativeBenzaSubscriptions();
-    }
-  }catch(e){
-    console.warn('Could not detach this iPhone from the signed-out account:',e?.message||e);
-  }
-  if(supabaseClient) await supabaseClient.auth.signOut();
-  clearBenzaAccountState();
+  const client=supabaseClient,userId=currentUser?.id;
+  // Hide account data immediately; remote cleanup must not hold the UI open.
+  clearBenzaAccountState();clearAuthPassword();
   document.getElementById('authScreen').style.display='flex';
-  document.getElementById('authStatus').textContent='';
-  setAuthError('');
+  document.getElementById('authStatus').textContent='';setAuthError('');
+  if(!client)return;
+  try{
+    if(isBenzaNativeRuntime()&&userId){
+      const plugin=nativeBenzaNotifications();const token=(await Promise.race([Promise.resolve(plugin?.status()),new Promise(resolve=>setTimeout(()=>resolve(null),1500))]))?.token;
+      if(token)client.from('notification_subscriptions').delete().eq('user_id',userId).eq('endpoint','apns:'+token).then(({error})=>{if(error)console.warn('Notification detach will retry:',error.message);}).catch(error=>console.warn('Notification detach unavailable:',error));
+    }
+  }catch(error){console.warn('Could not detach notifications:',error);}
+  try{
+    const {error}=await client.auth.signOut({scope:'local'});if(error)throw error;
+  }catch(error){
+    // Supabase may fail before removing its persisted session. Remove this
+    // client's known storage entry so relaunch does not reopen the account.
+    const key='sb-'+new URL(SUPABASE_URL).hostname.split('.')[0]+'-auth-token';
+    try{localStorage.removeItem(key);localStorage.removeItem(key+'-code-verifier');}catch(_){}
+    console.warn('Local sign-out completed with an auth cleanup error:',error);
+  }
 }
+
 function handleBenzaDeepLink(){
   const params=new URLSearchParams(location.search);
   const requested=params.get('open');
@@ -9549,6 +9579,25 @@ async function handlePendingPurchase(transaction){
   }catch(error){console.warn('Pending purchase verification will retry when connected:',error);}
   finally{pendingPurchaseVerifications.delete(key);}
 }
+async function handleStoreKitTransactionUpdate(transaction){
+  if(transaction?.revoked){
+    const userId=currentUser?.id;
+    if(!userId||String(transaction.appAccountToken||'').toLowerCase()!==userId.toLowerCase())return;
+    try{await verifyNativeStoreTransaction(transaction,{allowInactive:true});}catch(error){console.warn('Revocation reconciliation will retry:',error);}
+    return;
+  }
+  // Renewals and expirations update an already-Pro account without requiring
+  // a pending checkout marker. A Free account still needs explicit intent.
+  if(benzaEntitlement?.tier==='pro'&&currentUser){
+    const token=String(transaction?.appAccountToken||'').toLowerCase();
+    try{
+      if(token===currentUser.id.toLowerCase())await verifyNativeStoreTransaction(transaction,{allowInactive:true});
+      else if(!token)await reconcileAppleAccountEntitlement();
+    }catch(error){console.warn('Apple status update will retry when connected:',error);}
+    return;
+  }
+  await handlePendingPurchase(transaction);
+}
 async function replayPendingPurchases(){
   const plugin=nativeStoreKitPlugin();
   const userId=currentUser?.id;
@@ -9561,12 +9610,15 @@ async function initializePendingPurchases(){
   const plugin=nativeStoreKitPlugin();
   if(!isBenzaNativeRuntime()||!plugin?.addListener)return;
   try{
-    if(!pendingPurchaseListener)pendingPurchaseListener=await plugin.addListener('transactionUpdated',handlePendingPurchase);
+    if(!pendingPurchaseListener)pendingPurchaseListener=await plugin.addListener('transactionUpdated',handleStoreKitTransactionUpdate);
     await replayPendingPurchases();
   }catch(error){console.warn('Pending purchase listener unavailable:',error);}
 }
 document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible')replayPendingPurchases().catch(error=>console.warn('Pending purchase retry unavailable:',error));
+  if(document.visibilityState==='visible'){
+    replayPendingPurchases().catch(error=>console.warn('Pending purchase retry unavailable:',error));
+    if(benzaEntitlement?.tier==='pro')refreshNativeProEntitlementSilently().catch(()=>{});
+  }
 });
 async function openAppleSubscriptionManagement(){
   const plugin=nativeStoreKitPlugin();
@@ -9575,7 +9627,7 @@ async function openAppleSubscriptionManagement(){
     else window.open('https://apps.apple.com/account/subscriptions','_blank','noopener,noreferrer');
   }catch(error){alert(error?.message||'Apple subscription management could not be opened.');}
 }
-async function verifyNativeStoreTransaction(result){
+async function verifyNativeStoreTransaction(result,{allowInactive=false}={}){
   const purchaseUserId=currentUser?.id;
   const signedTransaction=String(result?.signedTransaction||'');
   if(!signedTransaction)throw new Error('Apple did not return a signed transaction.');
@@ -9606,7 +9658,7 @@ async function verifyNativeStoreTransaction(result){
   if(currentUser?.id!==purchaseUserId)throw new Error('The signed-in account changed.');
   await loadBenzaEntitlement();
   if(currentUser?.id!==purchaseUserId)throw new Error('The signed-in account changed.');
-  if(!isProActive())throw new Error(data?.error||'The purchase was verified, but Pro access has not refreshed yet.');
+  if(!allowInactive&&!isProActive())throw new Error(data?.error||'The purchase was verified, but Pro access has not refreshed yet.');
   renderProAnalytics();
   updateProIntegratedUI();
   if(Object.values(storeKitPlanIds).includes(result?.productId))setPendingPurchase(purchaseUserId,result.productId,false);
@@ -9624,6 +9676,17 @@ function sortStoreKitTransactionsForVerification(transactions){
     return priority(a)-priority(b);
   });
 }
+async function reconcileAppleAccountEntitlement(){
+  const userId=currentUser?.id;if(!supabaseClient||!userId)return;
+  const {data:{session},error}=await supabaseClient.auth.getSession();
+  if(error||!session?.access_token)throw new Error('Please sign in to refresh purchases.');
+  const response=await fetch('https://benza-storekit-verifier.vercel.app/api/storekit-entitlement',{
+    method:'POST',headers:{Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},
+    body:JSON.stringify({action:'reconcile'}),signal:AbortSignal.timeout(20000)
+  });
+  const data=await response.json();if(!response.ok)throw new Error(data.error||'Apple status refresh is unavailable');
+  if(currentUser?.id===userId)await loadBenzaEntitlement();
+}
 async function refreshNativeProEntitlementSilently(){
   const plugin=nativeStoreKitPlugin();
   // A Free account must stay Free until the user buys or explicitly restores.
@@ -9636,7 +9699,7 @@ async function refreshNativeProEntitlementSilently(){
     const transactions=sortStoreKitTransactionsForVerification(
       Array.isArray(result?.transactions)?result.transactions:[]
     );
-    if(!transactions.length)return;
+    if(!transactions.length){await reconcileAppleAccountEntitlement();return;}
     for(const transaction of transactions){
       if(currentUser?.id!==userId||benzaEntitlement?.tier!=='pro')return;
       try{
@@ -9675,8 +9738,9 @@ async function startNativeProPurchase(){
   if(button){button.dataset.purchaseBusy='true';button.disabled=true;button.textContent='Opening App Store…';}
 
   try{
+    setPendingPurchase(purchaseUserId,productId,true);
     const result=await plugin.purchase({productId,appAccountToken:purchaseUserId});
-    if(result?.state==='pending')setPendingPurchase(purchaseUserId,productId,true);
+    if(result?.state==='cancelled')setPendingPurchase(purchaseUserId,productId,false);
     if(currentUser?.id!==purchaseUserId)return;
     if(result?.state==='cancelled')return;
     if(result?.state==='pending'){
@@ -9695,7 +9759,7 @@ async function startNativeProPurchase(){
       :'Benza Bullion Pro is now active.');
   }catch(error){
     console.error('StoreKit purchase failed:',error);
-    alert(error?.message||'The App Store purchase could not be completed.');
+    alert((error?.message||'Purchase verification is unavailable.')+' If Apple completed your payment, activation will retry when connected. You can also use Restore Purchases.');
   }finally{
     if(button){delete button.dataset.purchaseBusy;button.disabled=false;button.textContent=previousText;renderStoreKitProducts();}
   }
@@ -9842,7 +9906,7 @@ function isProActive(){
   if(!['active','trial','grace'].includes(e.status))return false;
   if(e.expires_at){
     const exp=new Date(e.expires_at);
-    if(!Number.isNaN(exp.getTime()) && exp.getTime()<Date.now() && e.status!=='grace')return false;
+    if(Number.isNaN(exp.getTime()) || exp.getTime()<=Date.now())return false;
   }
   return true;
 }
@@ -9891,7 +9955,7 @@ async function restoreProPurchases(){
       Array.isArray(result?.transactions)?result.transactions:[]
     );
     if(!transactions.length){
-      await loadBenzaEntitlement();
+      await reconcileAppleAccountEntitlement();
       alert(isProActive()
         ?'Benza Bullion Pro is active on this account.'
         :'Apple did not find an active Benza Bullion Pro purchase to restore.');
@@ -10593,8 +10657,11 @@ async function removePrivateHoldingFiles(paths=[]){
   if(!supabaseClient)return;
   const clean=[...new Set((paths||[]).filter(Boolean))];
   if(!clean.length)return;
-  const {error}=await supabaseClient.storage.from('holding-documents').remove(clean);
-  if(error)console.warn('Private holding file cleanup failed:',error);
+  try{
+    const {error:queueError}=await supabaseClient.rpc('benza_queue_file_cleanup',{p_paths:clean});
+    if(queueError)throw queueError;
+    // The worker checks holding/sale references before removing bytes.
+  }catch(error){console.warn('Private file cleanup will be recovered by the server:',error);}
 }
 
 async function finishHoldingAttachmentUploads({holdingId,photoFile,receiptFile,oldPhotoPath=null,oldReceiptPath=null}){
@@ -12372,7 +12439,7 @@ loadBenzaWatchlist();
     </div>
     <div class="proFutureFine">Planned additions include Future Potential historical scenarios with optional contributions, richer premium analysis, expanded alerts, reports, and new stack tools. Timing and availability may change.</div>
     <div class="proUpgradePrices"><button class="proUpgradePrice selected" id="proPlanMonthly" type="button" onclick="selectProPlan('monthly')"><strong data-store-price="monthly">Monthly subscription</strong><span data-store-offer="monthly">View App Store pricing</span></button><button class="proUpgradePrice" id="proPlanAnnual" type="button" onclick="selectProPlan('annual')"><strong data-store-price="annual">Annual subscription</strong><span data-store-offer="annual">View App Store pricing</span></button><button class="proUpgradePrice founder" id="proPlanFounder" type="button" onclick="selectProPlan('founder')"><span class="founderOfferBadge">LIMITED LAUNCH OFFER</span><strong data-store-price="founder">Founder lifetime access</strong><span data-store-offer="founder">One-time purchase · never renews</span><span class="founderBadgeBonus">Includes the exclusive Founding Member badge on Home</span></button></div>
-    <div class="proUpgradeActions"><button class="primary" id="proStartTrialBtn" type="button" onclick="startNativeProPurchase()">Continue</button><button class="secondary" type="button" onclick="closeProUpgrade()">Not now</button></div>
+    <div class="proUpgradeActions"><button class="primary" id="proStartTrialBtn" type="button" onclick="startNativeProPurchase()">Continue</button><button class="secondary" type="button" onclick="restoreProPurchases()">Restore Purchases</button><button class="secondary" type="button" onclick="closeProUpgrade()">Not now</button></div><p class="proFutureFine">Subscriptions renew automatically unless cancelled through Apple. <a href="terms.html">Terms of Use</a> · <a href="privacy.html">Privacy Policy</a></p>
   </div>
 </div>
 </body>
