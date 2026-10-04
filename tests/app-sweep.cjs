@@ -79,6 +79,28 @@ window.supabase={createClient:()=>({
   assert.match(await page.locator('#holdingQuantityHint').textContent(),/Total entered: 5 avoirdupois oz/);
   await page.evaluate(()=>{selectMetal('gold');closeAdd();});
   assert.match(await page.locator('#holdingWeightLabel').textContent(),/troy oz/);
+  console.log('Check sale date sizing, centering and correction sync in '+engineName);
+  for(const viewport of [{width:320,height:844},{width:360,height:844},{width:390,height:844},{width:430,height:932},{width:844,height:390}])for(const theme of ['dark','light'])for(const editing of [false,true]){
+   await page.setViewportSize(viewport);
+   await page.evaluate(({theme,editing})=>{
+    applyTheme(theme);closeSaleModal();
+    activities=[{id:'sale-date-fixture',type:'sell',holding_id:holdings[0].id,product:holdings[0].product,quantity:.5,weight_oz:1,cost_basis_removed:1000,sale_proceeds:2000,transaction_date:'2026-09-18'}];
+    if(editing)openEditSaleModal('sale-date-fixture');else openSaleModal(0);
+   },{theme,editing});
+   await page.locator('#saleDate').fill('2026-10-04');
+   assert.match(await page.locator('#saleDateDisplay').textContent(),/2026/);
+   const bounds=await page.evaluate(()=>{
+    const field=document.querySelector('#saleModal .dateField').getBoundingClientRect(),input=document.getElementById('saleDate').getBoundingClientRect(),proceeds=document.getElementById('saleProceeds').getBoundingClientRect();
+    const text=document.getElementById('saleDateDisplay').getBoundingClientRect(),sheet=document.querySelector('.saleSheet');
+    return {height:field.height,aligned:Math.abs(field.left-proceeds.left)<1&&Math.abs(field.width-proceeds.width)<1,centered:Math.abs((text.left+text.right)-(field.left+field.right))<2&&Math.abs((text.top+text.bottom)-(field.top+field.bottom))<2,inputFits:input.width<=field.width&&input.height<=field.height,overflow:sheet.scrollWidth>sheet.clientWidth+1};
+   });
+   assert.equal(bounds.height,48);assert.equal(bounds.aligned,true);assert.equal(bounds.centered,true);assert.equal(bounds.inputFits,true);assert.equal(bounds.overflow,false,JSON.stringify({engineName,viewport,theme,editing,bounds}));
+   await page.locator('#saleDate').fill('');assert.equal(await page.locator('#saleDateDisplay').textContent(),'');
+   await page.locator('#saleDate').fill('2026-10-04');
+   if(viewport.width===390&&!editing){await page.locator('#saleDate').scrollIntoViewIfNeeded();await page.screenshot({path:'ui-artifacts/sale-date-'+engineName+'-'+theme+'.png'});}
+  }
+  await page.setViewportSize({width:390,height:844});
+  await page.evaluate(()=>{closeSaleModal();applyTheme('dark');});
   console.log('Check both native report entry points in '+engineName);
   await page.evaluate(()=>{
     closeAdd();hideMainOverlays();
