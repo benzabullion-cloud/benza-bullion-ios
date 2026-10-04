@@ -3497,7 +3497,7 @@ html.native-app select{
 #addScreen .money:focus-within{
   border-color:var(--gold);
 }
-#addScreen .dateField{
+:is(#addScreen,#saleModal) .dateField{
   box-sizing:border-box;
   width:100%;
   max-width:100%;
@@ -3511,7 +3511,7 @@ html.native-app select{
   align-items:center;
   justify-content:center;
 }
-#addScreen .dateField #dateDisplay{
+:is(#addScreen,#saleModal) .dateField :is(#dateDisplay,#saleDateDisplay){
   position:absolute;
   inset:0;
   display:flex;
@@ -3525,10 +3525,10 @@ html.native-app select{
   white-space:nowrap;
 }
 
-#addScreen .dateField:focus-within{
+:is(#addScreen,#saleModal) .dateField:focus-within{
   border-color:var(--gold);
 }
-#addScreen .dateField #date{
+:is(#addScreen,#saleModal) .dateField :is(#date,#saleDate){
   -webkit-appearance:none !important;
   appearance:none !important;
   position:absolute !important;
@@ -3549,8 +3549,8 @@ html.native-app select{
   opacity:.001 !important;
   cursor:pointer;
 }
-#addScreen .dateField #date:focus,
-#addScreen .dateField #date:focus-visible{
+:is(#addScreen,#saleModal) .dateField :is(#date,#saleDate):focus,
+:is(#addScreen,#saleModal) .dateField :is(#date,#saleDate):focus-visible{
   outline:none !important;
 }
 
@@ -5120,11 +5120,17 @@ nav > div{
 .inventoryChip{font-size:10px;padding:4px 7px;border-radius:999px;background:var(--surface3);border:1px solid var(--border);color:var(--muted)}
 .inventoryChip.link{cursor:pointer;color:var(--text)}
 .proSellBtn{color:#b77a17!important}
-.saleModal{position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;padding:14px}
-.saleModal.show{display:flex}.saleSheet{width:min(520px,100%);max-height:88vh;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:22px 22px 14px 14px;padding:18px;box-sizing:border-box}
+.saleModal{position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding: max(14px,env(safe-area-inset-top,0px)) max(14px,env(safe-area-inset-right,0px)) max(14px,env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px));box-sizing:border-box;overscroll-behavior:contain}
+html.sale-dialog-open{overflow:hidden !important}
+html.sale-dialog-open body{position:fixed !important;top:var(--sale-scroll-top);left:0;right:0;width:100%;overflow:hidden !important}
+.saleModal.show{display:flex}.saleSheet{width:min(520px,100%);max-height:100%;min-height:0;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;background:var(--surface);border:1px solid var(--border);border-radius:22px;padding:18px;box-sizing:border-box}
 .saleHeader{display:flex;justify-content:space-between;align-items:center;gap:12px}.saleHeader h2{margin:0;font-size:20px}.saleHeader button{border:0;background:var(--surface3);color:var(--text);border-radius:999px;width:32px;height:32px}
 .saleSub{font-size:12px;color:var(--muted);margin:5px 0 15px;line-height:1.45}.saleGrid{display:grid;gap:11px}.saleGrid label{font-size:11px;color:var(--muted);font-weight:700}
-.saleGrid input{width:100%;box-sizing:border-box;margin-top:5px;border:1px solid var(--border);background:var(--surface3);color:var(--text);border-radius:11px;padding:12px;font-size:14px}
+.saleGrid input{width:100%;min-width:0;max-width:100%;box-sizing:border-box;margin-top:5px;border:1px solid var(--border);background:var(--surface3);color:var(--text);border-radius:11px;padding:12px;font-size:14px}
+#saleModal .dateField{margin-top:5px;background:var(--surface3);border-radius:11px;min-width:0}
+html[data-theme="dark"] #saleModal .dateField{background:var(--surface2)}
+html:not([data-theme="dark"]) #saleModal .dateField{background:#FFFDF8 !important}
+.saleGrid>label{min-width:0}
 .salePreview{display:grid;grid-template-columns:1fr 1fr;gap:8px}.salePreview>div{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:11px}
 .salePreview span{font-size:10px;color:var(--muted);display:block}.salePreview strong{font-size:14px;display:block;margin-top:3px}
 .saleActions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}.saleActions button{border:0;border-radius:12px;padding:12px;font-weight:800}.saleActions .primary{background:var(--button);color:var(--buttonText)}.saleActions .secondary{background:var(--surface3);color:var(--text)}
@@ -8298,15 +8304,17 @@ function editHolding(i){
   update();
   addScreen.classList.add('show');
 }
-function syncPurchaseDateDisplay(){
-  const input=document.getElementById('date');
-  const display=document.getElementById('dateDisplay');
+function syncDateFieldDisplay(inputId,displayId){
+  const input=document.getElementById(inputId);
+  const display=document.getElementById(displayId);
   if(!input||!display)return;
   const value=input.value;
   if(!value){display.textContent='';return;}
   const parsed=new Date(value+'T12:00:00');
   display.textContent=parsed.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
 }
+function syncPurchaseDateDisplay(){syncDateFieldDisplay('date','dateDisplay');}
+function syncSaleDateDisplay(){syncDateFieldDisplay('saleDate','saleDateDisplay');}
 document.getElementById('date')?.addEventListener('input',syncPurchaseDateDisplay);
 document.getElementById('date')?.addEventListener('change',syncPurchaseDateDisplay);
 
@@ -8873,7 +8881,7 @@ function clearBenzaAccountState(){
   liveCloudLoaded=false;lastLiveCloudSync=0;
   benzaWatchlist=[];
   benzaNotificationPrefs={...DEFAULT_NOTIFICATION_PREFS};
-  closeSmartCamera();closeAdd();closeAddChoice();closeProUpgrade();
+  closeSmartCamera();closeAdd();closeAddChoice();closeProUpgrade();closeSaleModal();
   resetProInventoryForm();resetBullionDetails();
   hideMainOverlays();
   document.querySelectorAll('.modal.show').forEach(node=>node.classList.remove('show'));
@@ -10392,7 +10400,7 @@ function openSaleModal(i){
   document.getElementById('saleUndoBtn')?.classList.remove('show');
   const correction=document.getElementById('saleCorrectionNote'); if(correction)correction.hidden=true;
   updateSalePreview();
-  document.getElementById('saleModal').classList.add('show');
+  showSaleModal();
 }
 function openEditSaleModal(saleId){
   if(saleMutationBusy)return;
@@ -10414,9 +10422,27 @@ function openEditSaleModal(saleId){
   document.getElementById('saleUndoBtn')?.classList.add('show');
   const correction=document.getElementById('saleCorrectionNote'); if(correction)correction.hidden=false;
   updateSalePreview();
-  document.getElementById('saleModal').classList.add('show');
+  showSaleModal();
+}
+let saleScrollPosition=null;
+function showSaleModal(){
+  if(!saleScrollPosition){
+    saleScrollPosition={x:window.scrollX,y:window.scrollY};
+    document.documentElement.style.setProperty('--sale-scroll-top',`-${saleScrollPosition.y}px`);
+    document.documentElement.classList.add('sale-dialog-open');
+  }
+  const modal=document.getElementById('saleModal');
+  modal.classList.add('show');
+  modal.querySelector('.saleSheet').scrollTop=0;
 }
 function closeSaleModal(){
+  if(saleScrollPosition){
+    const position=saleScrollPosition;
+    saleScrollPosition=null;
+    document.documentElement.classList.remove('sale-dialog-open');
+    document.documentElement.style.removeProperty('--sale-scroll-top');
+    window.scrollTo({left:position.x,top:position.y,behavior:'instant'});
+  }
   document.getElementById('saleModal')?.classList.remove('show');
   saleHoldingIndex=null;
   saleHoldingId=null;
@@ -10434,6 +10460,7 @@ function setSaleAll(){
   updateSalePreview();
 }
 function updateSalePreview(){
+  syncSaleDateDisplay();
   const base=saleBaseState();
   const quantity=document.getElementById('saleQuantity');
   if(base){
@@ -12535,7 +12562,7 @@ loadBenzaWatchlist();
       <p id="saleQuantityHint" class="holdingDetailHint">Enter pieces sold, not ounces. To sell one 10 oz bar, enter 1.</p>
       <label>Total sale proceeds ($ for all pieces sold)<input id="saleProceeds" type="number" min="0" step="0.01" placeholder="Total amount received" inputmode="decimal" oninput="updateSalePreview()" aria-describedby="saleValidation"></label>
       <p id="saleValidation" class="holdingDetailHint neg" role="status" aria-live="polite" hidden></p>
-      <label>Sale date<input id="saleDate" type="date"></label>
+      <label for="saleDate">Sale date<div class="dateField"><span id="saleDateDisplay" aria-hidden="true"></span><input id="saleDate" type="date" aria-label="Sale date" oninput="syncSaleDateDisplay()" onchange="syncSaleDateDisplay()"></div></label>
       <div class="salePreview">
         <div><span>Cost basis sold</span><strong id="saleCostPreview">$0.00</strong></div>
         <div><span>Estimated realized P/L</span><strong id="saleGainPreview">$0.00</strong></div>
