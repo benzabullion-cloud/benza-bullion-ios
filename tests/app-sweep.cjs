@@ -125,9 +125,10 @@ window.supabase={createClient:()=>({
   await page.evaluate(()=>{hideMainOverlays();currentUser.user_metadata={name:'',full_name:'Existing Name'};updateWelcomeBack();});
   assert.equal(await page.locator('#welcomeBack').textContent(),'Welcome back, Existing Name');
   await page.evaluate(async()=>{
+    const signupClient=supabaseClient,createClient=window.supabase.createClient;window.supabase.createClient=()=>signupClient;
     supabaseClient.auth.signUp=async attrs=>{sweep.signup=attrs;return {data:{session:null,user:null},error:null};};
     document.getElementById('authEmail').value='new@example.test';document.getElementById('authPassword').value='test-password';
-    setAuthMode('signup');await handleAuth();setAuthMode('login');
+    setAuthMode('signup');await handleAuth();setAuthMode('login');window.supabase.createClient=createClient;
   });
   assert.equal(await page.evaluate(()=>sweep.signup.options.data.name),'Bullion Builder');
   console.log('Check password field controls in '+engineName);
