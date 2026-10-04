@@ -124,6 +124,7 @@ window.supabase={createClient:()=>({
   await page.waitForFunction(()=>!document.getElementById('exportDataButton').disabled);
   assert.match(await page.locator('#accountSettingsStatus').textContent(),/cancelled/);
   console.log('Check default and personalized account names in '+engineName);
+  await page.evaluate(()=>{hideMainOverlays();goPortfolio();});
   await page.evaluate(()=>{currentUser.user_metadata={};updateWelcomeBack();populateAccountSettings();});
   assert.equal(await page.locator('#welcomeBack').textContent(),'Welcome back, Bullion Builder');
   assert.equal(await page.locator('#accountName').inputValue(),'Bullion Builder');

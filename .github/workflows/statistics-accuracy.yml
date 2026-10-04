@@ -7,6 +7,7 @@ on:
       - 'tests/statistics-accuracy.test.cjs'
       - 'tests/launch-account-purchases.test.cjs'
       - 'tests/launch-sweep.test.cjs'
+      - 'tests/app-sweep.cjs'
       - 'tests/holding-base-edits.cjs'
       - 'App/public/supabase_bullion_details.sql'
       - 'supabase/migrations/**'
