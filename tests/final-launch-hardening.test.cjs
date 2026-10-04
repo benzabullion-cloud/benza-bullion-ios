@@ -11,7 +11,7 @@ test('password can be revealed, concealed and cleared; focus and accessibility s
 });
 test('completed payment plus verification outage retains recovery; cancellation removes it',async()=>{
  let state='purchased',marked=false;
- const c=run({console:{error(){}},currentUser:{id:'account-a'},selectedProPlan:'monthly',storeKitProducts:{benza_pro_monthly:{}},isBenzaNativeRuntime:()=>true,nativeStoreKitPlugin:()=>({purchase:async()=>({state})}),document:{getElementById:()=>({dataset:{},textContent:'Subscribe'})},setPendingPurchase(u,p,b){marked=b},verifyNativeStoreTransaction:async()=>{throw Error('Offline')},alert(){},closeProUpgrade(){},renderStoreKitProducts(){}},html,['startNativeProPurchase']);
+ const c=run({console:{error(){}},currentUser:{id:'account-a'},selectedProPlan:'monthly',storeKitProducts:{benza_pro_monthly:{}},isBenzaNativeRuntime:()=>true,nativeStoreKitPlugin:()=>({purchase:async()=>({state})}),document:{getElementById:()=>({dataset:{},textContent:'Subscribe'})},setPendingPurchase(u,p,b){marked=b},verifyNativeStoreTransaction:async()=>{throw Error('Offline')},alert(){},closeProUpgrade(){},renderStoreKitProducts(){}},html,['isStoreKitAccountConflict','storeKitAccountConflictMessage','startNativeProPurchase']);
  await c.startNativeProPurchase();assert.equal(marked,true);state='cancelled';await c.startNativeProPurchase();assert.equal(marked,false);
 });
 test('sign-out clears account UI and stored session even when auth throws',async()=>{
@@ -37,4 +37,13 @@ test('verified renewal refreshes an existing Pro account without restoring old F
  await c.handleStoreKitTransactionUpdate({appAccountToken:'account-a'});assert.equal(verified,1);
  c.benzaEntitlement={tier:'free'};await c.handleStoreKitTransactionUpdate({appAccountToken:'account-a'});assert.equal(verified,1);assert.equal(pending,1);
  await c.handleStoreKitTransactionUpdate({appAccountToken:'account-b',revoked:true});assert.equal(verified,1);
+});
+
+test('all purchase plans stop retrying foreign-account receipts and recover checkout; offline payments remain recoverable',async()=>{
+ for(const [plan,productId] of Object.entries({monthly:'benza_pro_monthly',annual:'benza_pro_annual',founder:'benza_pro_founder_lifetime'})){
+  let marked=false;const alerts=[],button={dataset:{},textContent:'Continue'};
+  const c=run({console:{error(){}},currentUser:{id:'account-a'},selectedProPlan:plan,storeKitProducts:{[productId]:{}},isBenzaNativeRuntime:()=>true,nativeStoreKitPlugin:()=>({purchase:async()=>({state:'purchased',productId})}),document:{getElementById:()=>button},setPendingPurchase(u,p,b){marked=b},verifyNativeStoreTransaction:async()=>{throw Error('Purchase is linked to a different Benza Bullion account')},alert:m=>alerts.push(m),closeProUpgrade(){throw Error('must not activate')},renderStoreKitProducts(){}},html,['isStoreKitAccountConflict','storeKitAccountConflictMessage','startNativeProPurchase']);
+  await c.startNativeProPurchase();assert.equal(marked,false);assert.equal(button.disabled,false);assert.equal(button.dataset.purchaseBusy,undefined);assert.match(alerts[0],/originally purchased/);assert.doesNotMatch(alerts[0],/retry when connected/);
+  c.verifyNativeStoreTransaction=async()=>{throw Error('Offline')};await c.startNativeProPurchase();assert.equal(marked,true);assert.match(alerts[1],/retry when connected/);
+ }
 });

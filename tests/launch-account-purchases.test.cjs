@@ -30,7 +30,7 @@ test('notification failures roll back and concurrent changes save only their own
  const request=c.toggleNotificationPreference('daily_summary');await c.toggleNotificationPreference('daily_summary');assert.equal(updates.length,2);c.currentUser={id:'account-b'};c.benzaNotificationPrefs={daily_summary:true};reject(Error('Offline'));await request;assert.equal(c.benzaNotificationPrefs.daily_summary,true);
  assert.equal('price_targets' in updates[1],false);assert.equal(updates[1].daily_summary,true);
 });
-function storeContext(){const c=context();c.selectedProPlan='monthly';load(c,['nativeStoreKitPlugin','storeKitPlanCopy','renderStoreKitProducts','refreshStoreKitProducts','pendingPurchaseKey','setPendingPurchase','handlePendingPurchase','replayPendingPurchases'],"const storeKitPlanIds={monthly:'benza_pro_monthly',annual:'benza_pro_annual',founder:'benza_pro_founder_lifetime'};let storeKitProducts={};let storeKitProductsRequest=null;const pendingPurchaseIntents=new Set();const pendingPurchaseVerifications=new Set();");return c}
+function storeContext(){const c=context();c.selectedProPlan='monthly';load(c,['nativeStoreKitPlugin','storeKitPlanCopy','renderStoreKitProducts','refreshStoreKitProducts','pendingPurchaseKey','setPendingPurchase','isStoreKitAccountConflict','storeKitAccountConflictMessage','handlePendingPurchase','replayPendingPurchases'],"const storeKitPlanIds={monthly:'benza_pro_monthly',annual:'benza_pro_annual',founder:'benza_pro_founder_lifetime'};let storeKitProducts={};let storeKitProductsRequest=null;const pendingPurchaseIntents=new Set();const pendingPurchaseVerifications=new Set();");return c}
 test('localized prices and trial eligibility drive every plan; failures disable native checkout',async()=>{
  const c=storeContext();c.window.Capacitor.Plugins.BenzaStoreKit={getProducts:async()=>({products:[{productId:'benza_pro_monthly',displayPrice:'€5,99'},{productId:'benza_pro_annual',displayPrice:'€44,99',trialValue:7,trialUnit:'day'},{productId:'benza_pro_founder_lifetime',displayPrice:'€29,99'}]})};
  await c.refreshStoreKitProducts();assert.equal(c.storeKitPlanCopy('monthly').price,'€5,99/month');assert.equal(c.storeKitPlanCopy('monthly').action,'Subscribe');assert.match(c.storeKitPlanCopy('annual').action,/7-day free trial/);assert.equal(c.storeKitPlanCopy('founder').price,'€29,99 one time');assert.equal(c.els.proStartTrialBtn.disabled,false);
@@ -50,4 +50,11 @@ test('pending approvals survive restart and duplicate events do not verify concu
 test('deletion warns about billing and provides management without blocking immediate deletion',()=>{
  assert.match(fn('deleteBenzaAccount'),/Deleting your account does not cancel Apple subscriptions/);assert.match(html,/onclick="openAppleSubscriptionManagement\(\)"/);assert.doesNotMatch(fn('saveHolding'),/Renew Pro to edit/);
  const support=fs.readFileSync('App/public/support.html','utf8');assert.doesNotMatch(support,/Build 125/);assert.match(support,/billing continues/i);
+});
+
+test('pending receipt account conflicts clear retry intent without granting access',async()=>{
+ const c=storeContext();const tx={productId:'benza_pro_annual',transactionId:'99',appAccountToken:'account-a'};
+ c.setPendingPurchase('account-a',tx.productId,true);let calls=0;
+ c.verifyNativeStoreTransaction=async()=>{calls++;throw Error('Purchase is linked to a different Benza Bullion account')};
+ await c.handlePendingPurchase(tx);assert.equal(c.storage.size,0);assert.equal(c.messages.length,0);await c.handlePendingPurchase(tx);assert.equal(calls,1);
 });
