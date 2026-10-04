@@ -3664,7 +3664,8 @@ html:not([data-theme="dark"]) #addScreen{--holding-accent:#a9550a}
 #addScreen .holdingDetailHint{font-size:12px;line-height:1.5;color:var(--muted);margin:12px 0 0}
 #addScreen input,#addScreen select,#addScreen textarea{font-size:16px}
 #addScreen .row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-#addScreen .row label{display:block;line-height:1.35;min-height:34px}
+#addScreen .row>div{display:flex;flex-direction:column}
+#addScreen .row label{display:block;line-height:1.35;min-height:34px;flex:1}
 #addScreen .row input,#addScreen select,#addScreen .money,#addScreen .dateField{min-height:48px}
 #addScreen .proRecordBadge{display:inline-block;margin-left:8px;padding:3px 7px;border-radius:6px;background:rgba(245,154,53,.16);color:var(--holding-accent);font-size:10px;vertical-align:middle}
 #addScreen #holdingScannerPhotoPreviews{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
@@ -6134,7 +6135,8 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
           <div class="analyticsSectionHead"><h2>Pro portfolio report</h2><span>Detailed inventory summary</span></div>
           <div class="proCard proReportCard">
             <div><strong>Export a detailed Benza Bullion report</strong><p>Includes current value, cost basis, gain/loss, metal allocation and itemized holdings.</p></div>
-            <button class="proPrimaryBtn compact" onclick="exportProReport()">Export report</button>
+            <button id="proExportReportButton" type="button" class="proPrimaryBtn compact" onclick="exportProReport()">Export report</button>
+            <p class="reportExportStatus" role="status" aria-live="polite" hidden></p>
           </div>
         </div>
       </div>
@@ -6234,11 +6236,11 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
             <input id="calcSpot" type="text" readonly value="$0.00">
           </label>
           <label class="calcField">
-            <span>Quantity</span>
+            <span>Quantity (pieces)</span>
             <input id="calcQty" type="number" inputmode="decimal" min="0" step="1" value="1" oninput="updateBullionCalculator()">
           </label>
           <label class="calcField">
-            <span>Weight each (oz)</span>
+            <span id="calcWeightLabel">Weight per piece (troy oz)</span>
             <input id="calcWeight" type="number" inputmode="decimal" min="0" step="0.001" value="1" oninput="updateBullionCalculator()">
           </label>
           <label class="calcField calcWide">
@@ -6328,7 +6330,8 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
         <div class="settingsAccountTitle">Account</div>
 
         <label class="settingsAccountLabel" for="accountName">Display Name</label>
-        <input id="accountName" class="settingsAccountInput" type="text" autocomplete="name" placeholder="Your display name">
+        <input id="accountName" class="settingsAccountInput" type="text" autocomplete="name" placeholder="Bullion Builder" aria-describedby="accountNameHint">
+        <div id="accountNameHint" class="settingsHint">Make it yours—add your name or nickname.</div>
 
         <label class="settingsAccountLabel" for="accountEmail">Email</label>
         <input id="accountEmail" class="settingsAccountInput" type="email" autocomplete="email" placeholder="Email address">
@@ -6441,13 +6444,14 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
         <div id="settingsProPricing" class="settingsProPricing">
           <div><strong data-store-price="monthly">Monthly subscription</strong><span data-store-offer="monthly">View App Store pricing</span></div>
           <div><strong data-store-price="annual">Annual subscription</strong><span data-store-offer="annual">View App Store pricing</span></div>
-          <div class="settingsFounderPrice"><div class="founderOfferBadge">LIMITED LAUNCH OFFER</div><strong data-store-price="founder">Founder lifetime access</strong><span data-store-offer="founder">One-time purchase · never renews</span><span class="founderBadgeBonus">Includes the exclusive Founding Member badge on Home</span></div>
+          <div class="settingsFounderPrice"><div class="founderOfferBadge">LIMITED LAUNCH OFFER</div><strong data-store-price="founder">Founder lifetime access</strong><span data-store-offer="founder">One-time purchase · never renews</span><span class="founderBadgeBonus">Includes the exclusive Founding Member badge on the Portfolio Home Screen</span></div>
         </div>
 
         <div class="settingsProPageActions">
           <button id="settingsProPagePrimary" class="primary" type="button" onclick="openProUpgrade('settings')">View Pro Plans</button>
           <button id="settingsProAnalyticsButton" type="button" onclick="closeSettings();openAnalytics();setAnalyticsTab('pro')">Open Advanced Analytics</button>
           <button id="settingsProReportButton" type="button" onclick="handlePremiumReport()">Create Portfolio Report</button>
+          <p class="reportExportStatus" role="status" aria-live="polite" hidden></p>
           <button id="settingsProManageButton" type="button" onclick="manageProSubscription()">Manage Subscription</button>
         </div>
         <div class="settingsProFine">Billing will be handled by Apple in the native iPhone app. Monthly and annual plans renew until canceled; Founder is a limited-time, non-renewing purchase for permanent Pro access. Your plan stays tied to your Benza Bullion account. Marketplace transactions and separately identified services are not included.</div>
@@ -6507,10 +6511,11 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
       </select>
 
       <div class="row">
-        <div><label>Quantity</label><input id="qty" type="number" min="0" step=".01" value="1"></div>
-        <div><label>Weight each (oz)</label><input id="weight" type="number" min="0" step=".001" value="1"></div>
+        <div><label for="qty">Quantity (pieces)</label><input id="qty" type="number" min="0" step=".01" value="1" aria-describedby="holdingQuantityHint"></div>
+        <div><label id="holdingWeightLabel" for="weight">Weight per piece (troy oz)</label><input id="weight" type="number" min="0" step=".001" value="1" aria-describedby="holdingQuantityHint"></div>
       </div>
 
+      <p id="holdingQuantityHint" class="holdingDetailHint" aria-live="polite">Quantity counts coins or bars, not ounces. Example: 5 one-ounce coins = 5 pieces × 1 oz each.</p>
       <div class="holdingSectionTitle">Purchase</div>
       <label for="purchaseCostMode">Purchase price entry</label>
       <select id="purchaseCostMode" onchange="changePurchaseCostMode()"><option value="each">Price per piece</option><option value="total">Total cost for this holding</option></select>
@@ -8157,18 +8162,22 @@ async function signedHoldingFileUrl(path){
 }
 async function hydrateExistingAttachmentPreviews(h){
   const generation=scannerPreviewGeneration;
+  const userId=currentUser?.id;
+  const isCurrent=()=>generation===scannerPreviewGeneration&&currentUser?.id===userId;
   const paths=(h?.scannerPhotoPaths||[]).slice(0,2);
   if(paths.length){
     const urls=await Promise.all(paths.map(signedHoldingFileUrl));
-    if(generation!==scannerPreviewGeneration)return;
+    if(!isCurrent())return;
     renderScannerPhotoPreviews(urls.filter(Boolean));
   }
   if(h?.photoPath){
     const url=await signedHoldingFileUrl(h.photoPath);
+    if(!isCurrent())return;
     if(url)setAttachmentPreview('photo',url,'Photo attached');
   }
   if(h?.receiptPath){
     const url=await signedHoldingFileUrl(h.receiptPath);
+    if(!isCurrent())return;
     const isPdf=/\.pdf(?:$|\?)/i.test(h.receiptPath);
     if(url)setAttachmentPreview('receipt',url,isPdf?'PDF receipt attached':'Receipt attached',isPdf);
   }
@@ -8320,6 +8329,9 @@ function changePurchaseCostMode(){
 }
 function update(){
   syncPurchaseDateDisplay();
+  const unit=metal==='copper'?'avoirdupois oz':'troy oz';
+  document.getElementById('holdingWeightLabel').textContent='Weight per piece ('+unit+')';
+  document.getElementById('holdingQuantityHint').textContent='Quantity counts coins or bars, not ounces. Example: 5 one-ounce coins = 5 pieces × 1 oz each. Total entered: '+((Number(qty.value)||0)*(Number(weight.value)||0)).toLocaleString(undefined,{maximumFractionDigits:4})+' '+unit+'.';
   const mode=document.getElementById('purchaseCostMode').value;
   previousPurchaseCostMode=mode;
   const q=Number(qty.value)||0, w=Number(weight.value)||0;
@@ -8361,6 +8373,8 @@ let currentUser=null;
 let benzaEntitlement={tier:'free',status:'inactive',expires_at:null,trial_ends_at:null};
 let proScenarioMoves={gold:0,silver:0,platinum:0,palladium:0,copper:0};
 let saleHoldingIndex=null;
+let saleHoldingId=null;
+let saleMutationBusy=false;
 let editingSaleId=null;
 let pendingHoldingPhotoPath=null;
 let pendingHoldingReceiptPath=null;
@@ -8628,6 +8642,7 @@ function toggleAuthMode(){
   setAuthMode(authMode==='login'?'signup':'login');
 }
 function initSupabase(){
+  if(supabaseClient)return;
   if(!window.supabase?.createClient) throw new Error('Benza Bullion could not load its secure account service. Please try again in a moment.');
   supabaseClient=window.supabase.createClient(
     SUPABASE_URL,
@@ -8716,7 +8731,7 @@ async function handleAuth(){
     status.textContent=authMode==='login'?'Signing in…':'Creating account…';
     const result=authMode==='login'
       ? await supabaseClient.auth.signInWithPassword({email,password})
-      : await supabaseClient.auth.signUp({email,password});
+      : await supabaseClient.auth.signUp({email,password,options:{data:{name:'Bullion Builder'}}});
 
     if(result.error)throw result.error;
 
@@ -8736,6 +8751,8 @@ async function handleAuth(){
 }
 
 async function onSignedIn(){
+  const userId=currentUser?.id;
+  if(!userId)return;
   document.getElementById('authScreen').style.display='none';
   updateWelcomeBack();
 
@@ -8743,17 +8760,24 @@ async function onSignedIn(){
   handleBenzaDeepLink();
 
   await loadHoldingsFromSupabase();
+  if(currentUser?.id!==userId)return;
   await loadBenzaEntitlement();
+  if(currentUser?.id!==userId)return;
   refreshStoreKitProducts();
   initializePendingPurchases();
   refreshNativeProEntitlementSilently().catch(()=>{});
   restoreLiveChartPoints();
   await loadLiveChartFromCloud();
+  if(currentUser?.id!==userId)return;
   await loadActivityFromSupabase();
+  if(currentUser?.id!==userId)return;
   repairLegacyLiveChartShock();
   await loadPortfolioSnapshots(activeChartRange);
+  if(currentUser?.id!==userId)return;
   await loadBenzaWatchlist();
+  if(currentUser?.id!==userId)return;
   await loadNotificationPreferences();
+  if(currentUser?.id!==userId)return;
   await updateNotificationUI();
 }
 const SUPABASE_PAGE_SIZE=1000;
@@ -8765,11 +8789,13 @@ function holdingHasCostBasis(h){
   return h.cost!==null&&h.cost!==undefined&&h.cost!==''&&Number.isFinite(Number(h.cost));
 }
 
-async function fetchAllSupabaseRows(table,{select='*',orderColumn='created_at',ascending=false,expectedUserId=currentUser?.id}={}){
+async function fetchAllSupabaseRows(table,{select='*',orderColumn='created_at',ascending=false,expectedUserId=currentUser?.id,since=null}={}){
   const rows=[];
   for(let from=0;;from+=SUPABASE_PAGE_SIZE){
     let query=supabaseClient.from(table).select(select);
     if(orderColumn)query=query.order(orderColumn,{ascending});
+    query=query.order('id',{ascending});
+    if(since&&orderColumn)query=query.gte(orderColumn,since);
     query=query.range(from,from+SUPABASE_PAGE_SIZE-1);
     const {data,error}=await query;
     if(expectedUserId&&currentUser?.id!==expectedUserId)return {data:null,error:null,aborted:true};
@@ -9438,6 +9464,7 @@ function updateBullionCalculator(){
   if(!metalEl)return;
 
   const metal=metalEl.value;
+  document.getElementById('calcWeightLabel').textContent='Weight per piece ('+(metal==='copper'?'avoirdupois oz':'troy oz')+')';
   const spot=Number(livePrices[metal])||0;
   const qty=Math.max(0,Number(document.getElementById('calcQty')?.value)||0);
   const weight=Math.max(0,Number(document.getElementById('calcWeight')?.value)||0);
@@ -9636,13 +9663,14 @@ async function verifyNativeStoreTransaction(result,{allowInactive=false}={}){
   const {data:{session},error:sessionError}=await supabaseClient.auth.getSession();
   if(sessionError||!session?.access_token)throw new Error('Your Benza Bullion session has expired. Please sign in again.');
 
+  if(currentUser?.id!==purchaseUserId)throw new Error('The signed-in account changed.');
   const response=await fetch('https://benza-storekit-verifier.vercel.app/api/storekit-entitlement',{
     method:'POST',
     headers:{
       'Authorization':`Bearer ${session.access_token}`,
       'Content-Type':'application/json'
     },
-    body:JSON.stringify({signedTransaction})
+    body:JSON.stringify({signedTransaction}),signal:AbortSignal.timeout(20000)
   });
 
   let data={};
@@ -9880,7 +9908,7 @@ function proHoldingInsightHtml(h){
   if(isProActive()){
     const needed=avg!==null&&spot>0?(avg/spot-1)*100:null;
     const unit=h.metal==='copper'?'av oz':'t oz';
-    return `<div class="proHoldingInsight"><div class="proHoldingInsightGrid"><div><span>Break-even spot / ${unit}</span><strong>${avg===null?'—':money(avg)}</strong></div><div><span>Spot move to break-even</span><strong>${needed===null?'—':(needed>=0?'+':'')+pct(needed)}</strong></div><div><span>Unrealized gain/loss</span><strong class="${gain===null?'':gain>=0?'pos':'neg'}">${gain===null?'—':signedMoney(gain)}</strong></div><div><span>Unrealized return</span><strong class="${ret===null?'':ret>=0?'pos':'neg'}">${ret===null?'—':(ret>=0?'+':'')+pct(ret)}</strong></div></div></div>`;
+    return `<div class="proHoldingInsight"><div class="proHoldingInsightGrid"><div><span>Break-even spot / ${unit}</span><strong>${avg===null?'—':money(avg)}</strong></div><div><span>Spot move to break-even</span><strong>${known&&h.cost===0?'No cost to recover':needed===null?'—':(needed>=0?'+':'')+pct(needed)}</strong></div><div><span>Unrealized gain/loss</span><strong class="${gain===null?'':gain>=0?'pos':'neg'}">${gain===null?'—':signedMoney(gain)}</strong></div><div><span>Unrealized return</span><strong class="${ret===null?'':ret>=0?'pos':'neg'}">${ret===null?'—':(ret>=0?'+':'')+pct(ret)}</strong></div></div></div>`;
   }
   return `<button class="proHoldingTeaser" type="button" onclick="event.stopPropagation();openProUpgrade('holding')"><span class="proHoldingTeaserLabel">Per-Holding Break-Even Details</span><span class="proMiniBadge">PRO</span></button>`;
 }
@@ -10021,6 +10049,7 @@ function renderProAnalytics(){
     const rows=METALS.filter(m=>stats[m].oz>0).map(m=>{
       const s=stats[m];
       if(s.avg===null)return `<div class="proMetricRow"><div><strong>${METAL_NAMES[m]}</strong><span>Cost basis unavailable · spot ${money(s.spot)}/oz</span></div><div class="proMetricRight"><strong>—</strong><span>Break-even unavailable</span></div></div>`;
+      if(s.cost===0)return `<div class="proMetricRow"><div><strong>${METAL_NAMES[m]}</strong><span>Recorded cost $0.00</span></div><div class="proMetricRight"><strong>No cost to recover</strong></div></div>`;
       const needed=s.spot>0?(s.avg/s.spot-1)*100:null;
       const unit=m==='copper'?'av oz':'t oz';
       return `<div class="proMetricRow"><div><strong>${METAL_NAMES[m]}</strong><span>Cost ${money(s.avg)}/${unit} · spot ${money(s.spot)}/${unit}</span></div><div class="proMetricRight ${needed===null?'':needed>0?'neg':'pos'}"><strong>${needed===null?'—':(needed>=0?'+':'')+needed.toFixed(2)+'%'}</strong><span>${needed===null?'Spot unavailable':needed>0?'Spot rise needed to recover cost':needed<0?'Spot can fall this much before break-even':'At break-even'}</span></div></div>`;
@@ -10096,8 +10125,7 @@ function updateProScenario(){
   }
 }
 
-function exportProReport(){
-  if(!isProActive())return openProUpgrade();
+function buildProReportCsv(){
   const stats=Object.fromEntries(METALS.map(m=>[m,metalStats(m)]));
   const totalValue=METALS.reduce((s,m)=>s+stats[m].value,0);
   const totalCost=METALS.reduce((s,m)=>s+stats[m].cost,0);
@@ -10107,6 +10135,7 @@ function exportProReport(){
     h.product,
     Number(h.qty)||0,
     Number(h.oz)||0,
+    h.metal==='copper'?'avoirdupois oz':'troy oz',
     holdingHasCostBasis(h)?Number(h.cost):'',
     (Number(h.oz)||0)*(livePrices[h.metal]||0),
     h.date||'',
@@ -10122,16 +10151,51 @@ function exportProReport(){
     ['Cost Basis',totalCostKnown?totalCost.toFixed(2):'Unavailable'],
     ['Unrealized Gain/Loss',totalCostKnown?(totalValue-totalCost).toFixed(2):'Unavailable'],
     [],
-    ['Metal','Product','Pieces','Ounces','Cost Basis','Current Metal Value','Purchase Date','Serial / Certificate','Notes','Photo Attached','Receipt Attached'],
+    ['Metal allocation'],
+    ['Metal','Current Metal Value','Allocation (%)'],
+    ...METALS.map(m=>[METAL_NAMES[m],stats[m].value.toFixed(2),totalValue>0?(stats[m].value/totalValue*100).toFixed(2):'0.00']),
+    [],
+    ['Itemized holdings'],
+    ['Metal','Product','Pieces','Ounces','Weight Unit','Cost Basis','Current Metal Value','Purchase Date','Serial / Certificate','Notes','Photo Attached','Receipt Attached'],
     ...rows
   ].map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(',')).join('\n');
-  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;
-  a.download='Benza_Bullion_Pro_Portfolio_Report.csv';
-  document.body.appendChild(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  return csv;
+}
+let proReportExportBusy=false;
+function setReportExportStatus(message){
+  document.querySelectorAll('.reportExportStatus').forEach(el=>{el.textContent=message;el.hidden=!message;});
+}
+async function deliverExportFile(text,filename,type='text/csv;charset=utf-8'){
+  if(isBenzaNativeRuntime()){
+    const plugin=window.Capacitor?.Plugins?.BenzaExport;
+    if(!plugin?.shareFile)throw new Error('Report sharing is unavailable. Please update the app and try again.');
+    const result=await plugin.shareFile({filename,text});
+    return result?.completed?'Report shared or saved.':'Export cancelled.';
+  }
+  const file=new File([text],filename,{type});
+  if(navigator.share&&navigator.canShare?.({files:[file]})){
+    try{await navigator.share({title:'Benza Bullion Export',files:[file]});return 'Report shared or saved.';}
+    catch(error){if(error?.name==='AbortError')return 'Export cancelled.';throw error;}
+  }
+  const url=URL.createObjectURL(file);
+  const link=document.createElement('a');link.href=url;link.download=filename;
+  document.body.appendChild(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+  return 'Report download started. Check your downloads.';
+}
+async function deliverProReport(csv){
+  return deliverExportFile(csv,'Benza_Bullion_Pro_Portfolio_Report.csv');
+}
+async function exportProReport(){
+  if(!isProActive())return openProUpgrade('report');
+  if(proReportExportBusy)return;
+  proReportExportBusy=true;
+  const buttons=['proExportReportButton','settingsProReportButton'].map(id=>document.getElementById(id));
+  buttons.forEach(button=>setButtonBusy(button,true,'Preparing report…'));
+  setReportExportStatus('Preparing your portfolio report…');
+  try{setReportExportStatus(await deliverProReport(buildProReportCsv()));}
+  catch(error){setReportExportStatus(error?.message||'We could not export your report. Please try again.');}
+  finally{proReportExportBusy=false;buttons.forEach(button=>setButtonBusy(button,false));}
 }
 
 function renderAnalytics(){
@@ -10296,7 +10360,7 @@ function saleById(id){
 function saleBaseState(){
   const sale=editingSaleId?saleById(editingSaleId):null;
   if(!sale){
-    const h=holdings[saleHoldingIndex];
+    const h=holdings.find(h=>h.id===saleHoldingId)||(!saleHoldingId?holdings[saleHoldingIndex]:null);
     return h?{holding:h,baseQty:Number(h.qty)||0,baseCost:Number(h.cost)||0,weight:Number(h.weight)||0}:null;
   }
   const current=holdings.find(h=>h.id===sale.holding_id)||null;
@@ -10311,10 +10375,12 @@ function saleBaseState(){
   };
 }
 function openSaleModal(i){
+  if(saleMutationBusy)return;
   if(!isProActive()){openProUpgrade('sale');return;}
   const h=holdings[i]; if(!h)return;
   editingSaleId=null;
   saleHoldingIndex=i;
+  saleHoldingId=h.id;
   document.getElementById('saleTitle').textContent='Record sale';
   document.getElementById('saleHoldingLabel').textContent=`${h.product} · ${Number(h.qty.toFixed(2)).toLocaleString()} pieces available`;
   const qtyInput=document.getElementById('saleQuantity');
@@ -10329,11 +10395,13 @@ function openSaleModal(i){
   document.getElementById('saleModal').classList.add('show');
 }
 function openEditSaleModal(saleId){
+  if(saleMutationBusy)return;
   if(!isProActive()){openProUpgrade('sale');return;}
   const sale=saleById(saleId);
   if(!sale)return;
   editingSaleId=saleId;
   saleHoldingIndex=holdings.findIndex(h=>h.id===sale.holding_id);
+  saleHoldingId=sale.holding_id;
   const base=saleBaseState();
   document.getElementById('saleTitle').textContent='Edit recorded sale';
   document.getElementById('saleHoldingLabel').textContent=`${sale.product||'Bullion sale'} · correct the quantity, proceeds, or date`;
@@ -10351,6 +10419,7 @@ function openEditSaleModal(saleId){
 function closeSaleModal(){
   document.getElementById('saleModal')?.classList.remove('show');
   saleHoldingIndex=null;
+  saleHoldingId=null;
   editingSaleId=null;
 }
 function setSaleAll(){
@@ -10366,28 +10435,41 @@ function setSaleAll(){
 }
 function updateSalePreview(){
   const base=saleBaseState();
-  if(!base){
-    document.getElementById('saleCostPreview').textContent='$0.00';
-    document.getElementById('saleGainPreview').textContent='$0.00';
-    return;
+  const quantity=document.getElementById('saleQuantity');
+  if(base){
+    const unit=(base.holding?.metal||base.sale?.metal)==='copper'?'avoirdupois oz':'troy oz';
+    document.getElementById('saleQuantityHint').textContent='Enter pieces sold, not ounces. Each piece weighs '+base.weight.toLocaleString(undefined,{maximumFractionDigits:4})+' '+unit+'. To sell one coin or bar, enter 1.';
   }
-  const q=Number(document.getElementById('saleQuantity').value)||0;
-  const proceeds=Number(document.getElementById('saleProceeds').value)||0;
-  const costRemoved=base.baseQty>0?Math.round(base.baseCost*(q/base.baseQty)*100)/100:0;
+  const received=document.getElementById('saleProceeds');
+  const q=Number(quantity.value),proceeds=Number(received.value);
+  let error='';
+  if(quantity.value!==''&&(!Number.isFinite(q)||q<=0))error='Enter a quantity greater than zero, in pieces.';
+  else if(base&&q>base.baseQty)error='Only '+base.baseQty.toLocaleString()+(base.baseQty===1?' piece':' pieces')+' available. Enter pieces sold, not ounces.';
+  else if(received.value!==''&&(!Number.isFinite(proceeds)||proceeds<0))error='Enter total sale proceeds of $0 or more.';
+  const validation=document.getElementById('saleValidation');
+  validation.textContent=error;validation.hidden=!error;
+  const valid=!!base&&quantity.value!==''&&received.value!==''&&!error&&q>0;
+  document.getElementById('saleSaveBtn').disabled=saleMutationBusy||!valid;
+  quantity.setAttribute('aria-invalid',String(!!error&&(!Number.isFinite(q)||q<=0||q>base?.baseQty)));
+  const cost=document.getElementById('saleCostPreview'),gainEl=document.getElementById('saleGainPreview');
+  if(!valid){cost.textContent='—';gainEl.textContent='—';gainEl.className='';return;}
+  const costRemoved=Math.round(base.baseCost*(q/base.baseQty)*100)/100;
   const gain=proceeds-costRemoved;
-  document.getElementById('saleCostPreview').textContent=money(costRemoved);
-  const el=document.getElementById('saleGainPreview');
-  el.textContent=signedMoney(gain);
-  el.className=gain>=0?'pos':'neg';
+  cost.textContent=money(costRemoved);gainEl.textContent=signedMoney(gain);gainEl.className=gain>=0?'pos':'neg';
 }
-['saleQuantity','saleProceeds'].forEach(id=>document.getElementById(id)?.addEventListener('input',updateSalePreview));
 async function refreshAfterSaleCorrection(){
+  const userId=currentUser?.id;
   await loadHoldingsFromSupabase();
+  if(currentUser?.id!==userId)return;
   await loadActivityFromSupabase();
+  if(currentUser?.id!==userId)return;
   renderProAnalytics();
   Promise.resolve(recordPortfolioSnapshot(true)).catch(()=>{});
 }
 async function recordHoldingSale(){
+  if(saleMutationBusy)return;
+  const userId=currentUser?.id;
+  const saleId=editingSaleId;
   const base=saleBaseState();
   if(!base||!supabaseClient||!currentUser)return;
   const q=Number(document.getElementById('saleQuantity').value);
@@ -10397,16 +10479,18 @@ async function recordHoldingSale(){
   if(!Number.isFinite(proceeds)||proceeds<0){alert('Enter valid sale proceeds.');return;}
   const isFullSale=Math.abs(q-base.baseQty)<0.000001;
   if(isFullSale){
-    const ok=confirm('This is the full quantity available before this sale. The holding will not appear in Current Holdings, but the sale will remain in Activity and Realized Performance. Continue?');
+    const ok=confirm('This is the full quantity available before this sale. The holding will no longer appear in My Bullion. View the sale in Settings → History and Analytics → Pro → Realized performance. Continue?');
     if(!ok)return;
   }
   const btn=document.getElementById('saleSaveBtn');
+  saleMutationBusy=true;
+  const undoBtn=document.getElementById('saleUndoBtn');if(undoBtn)undoBtn.disabled=true;
   setButtonBusy(btn,true,editingSaleId?'Saving…':'Recording…');
   try{
     let response;
-    if(editingSaleId){
+    if(saleId){
       response=await supabaseClient.rpc('benza_edit_sale_atomic',{
-        p_sale_id:editingSaleId,p_quantity:q,p_sale_proceeds:proceeds,p_transaction_date:date||null
+        p_sale_id:saleId,p_quantity:q,p_sale_proceeds:proceeds,p_transaction_date:date||null
       });
     }else{
       const h=base.holding;
@@ -10416,27 +10500,42 @@ async function recordHoldingSale(){
       });
     }
     const {error}=response||{};
+    if(currentUser?.id!==userId)return;
     if(error){
       if(isAuthSessionError(error)){await handleExpiredSession();return;}
       alert(friendlyErrorMessage(error,editingSaleId?'We could not save this sale correction.':'We could not record this sale.'));
       return;
     }
+    const wasCorrection=!!saleId;
     closeSaleModal();
     await refreshAfterSaleCorrection();
+    if(currentUser?.id!==userId)return;
+    alert((wasCorrection?'Sale updated.':'Sale recorded.')+' View your sale in Settings → History and Analytics → Pro → Realized performance.');
+  }catch(error){
+    if(currentUser?.id===userId)alert(friendlyErrorMessage(error,'We could not save this sale. Please refresh History before retrying.'));
   }finally{
+    saleMutationBusy=false;
     setButtonBusy(btn,false);
+    if(undoBtn)undoBtn.disabled=false;
+    updateSalePreview();
   }
 }
 async function undoRecordedSale(){
+  if(saleMutationBusy)return;
+  const userId=currentUser?.id;
+  const saleId=editingSaleId;
   if(!editingSaleId||!supabaseClient||!currentUser)return;
   const sale=saleById(editingSaleId);
   if(!sale)return;
   const ok=confirm(`Undo this sale of ${Number(sale.quantity||0).toLocaleString()} ${sale.product||'holding'}? The sold quantity and cost basis will be restored to Current Holdings, and this realized gain/loss entry will be removed.`);
   if(!ok)return;
   const btn=document.getElementById('saleUndoBtn');
+  saleMutationBusy=true;
+  const saveBtn=document.getElementById('saleSaveBtn');if(saveBtn)saveBtn.disabled=true;
   setButtonBusy(btn,true,'Undoing…');
   try{
-    const {error}=await supabaseClient.rpc('benza_undo_sale_atomic',{p_sale_id:editingSaleId});
+    const {error}=await supabaseClient.rpc('benza_undo_sale_atomic',{p_sale_id:saleId});
+    if(currentUser?.id!==userId)return;
     if(error){
       if(isAuthSessionError(error)){await handleExpiredSession();return;}
       alert(friendlyErrorMessage(error,'We could not undo this sale.'));
@@ -10444,22 +10543,28 @@ async function undoRecordedSale(){
     }
     closeSaleModal();
     await refreshAfterSaleCorrection();
+  }catch(error){
+    if(currentUser?.id===userId)alert(friendlyErrorMessage(error,'We could not undo this sale. Please refresh History before retrying.'));
   }finally{
+    saleMutationBusy=false;
     setButtonBusy(btn,false);
+    updateSalePreview();
   }
 }
 
 async function deleteHolding(i){
-  if(!confirm('Remove this holding from your portfolio? This will be recorded in Activity.')) return;
-  const portfolioValueBeforeMutation=currentPortfolioMarketValue();
   const h=holdings[i];
-  if(!h?.id){holdings.splice(i,1);renderHoldings();return}
+  if(!h?.id||holdingDeletes.has(h.id))return;
+  if(!confirm('Remove this holding from your portfolio? This will be recorded in Settings → History.')) return;
+  const userId=currentUser?.id;
+  const portfolioValueBeforeMutation=currentPortfolioMarketValue();
   if(!supabaseClient||!currentUser){alert('Please log in before removing a holding.');return}
-
+  holdingDeletes.add(h.id);
+  try{
   const {error}=await supabaseClient.rpc('benza_delete_holding_atomic',{
     p_holding_id:h.id
   });
-
+  if(currentUser?.id!==userId)return;
   if(error){
     if(isAuthSessionError(error)){await handleExpiredSession();return}
     alert(friendlyErrorMessage(error,'We could not remove this holding. Please try again.'));
@@ -10467,12 +10572,18 @@ async function deleteHolding(i){
   }
 
   await removePrivateHoldingFiles([h.photoPath,h.receiptPath,...(h.scannerPhotoPaths||[])]);
-  holdings.splice(i,1);
+  if(currentUser?.id!==userId)return;
+  holdings=holdings.filter(row=>row.id!==h.id);
   rebaseLiveChartForPortfolioFlow(portfolioValueBeforeMutation,currentPortfolioMarketValue());
   renderHoldings();
   await loadActivityFromSupabase();
+  if(currentUser?.id!==userId)return;
   await recordPortfolioSnapshot(true);
+  }catch(error){
+    if(currentUser?.id===userId)alert(friendlyErrorMessage(error,'We could not remove this holding. Refresh My Bullion before retrying.'));
+  }finally{holdingDeletes.delete(h.id);}
 }
+const holdingDeletes=new Set();
 function updatePortfolio(){
   let total=0,totalCost=0;
   const totalCostKnown=holdings.length===0||holdings.every(holdingHasCostBasis);
@@ -10666,17 +10777,20 @@ async function removePrivateHoldingFiles(paths=[]){
 
 async function finishHoldingAttachmentUploads({holdingId,photoFile,receiptFile,oldPhotoPath=null,oldReceiptPath=null}){
   if(!holdingId||(!photoFile&&!receiptFile))return;
+  const userId=currentUser?.id;
   const uploaded=[];
   try{
     const changes={};
     if(photoFile){
       const path=await uploadPrivateHoldingFile(photoFile,'photo');
       uploaded.push(path);
+      if(currentUser?.id!==userId)return;
       changes.photo_path=path;
     }
     if(receiptFile){
       const path=await uploadPrivateHoldingFile(receiptFile,'receipt');
       uploaded.push(path);
+      if(currentUser?.id!==userId)return;
       changes.receipt_path=path;
     }
     const {data,error}=await supabaseClient.rpc('benza_update_holding_documents',{
@@ -10684,6 +10798,7 @@ async function finishHoldingAttachmentUploads({holdingId,photoFile,receiptFile,o
       p_photo_path:photoFile?(changes.photo_path||null):null,
       p_receipt_path:receiptFile?(changes.receipt_path||null):null
     });
+    if(currentUser?.id!==userId)return;
     if(error)throw error;
     const row=Array.isArray(data)?data[0]:data;
     if(!row?.id)throw new Error('The attachment update completed without a valid response.');
@@ -10698,6 +10813,7 @@ async function finishHoldingAttachmentUploads({holdingId,photoFile,receiptFile,o
     if(receiptFile&&oldReceiptPath&&oldReceiptPath!==row.receipt_path)replaced.push(oldReceiptPath);
     await removePrivateHoldingFiles(replaced);
   }catch(error){
+    if(currentUser?.id!==userId)return;
     await removePrivateHoldingFiles(uploaded);
     console.warn('Pro attachment upload failed:',error);
     alert('Your holding was saved, but one or more private attachments could not be uploaded. You can edit the holding and try the attachment again.');
@@ -10706,16 +10822,19 @@ async function finishHoldingAttachmentUploads({holdingId,photoFile,receiptFile,o
 
 async function finishScannerPhotoUploads(holdingId,files=[]){
   if(!holdingId||!files.length)return [];
+  const userId=currentUser?.id;
   const uploaded=[];
   try{
     for(let index=0;index<files.length;index++){
       const file=files[index];
       const path=await uploadPrivateHoldingFile(file,`scan-${index+1}`);
       if(path){uploaded.push(path);}
+      if(currentUser?.id!==userId)return [];
     }
     if(!uploaded.length)return [];
     const {data:response,error}=await supabaseClient.rpc('benza_update_scanner_photos',{p_holding_id:holdingId,p_paths:uploaded});
     const data=Array.isArray(response)?response[0]:response;
+    if(currentUser?.id!==userId)return [];
     if(error)throw error;
     if(data?.id!==holdingId||!Array.isArray(data.scanner_photo_paths)||
       uploaded.some(path=>!data.scanner_photo_paths.includes(path))){
@@ -10728,6 +10847,7 @@ async function finishScannerPhotoUploads(holdingId,files=[]){
     }
     return uploaded;
   }catch(error){
+    if(currentUser?.id!==userId)return [];
     await removePrivateHoldingFiles(uploaded);
     console.warn('Bullion Scan Assist photo upload failed:',error);
     alert('Your holding was saved, but the Bullion Scan Assist photos could not be attached. You can add photos from Edit Holding.');
@@ -10812,7 +10932,9 @@ async function saveHolding(){
         return;
       }
 
-      holdings[editingHoldingIndex]={
+      const index=holdings.findIndex(h=>h.id===existing.id);
+      if(index<0){await loadHoldingsFromSupabase();return;}
+      holdings[index]={
         id:row.id,
         metal:row.metal,
         product:row.product,
@@ -10832,6 +10954,7 @@ async function saveHolding(){
       rebaseLiveChartForPortfolioFlow(portfolioValueBeforeMutation,currentPortfolioMarketValue());
       renderHoldings();
       if(scannerPhotoFiles.length)await finishScannerPhotoUploads(row.id,scannerPhotoFiles);
+      if(currentUser?.id!==userId)return;
       pendingScannerPhotoFiles=[];
       closeAdd({preserveScannerPhotos:true});
       setButtonBusy(button,false);
@@ -10881,6 +11004,7 @@ async function saveHolding(){
     rebaseLiveChartForPortfolioFlow(portfolioValueBeforeMutation,currentPortfolioMarketValue());
     renderHoldings();
     if(scannerPhotoFiles.length)await finishScannerPhotoUploads(row.id,scannerPhotoFiles);
+    if(currentUser?.id!==userId)return;
     pendingScannerPhotoFiles=[];
     closeAdd({preserveScannerPhotos:true});
     setButtonBusy(button,false);
@@ -11054,8 +11178,10 @@ function captureLiveChartPoint(time=new Date()){
 }
 
 async function loadLivePortfolioSnapshots(){
+  const userId=currentUser?.id;
   restoreLiveChartPoints();
   await loadLiveChartFromCloud();
+  if(currentUser?.id!==userId||activeChartRange!=='LIVE')return;
 
   // LIVE is intentionally built only from real high-frequency points
   // captured while Benza is open. Do not mix normal database snapshots
@@ -11294,17 +11420,12 @@ async function loadPortfolioSnapshots(range=activeChartRange){
   }
 
   const userId=currentUser.id;
-  let query=supabaseClient
-    .from('portfolio_snapshots')
-    .select('captured_at,total_value')
-    .order('captured_at',{ascending:true})
-    .limit(5000);
-
   const start=chartRangeStart(range);
-  if(start)query=query.gte('captured_at',start.toISOString());
-
-  const {data,error}=await query;
-  if(currentUser?.id!==userId)return;
+  const {data,error,aborted}=await fetchAllSupabaseRows('portfolio_snapshots',{
+    select:'captured_at,total_value',orderColumn:'captured_at',ascending:true,
+    expectedUserId:userId,since:start?start.toISOString():null
+  });
+  if(aborted||currentUser?.id!==userId||activeChartRange!==range)return;
   if(error){
     if(isAuthSessionError(error)){await handleExpiredSession();return}
     console.warn('Portfolio history unavailable:',error.message);
@@ -11694,10 +11815,15 @@ function setAccountSettingsStatus(message, isError=false){
   el.style.color=isError?'#d9534f':'var(--muted)';
 }
 
+function accountDisplayName(){
+  const metadata=currentUser?.user_metadata||{};
+  return [metadata.name,metadata.full_name].find(value=>typeof value==='string'&&value.trim())?.trim()||'Bullion Builder';
+}
+
 function updateWelcomeBack(){
   const el=document.getElementById('welcomeBack');
   if(!el) return;
-  const displayName=(currentUser?.user_metadata?.name || currentUser?.user_metadata?.full_name || '').trim();
+  const displayName=currentUser?accountDisplayName():'';
   if(displayName){
     el.textContent=`Welcome back, ${displayName}`;
     el.classList.add('show');
@@ -11716,7 +11842,7 @@ function populateAccountSettings(){
   const pwEl=document.getElementById('accountPassword');
   const pw2El=document.getElementById('accountPasswordConfirm');
 
-  if(nameEl) nameEl.value=currentUser.user_metadata?.name || currentUser.user_metadata?.full_name || '';
+  if(nameEl) nameEl.value=accountDisplayName();
   if(emailEl) emailEl.value=currentUser.email || '';
   if(pwEl) pwEl.value='';
   if(pw2El) pw2El.value='';
@@ -11727,7 +11853,7 @@ async function saveAccountProfile(){
   if(!supabaseClient||!currentUser) return;
   const button=document.getElementById('saveProfileButton');
   if(button?.disabled)return;
-  const name=(document.getElementById('accountName')?.value||'').trim();
+  const name=(document.getElementById('accountName')?.value||'').trim()||'Bullion Builder';
   const email=(document.getElementById('accountEmail')?.value||'').trim();
   if(name.length>60){setAccountSettingsStatus('Display Name must be 60 characters or fewer.',true);return}
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){setAccountSettingsStatus('Please enter a valid email address.',true);return}
@@ -11791,7 +11917,7 @@ async function exportBenzaData(){
       account:{
         id:currentUser.id,
         email:currentUser.email||null,
-        display_name:currentUser.user_metadata?.name||currentUser.user_metadata?.full_name||null
+        display_name:accountDisplayName()
       },
       holdings:results[0].data||[],
       activity:results[1].data||[],
@@ -11802,37 +11928,8 @@ async function exportBenzaData(){
 
     const text=JSON.stringify(payload,null,2);
     const filename='benza-bullion-data-'+new Date().toISOString().slice(0,10)+'.json';
-    const file=new File([text],filename,{type:'application/json'});
-    let shared=false;
-
-    try{
-      if(navigator.share&&navigator.canShare?.({files:[file]})){
-        await navigator.share({
-          title:'Benza Bullion Data Export',
-          files:[file]
-        });
-        shared=true;
-      }
-    }catch(err){
-      if(err?.name==='AbortError'){
-        setAccountSettingsStatus('Export cancelled.');
-        return;
-      }
-      console.warn('Share export unavailable:',err);
-    }
-
-    if(!shared){
-      const url=URL.createObjectURL(file);
-      const link=document.createElement('a');
-      link.href=url;
-      link.download=filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(()=>URL.revokeObjectURL(url),1000);
-    }
-
-    setAccountSettingsStatus('Your Benza Bullion data export is ready.');
+    const message=await deliverExportFile(text,filename,'application/json');
+    if(currentUser?.id===exportUserId)setAccountSettingsStatus(message.replaceAll('Report','Data export'));
   }catch(error){
     console.error('Data export failed:',error);
     setAccountSettingsStatus(
@@ -11846,6 +11943,8 @@ async function exportBenzaData(){
 
 async function deleteBenzaAccount(){
   if(!supabaseClient||!currentUser) return;
+  const deleteUserId=currentUser.id;
+  if(document.getElementById('deleteAccountButton')?.disabled)return;
 
   const first=confirm('Delete your Benza Bullion account?\n\nThis permanently deletes your account and associated portfolio data. This cannot be undone.\n\nDeleting your account does not cancel Apple subscriptions. Billing continues until you cancel through Apple. Choose Cancel to manage subscriptions first, or OK to delete now.');
   if(!first) return;
@@ -11862,6 +11961,7 @@ async function deleteBenzaAccount(){
 
   try{
     const {data:{session},error:sessionError}=await supabaseClient.auth.getSession();
+    if(currentUser?.id!==deleteUserId)return;
     const token=session?.access_token;
     if(sessionError||!token) throw new Error('Your session has expired. Please sign in again before deleting your account.');
 
@@ -11882,6 +11982,7 @@ async function deleteBenzaAccount(){
       throw new Error(result?.error||'Unable to delete your account. Please try again.');
     }
 
+    if(currentUser?.id!==deleteUserId)return;
     try{await supabaseClient.auth.signOut({scope:'local'});}catch(_){}
     try{localStorage.removeItem(benzaWatchlistStorageKey());}catch(_){}
     clearBenzaAccountState();
@@ -11891,8 +11992,10 @@ async function deleteBenzaAccount(){
     setAuthError('');
     alert('Your Benza Bullion account has been permanently deleted.');
   }catch(error){
+    if(currentUser?.id!==deleteUserId)return;
     console.error('Account deletion failed:',error);
     setAccountSettingsStatus(error?.message||'Unable to delete your account. Please try again.',true);
+  }finally{
     if(button){button.disabled=false;button.textContent='Delete Account';}
   }
 }
@@ -12033,12 +12136,12 @@ function persistBenzaWatchlist(){
 async function syncWatchItemToSupabase(item){
   if(!supabaseClient||!currentUser)return;
   const {error}=await supabaseClient.from('price_alerts').upsert({user_id:currentUser.id,metal:item.metal,target:Number(item.target),direction:item.direction==='lower'?'lower':'higher',enabled:true,is_triggered:false},{onConflict:'user_id,metal,direction'});
-  if(error)console.warn('Could not sync price alert:',error.message);
+  if(error)throw error;
 }
 async function removeWatchItemFromSupabase(metal,direction){
   if(!supabaseClient||!currentUser)return;
   const {error}=await supabaseClient.from('price_alerts').delete().eq('user_id',currentUser.id).eq('metal',metal).eq('direction',direction==='lower'?'lower':'higher');
-  if(error)console.warn('Could not remove cloud price alert:',error.message);
+  if(error)throw error;
 }
 function openMarkets(){hideMainOverlays();setActiveNav('markets');document.getElementById('marketsScreen')?.classList.add('show');setMarketsTab(activeMarketsTab);renderMarkets()}
 function closeMarkets(){document.getElementById('marketsScreen')?.classList.remove('show');setActiveNav('portfolio')}
@@ -12053,6 +12156,9 @@ function setMarketsWatchDirection(direction){
   document.getElementById('marketsWatchLower')?.classList.toggle('active',marketsWatchDirection==='lower');
 }
 async function saveMarketsWatchItem(){
+  if(watchlistMutationBusy)return;
+  const userId=currentUser?.id;
+  if(!userId||!supabaseClient){alert('Please sign in before saving a price alert.');return;}
   const button=document.getElementById('marketsWatchSaveButton');if(button?.disabled)return;
   const metal=document.getElementById('marketsWatchMetal')?.value;
   const target=Number(document.getElementById('marketsWatchTarget')?.value);
@@ -12062,19 +12168,33 @@ async function saveMarketsWatchItem(){
   const replacingExisting=benzaWatchlist.some(x=>x.metal===metal&&(x.direction||'higher')===direction);
   if(!isProActive() && !replacingExisting && benzaWatchlist.length>=3){openProUpgrade('alerts');return}
   setButtonBusy(button,true,'Saving…');
+  watchlistMutationBusy=true;
   try{
+    await syncWatchItemToSupabase({metal,target,direction});
+    if(currentUser?.id!==userId)return;
     const old=benzaWatchlist.find(x=>x.metal===metal&&(x.direction||'higher')===direction);
     if(old)old.target=target;else benzaWatchlist.push({metal,target,direction});
-    persistBenzaWatchlist();await syncWatchItemToSupabase({metal,target,direction});
+    persistBenzaWatchlist();
     const input=document.getElementById('marketsWatchTarget');if(input)input.value='';renderMarketsWatchlist();
-  }finally{setButtonBusy(button,false);}
+  }catch(error){
+    if(currentUser?.id===userId)alert(friendlyErrorMessage(error,'We could not save this price alert. Please try again.'));
+  }finally{watchlistMutationBusy=false;setButtonBusy(button,false);}
 }
 async function removeMarketsWatchItem(metal,direction){
+  if(watchlistMutationBusy||!currentUser||!supabaseClient)return;
+  const userId=currentUser.id;
+  watchlistMutationBusy=true;
+  try{
+  await removeWatchItemFromSupabase(metal,direction);
+  if(currentUser?.id!==userId)return;
   benzaWatchlist=benzaWatchlist.filter(x=>!(x.metal===metal&&(x.direction||'higher')===direction));
   persistBenzaWatchlist();
-  await removeWatchItemFromSupabase(metal,direction);
   renderMarketsWatchlist();
+  }catch(error){
+    if(currentUser?.id===userId)alert(friendlyErrorMessage(error,'We could not remove this price alert. Please try again.'));
+  }finally{watchlistMutationBusy=false;}
 }
+let watchlistMutationBusy=false;
 function renderMarketsWatchlist(){
   const wrap=document.getElementById('marketsWatchList');
   const meter=document.getElementById('proAlertMeter');
@@ -12407,12 +12527,14 @@ loadBenzaWatchlist();
     <div class="saleHeader"><h2 id="saleTitle">Record sale</h2><button type="button" onclick="closeSaleModal()" aria-label="Close">×</button></div>
     <div class="saleSub" id="saleHoldingLabel">Record what you sold and what you received. Benza Bullion will preserve the realized gain/loss in Activity and Pro Analytics.</div>
     <div class="saleGrid">
-      <div class="saleNotice"><strong>Partial sales keep the remaining holding.</strong> A full sale removes the holding from Current Holdings, but the sale stays recorded in Activity and Realized Performance.</div>
+      <div class="saleNotice"><strong>Partial sales keep your remaining bullion.</strong> Full sales remove it from My Bullion. View recorded sales in Settings → History, and realized gains/losses in Analytics → Pro → Realized performance.</div>
       <div class="saleQtyRow">
-        <label>Quantity sold<input id="saleQuantity" type="number" min="0.01" step="0.01" placeholder="Enter quantity"></label>
+        <label for="saleQuantity">Quantity sold (pieces)<input id="saleQuantity" type="number" min="0.01" step="0.01" placeholder="Number of coins or bars" inputmode="decimal" aria-describedby="saleQuantityHint saleValidation" oninput="updateSalePreview()"></label>
         <button class="saleAllButton" type="button" onclick="setSaleAll()">Sell all</button>
       </div>
-      <label>Total sale proceeds<input id="saleProceeds" type="number" min="0" step="0.01" placeholder="Enter total received"></label>
+      <p id="saleQuantityHint" class="holdingDetailHint">Enter pieces sold, not ounces. To sell one 10 oz bar, enter 1.</p>
+      <label>Total sale proceeds ($ for all pieces sold)<input id="saleProceeds" type="number" min="0" step="0.01" placeholder="Total amount received" inputmode="decimal" oninput="updateSalePreview()" aria-describedby="saleValidation"></label>
+      <p id="saleValidation" class="holdingDetailHint neg" role="status" aria-live="polite" hidden></p>
       <label>Sale date<input id="saleDate" type="date"></label>
       <div class="salePreview">
         <div><span>Cost basis sold</span><strong id="saleCostPreview">$0.00</strong></div>
@@ -12438,7 +12560,7 @@ loadBenzaWatchlist();
       <div class="proUpgradeBenefit"><i>✓</i><span>Future Pro releases included with an active subscription or permanent Founder access</span></div>
     </div>
     <div class="proFutureFine">Planned additions include Future Potential historical scenarios with optional contributions, richer premium analysis, expanded alerts, reports, and new stack tools. Timing and availability may change.</div>
-    <div class="proUpgradePrices"><button class="proUpgradePrice selected" id="proPlanMonthly" type="button" onclick="selectProPlan('monthly')"><strong data-store-price="monthly">Monthly subscription</strong><span data-store-offer="monthly">View App Store pricing</span></button><button class="proUpgradePrice" id="proPlanAnnual" type="button" onclick="selectProPlan('annual')"><strong data-store-price="annual">Annual subscription</strong><span data-store-offer="annual">View App Store pricing</span></button><button class="proUpgradePrice founder" id="proPlanFounder" type="button" onclick="selectProPlan('founder')"><span class="founderOfferBadge">LIMITED LAUNCH OFFER</span><strong data-store-price="founder">Founder lifetime access</strong><span data-store-offer="founder">One-time purchase · never renews</span><span class="founderBadgeBonus">Includes the exclusive Founding Member badge on Home</span></button></div>
+    <div class="proUpgradePrices"><button class="proUpgradePrice selected" id="proPlanMonthly" type="button" onclick="selectProPlan('monthly')"><strong data-store-price="monthly">Monthly subscription</strong><span data-store-offer="monthly">View App Store pricing</span></button><button class="proUpgradePrice" id="proPlanAnnual" type="button" onclick="selectProPlan('annual')"><strong data-store-price="annual">Annual subscription</strong><span data-store-offer="annual">View App Store pricing</span></button><button class="proUpgradePrice founder" id="proPlanFounder" type="button" onclick="selectProPlan('founder')"><span class="founderOfferBadge">LIMITED LAUNCH OFFER</span><strong data-store-price="founder">Founder lifetime access</strong><span data-store-offer="founder">One-time purchase · never renews</span><span class="founderBadgeBonus">Includes the exclusive Founding Member badge on the Portfolio Home Screen</span></button></div>
     <div class="proUpgradeActions"><button class="primary" id="proStartTrialBtn" type="button" onclick="startNativeProPurchase()">Continue</button><button class="secondary" type="button" onclick="restoreProPurchases()">Restore Purchases</button><button class="secondary" type="button" onclick="closeProUpgrade()">Not now</button></div><p class="proFutureFine">Subscriptions renew automatically unless cancelled through Apple. <a href="terms.html">Terms of Use</a> · <a href="privacy.html">Privacy Policy</a></p>
   </div>
 </div>

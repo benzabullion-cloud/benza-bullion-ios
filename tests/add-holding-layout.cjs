@@ -3,21 +3,24 @@ const {chromium,webkit}=require('playwright');
 const html=fs.readFileSync('App/public/index.html','utf8');
 const styles=[...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m=>m[1]).join('\n');
 const form=html.slice(html.indexOf('<div id="addScreen"'),html.indexOf('<!-- Locally bundled Supabase client'));
+const layoutBrowsers=[];
 (async()=>{
  for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
  const browser=await engine.launch({headless:true});
+ layoutBrowsers.push(browser);
  const page=await browser.newPage();fs.mkdirSync('ui-artifacts',{recursive:true});
  for(const width of [320,375,390,430,768,1280]){
-  for(const theme of ['dark','light'])for(const pro of [false,true]){
+  for(const theme of ['dark','light'])for(const pro of [false,true])for(const metal of ['gold','copper']){
    await page.setViewportSize({width,height:844});
    await page.setContent('<!doctype html><html class="native-app" data-theme="'+theme+'"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+styles+'</style></head><body>'+form+'</body></html>');
-   await page.evaluate(pro=>{
+   await page.evaluate(({pro,metal})=>{
     document.getElementById('addScreen').classList.add('show');
+    document.getElementById('holdingWeightLabel').textContent='Weight per piece ('+(metal==='copper'?'avoirdupois oz':'troy oz')+')';
     document.getElementById('proInventoryFields').hidden=!pro;
     document.getElementById('proInventoryFields').open=pro;
     document.getElementById('proInventoryTeaser').hidden=pro;
     document.getElementById('dateDisplay').textContent='October 1, 2026';
-   },pro);
+   },{pro,metal});
    await page.evaluate(()=>document.getAnimations().forEach(animation=>animation.finish()));
    await page.locator('#holdingSheetTitle').waitFor({state:'visible'});
    const metrics=await page.evaluate(()=>{
@@ -40,10 +43,10 @@ const form=html.slice(html.indexOf('<div id="addScreen"'),html.indexOf('<!-- Loc
    assert.ok(metrics.formWidth>250&&metrics.sheetHeight>200&&metrics.sheetTop>=0,JSON.stringify(metrics));
    assert.deepEqual(metrics.overflow,[],JSON.stringify({width,theme,pro,metrics}));
    assert.equal(metrics.headerOnTop,true,'Sticky header must remain above scrolled date and fields');assert.equal(metrics.rowErrors,0);assert.equal(metrics.horizontal,false);assert.equal(metrics.dateCentered,true);assert.equal(metrics.saveVisible,true);
-   if(width===390){await page.locator('#addScreen>.sheet').evaluate(e=>e.scrollTop=0);await page.screenshot({animations:'disabled',path:'ui-artifacts/add-holding-'+engineName+'-'+theme+'-'+(pro?'pro':'free')+'.png'});await page.locator('#addScreen>.sheet').evaluate(e=>e.scrollTop=e.scrollHeight);await page.screenshot({path:'ui-artifacts/add-holding-'+engineName+'-'+theme+'-'+(pro?'pro':'free')+'-details.png'});}
+   if(width===390&&metal==='gold'){await page.locator('#addScreen>.sheet').evaluate(e=>e.scrollTop=0);await page.screenshot({animations:'disabled',path:'ui-artifacts/add-holding-'+engineName+'-'+theme+'-'+(pro?'pro':'free')+'.png'});await page.locator('#addScreen>.sheet').evaluate(e=>e.scrollTop=e.scrollHeight);await page.screenshot({path:'ui-artifacts/add-holding-'+engineName+'-'+theme+'-'+(pro?'pro':'free')+'-details.png'});}
   }
  }
  await browser.close();
  }
- console.log('PASS 48 responsive form states: aligned fields, centered date, no horizontal overflow, save reachable');
-})().catch(e=>{console.error(e);process.exitCode=1});
+ console.log('PASS 192 responsive form states: aligned fields, centered date, no horizontal overflow, save reachable');
+})().catch(async e=>{await Promise.allSettled(layoutBrowsers.map(browser=>browser.close()));console.error(e);process.exitCode=1});
