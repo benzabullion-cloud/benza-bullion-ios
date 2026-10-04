@@ -3,7 +3,7 @@ const html=fs.readFileSync('App/public/index.html','utf8');
 const nodes=new Map();const make=()=>({children:[],hidden:false,append(...xs){this.children.push(...xs)},replaceChildren(...xs){this.children=xs}});
 const get=id=>{if(!nodes.has(id))nodes.set(id,make());return nodes.get(id)};
 let revoked=[],n=0;
-const context=vm.createContext({document:{getElementById:get,createElement:make},URL:{createObjectURL:()=> 'blob:'+(++n),revokeObjectURL:url=>revoked.push(url)},pendingScannerPhotoFiles:[{name:'front.jpg'},{name:'back.jpg'}],holdingPhotoObjectUrl:null,holdingReceiptObjectUrl:null,holdingPhotoViewUrl:null,holdingReceiptViewUrl:null,supabaseClient:null});
+const context=vm.createContext({currentUser:{id:'account-a'},document:{getElementById:get,createElement:make},URL:{createObjectURL:()=> 'blob:'+(++n),revokeObjectURL:url=>revoked.push(url)},pendingScannerPhotoFiles:[{name:'front.jpg'},{name:'back.jpg'}],holdingPhotoObjectUrl:null,holdingReceiptObjectUrl:null,holdingPhotoViewUrl:null,holdingReceiptViewUrl:null,supabaseClient:null});
 vm.runInContext(html.slice(html.indexOf('let scannerPreviewObjectUrls='),html.indexOf('function resetProInventoryForm()')),context);
 vm.runInContext(html.slice(html.indexOf('async function hydrateExistingAttachmentPreviews('),html.indexOf('function viewHoldingAttachment(')),context);
 context.previewPendingScannerPhotos();

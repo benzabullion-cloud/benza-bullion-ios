@@ -110,6 +110,19 @@ window.supabase={createClient:()=>({
   await page.locator('#proExportReportButton').click();
   assert.equal((await download).suggestedFilename(),'Benza_Bullion_Pro_Portfolio_Report.csv');
   await page.evaluate(()=>{hideMainOverlays();goPortfolio();window.Capacitor={isNativePlatform:()=>true,Plugins:{}};});
+  console.log('Check native account-data export in '+engineName);
+  await page.evaluate(()=>{
+    hideMainOverlays();openSettings('settings');
+    window.Capacitor.Plugins.BenzaExport={shareFile:async data=>{sweep.exports.push(data);return {completed:true};}};
+  });
+  await page.locator('#exportDataButton').click();
+  await page.waitForFunction(()=>!document.getElementById('exportDataButton').disabled);
+  assert.match(await page.evaluate(()=>sweep.exports.at(-1).filename),/\.json$/);
+  assert.equal(await page.evaluate(()=>JSON.parse(sweep.exports.at(-1).text).account.id),'account-a');
+  await page.evaluate(()=>{window.Capacitor.Plugins.BenzaExport.shareFile=async()=>({completed:false});});
+  await page.locator('#exportDataButton').click();
+  await page.waitForFunction(()=>!document.getElementById('exportDataButton').disabled);
+  assert.match(await page.locator('#accountSettingsStatus').textContent(),/cancelled/);
   console.log('Check default and personalized account names in '+engineName);
   await page.evaluate(()=>{currentUser.user_metadata={};updateWelcomeBack();populateAccountSettings();});
   assert.equal(await page.locator('#welcomeBack').textContent(),'Welcome back, Bullion Builder');

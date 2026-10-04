@@ -6,6 +6,7 @@ on:
       - 'App/public/supabase_sale_restore.sql'
       - 'tests/statistics-accuracy.test.cjs'
       - 'tests/launch-account-purchases.test.cjs'
+      - 'tests/launch-sweep.test.cjs'
       - 'tests/holding-base-edits.cjs'
       - 'App/public/supabase_bullion_details.sql'
       - 'supabase/migrations/**'
@@ -27,7 +28,7 @@ jobs:
         with:
           node-version: 24
       - name: Run statistics regression suite
-        run: node --test tests/statistics-accuracy.test.cjs tests/launch-account-purchases.test.cjs tests/final-launch-hardening.test.cjs
+        run: node --test tests/statistics-accuracy.test.cjs tests/launch-account-purchases.test.cjs tests/final-launch-hardening.test.cjs tests/launch-sweep.test.cjs
       - name: Verify basic holding edits against PostgreSQL
         run: |
           npm install --no-save --ignore-scripts @electric-sql/pglite@0.5.8

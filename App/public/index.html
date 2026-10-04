@@ -8162,18 +8162,22 @@ async function signedHoldingFileUrl(path){
 }
 async function hydrateExistingAttachmentPreviews(h){
   const generation=scannerPreviewGeneration;
+  const userId=currentUser?.id;
+  const isCurrent=()=>generation===scannerPreviewGeneration&&currentUser?.id===userId;
   const paths=(h?.scannerPhotoPaths||[]).slice(0,2);
   if(paths.length){
     const urls=await Promise.all(paths.map(signedHoldingFileUrl));
-    if(generation!==scannerPreviewGeneration)return;
+    if(!isCurrent())return;
     renderScannerPhotoPreviews(urls.filter(Boolean));
   }
   if(h?.photoPath){
     const url=await signedHoldingFileUrl(h.photoPath);
+    if(!isCurrent())return;
     if(url)setAttachmentPreview('photo',url,'Photo attached');
   }
   if(h?.receiptPath){
     const url=await signedHoldingFileUrl(h.receiptPath);
+    if(!isCurrent())return;
     const isPdf=/\.pdf(?:$|\?)/i.test(h.receiptPath);
     if(url)setAttachmentPreview('receipt',url,isPdf?'PDF receipt attached':'Receipt attached',isPdf);
   }
@@ -8369,6 +8373,8 @@ let currentUser=null;
 let benzaEntitlement={tier:'free',status:'inactive',expires_at:null,trial_ends_at:null};
 let proScenarioMoves={gold:0,silver:0,platinum:0,palladium:0,copper:0};
 let saleHoldingIndex=null;
+let saleHoldingId=null;
+let saleMutationBusy=false;
 let editingSaleId=null;
 let pendingHoldingPhotoPath=null;
 let pendingHoldingReceiptPath=null;
@@ -8636,6 +8642,7 @@ function toggleAuthMode(){
   setAuthMode(authMode==='login'?'signup':'login');
 }
 function initSupabase(){
+  if(supabaseClient)return;
   if(!window.supabase?.createClient) throw new Error('Benza Bullion could not load its secure account service. Please try again in a moment.');
   supabaseClient=window.supabase.createClient(
     SUPABASE_URL,
@@ -8744,6 +8751,8 @@ async function handleAuth(){
 }
 
 async function onSignedIn(){
+  const userId=currentUser?.id;
+  if(!userId)return;
   document.getElementById('authScreen').style.display='none';
   updateWelcomeBack();
 
@@ -8751,17 +8760,24 @@ async function onSignedIn(){
   handleBenzaDeepLink();
 
   await loadHoldingsFromSupabase();
+  if(currentUser?.id!==userId)return;
   await loadBenzaEntitlement();
+  if(currentUser?.id!==userId)return;
   refreshStoreKitProducts();
   initializePendingPurchases();
   refreshNativeProEntitlementSilently().catch(()=>{});
   restoreLiveChartPoints();
   await loadLiveChartFromCloud();
+  if(currentUser?.id!==userId)return;
   await loadActivityFromSupabase();
+  if(currentUser?.id!==userId)return;
   repairLegacyLiveChartShock();
   await loadPortfolioSnapshots(activeChartRange);
+  if(currentUser?.id!==userId)return;
   await loadBenzaWatchlist();
+  if(currentUser?.id!==userId)return;
   await loadNotificationPreferences();
+  if(currentUser?.id!==userId)return;
   await updateNotificationUI();
 }
 const SUPABASE_PAGE_SIZE=1000;
@@ -8773,11 +8789,13 @@ function holdingHasCostBasis(h){
   return h.cost!==null&&h.cost!==undefined&&h.cost!==''&&Number.isFinite(Number(h.cost));
 }
 
-async function fetchAllSupabaseRows(table,{select='*',orderColumn='created_at',ascending=false,expectedUserId=currentUser?.id}={}){
+async function fetchAllSupabaseRows(table,{select='*',orderColumn='created_at',ascending=false,expectedUserId=currentUser?.id,since=null}={}){
   const rows=[];
   for(let from=0;;from+=SUPABASE_PAGE_SIZE){
     let query=supabaseClient.from(table).select(select);
     if(orderColumn)query=query.order(orderColumn,{ascending});
+    query=query.order('id',{ascending});
+    if(since&&orderColumn)query=query.gte(orderColumn,since);
     query=query.range(from,from+SUPABASE_PAGE_SIZE-1);
     const {data,error}=await query;
     if(expectedUserId&&currentUser?.id!==expectedUserId)return {data:null,error:null,aborted:true};
@@ -9645,13 +9663,14 @@ async function verifyNativeStoreTransaction(result,{allowInactive=false}={}){
   const {data:{session},error:sessionError}=await supabaseClient.auth.getSession();
   if(sessionError||!session?.access_token)throw new Error('Your Benza Bullion session has expired. Please sign in again.');
 
+  if(currentUser?.id!==purchaseUserId)throw new Error('The signed-in account changed.');
   const response=await fetch('https://benza-storekit-verifier.vercel.app/api/storekit-entitlement',{
     method:'POST',
     headers:{
       'Authorization':`Bearer ${session.access_token}`,
       'Content-Type':'application/json'
     },
-    body:JSON.stringify({signedTransaction})
+    body:JSON.stringify({signedTransaction}),signal:AbortSignal.timeout(20000)
   });
 
   let data={};
@@ -10146,17 +10165,16 @@ let proReportExportBusy=false;
 function setReportExportStatus(message){
   document.querySelectorAll('.reportExportStatus').forEach(el=>{el.textContent=message;el.hidden=!message;});
 }
-async function deliverProReport(csv){
-  const filename='Benza_Bullion_Pro_Portfolio_Report.csv';
+async function deliverExportFile(text,filename,type='text/csv;charset=utf-8'){
   if(isBenzaNativeRuntime()){
     const plugin=window.Capacitor?.Plugins?.BenzaExport;
     if(!plugin?.shareFile)throw new Error('Report sharing is unavailable. Please update the app and try again.');
-    const result=await plugin.shareFile({filename,text:csv});
+    const result=await plugin.shareFile({filename,text});
     return result?.completed?'Report shared or saved.':'Export cancelled.';
   }
-  const file=new File([csv],filename,{type:'text/csv;charset=utf-8'});
+  const file=new File([text],filename,{type});
   if(navigator.share&&navigator.canShare?.({files:[file]})){
-    try{await navigator.share({title:'Benza Bullion Portfolio Report',files:[file]});return 'Report shared or saved.';}
+    try{await navigator.share({title:'Benza Bullion Export',files:[file]});return 'Report shared or saved.';}
     catch(error){if(error?.name==='AbortError')return 'Export cancelled.';throw error;}
   }
   const url=URL.createObjectURL(file);
@@ -10164,6 +10182,9 @@ async function deliverProReport(csv){
   document.body.appendChild(link);link.click();link.remove();
   setTimeout(()=>URL.revokeObjectURL(url),60000);
   return 'Report download started. Check your downloads.';
+}
+async function deliverProReport(csv){
+  return deliverExportFile(csv,'Benza_Bullion_Pro_Portfolio_Report.csv');
 }
 async function exportProReport(){
   if(!isProActive())return openProUpgrade('report');
@@ -10339,7 +10360,7 @@ function saleById(id){
 function saleBaseState(){
   const sale=editingSaleId?saleById(editingSaleId):null;
   if(!sale){
-    const h=holdings[saleHoldingIndex];
+    const h=holdings.find(h=>h.id===saleHoldingId)||(!saleHoldingId?holdings[saleHoldingIndex]:null);
     return h?{holding:h,baseQty:Number(h.qty)||0,baseCost:Number(h.cost)||0,weight:Number(h.weight)||0}:null;
   }
   const current=holdings.find(h=>h.id===sale.holding_id)||null;
@@ -10354,10 +10375,12 @@ function saleBaseState(){
   };
 }
 function openSaleModal(i){
+  if(saleMutationBusy)return;
   if(!isProActive()){openProUpgrade('sale');return;}
   const h=holdings[i]; if(!h)return;
   editingSaleId=null;
   saleHoldingIndex=i;
+  saleHoldingId=h.id;
   document.getElementById('saleTitle').textContent='Record sale';
   document.getElementById('saleHoldingLabel').textContent=`${h.product} · ${Number(h.qty.toFixed(2)).toLocaleString()} pieces available`;
   const qtyInput=document.getElementById('saleQuantity');
@@ -10372,11 +10395,13 @@ function openSaleModal(i){
   document.getElementById('saleModal').classList.add('show');
 }
 function openEditSaleModal(saleId){
+  if(saleMutationBusy)return;
   if(!isProActive()){openProUpgrade('sale');return;}
   const sale=saleById(saleId);
   if(!sale)return;
   editingSaleId=saleId;
   saleHoldingIndex=holdings.findIndex(h=>h.id===sale.holding_id);
+  saleHoldingId=sale.holding_id;
   const base=saleBaseState();
   document.getElementById('saleTitle').textContent='Edit recorded sale';
   document.getElementById('saleHoldingLabel').textContent=`${sale.product||'Bullion sale'} · correct the quantity, proceeds, or date`;
@@ -10394,6 +10419,7 @@ function openEditSaleModal(saleId){
 function closeSaleModal(){
   document.getElementById('saleModal')?.classList.remove('show');
   saleHoldingIndex=null;
+  saleHoldingId=null;
   editingSaleId=null;
 }
 function setSaleAll(){
@@ -10423,7 +10449,7 @@ function updateSalePreview(){
   const validation=document.getElementById('saleValidation');
   validation.textContent=error;validation.hidden=!error;
   const valid=!!base&&quantity.value!==''&&received.value!==''&&!error&&q>0;
-  document.getElementById('saleSaveBtn').disabled=!valid;
+  document.getElementById('saleSaveBtn').disabled=saleMutationBusy||!valid;
   quantity.setAttribute('aria-invalid',String(!!error&&(!Number.isFinite(q)||q<=0||q>base?.baseQty)));
   const cost=document.getElementById('saleCostPreview'),gainEl=document.getElementById('saleGainPreview');
   if(!valid){cost.textContent='—';gainEl.textContent='—';gainEl.className='';return;}
@@ -10432,12 +10458,18 @@ function updateSalePreview(){
   cost.textContent=money(costRemoved);gainEl.textContent=signedMoney(gain);gainEl.className=gain>=0?'pos':'neg';
 }
 async function refreshAfterSaleCorrection(){
+  const userId=currentUser?.id;
   await loadHoldingsFromSupabase();
+  if(currentUser?.id!==userId)return;
   await loadActivityFromSupabase();
+  if(currentUser?.id!==userId)return;
   renderProAnalytics();
   Promise.resolve(recordPortfolioSnapshot(true)).catch(()=>{});
 }
 async function recordHoldingSale(){
+  if(saleMutationBusy)return;
+  const userId=currentUser?.id;
+  const saleId=editingSaleId;
   const base=saleBaseState();
   if(!base||!supabaseClient||!currentUser)return;
   const q=Number(document.getElementById('saleQuantity').value);
@@ -10451,12 +10483,14 @@ async function recordHoldingSale(){
     if(!ok)return;
   }
   const btn=document.getElementById('saleSaveBtn');
+  saleMutationBusy=true;
+  const undoBtn=document.getElementById('saleUndoBtn');if(undoBtn)undoBtn.disabled=true;
   setButtonBusy(btn,true,editingSaleId?'Saving…':'Recording…');
   try{
     let response;
-    if(editingSaleId){
+    if(saleId){
       response=await supabaseClient.rpc('benza_edit_sale_atomic',{
-        p_sale_id:editingSaleId,p_quantity:q,p_sale_proceeds:proceeds,p_transaction_date:date||null
+        p_sale_id:saleId,p_quantity:q,p_sale_proceeds:proceeds,p_transaction_date:date||null
       });
     }else{
       const h=base.holding;
@@ -10466,29 +10500,42 @@ async function recordHoldingSale(){
       });
     }
     const {error}=response||{};
+    if(currentUser?.id!==userId)return;
     if(error){
       if(isAuthSessionError(error)){await handleExpiredSession();return;}
       alert(friendlyErrorMessage(error,editingSaleId?'We could not save this sale correction.':'We could not record this sale.'));
       return;
     }
-    const wasCorrection=!!editingSaleId;
+    const wasCorrection=!!saleId;
     closeSaleModal();
     await refreshAfterSaleCorrection();
+    if(currentUser?.id!==userId)return;
     alert((wasCorrection?'Sale updated.':'Sale recorded.')+' View your sale in Settings → History and Analytics → Pro → Realized performance.');
+  }catch(error){
+    if(currentUser?.id===userId)alert(friendlyErrorMessage(error,'We could not save this sale. Please refresh History before retrying.'));
   }finally{
+    saleMutationBusy=false;
     setButtonBusy(btn,false);
+    if(undoBtn)undoBtn.disabled=false;
+    updateSalePreview();
   }
 }
 async function undoRecordedSale(){
+  if(saleMutationBusy)return;
+  const userId=currentUser?.id;
+  const saleId=editingSaleId;
   if(!editingSaleId||!supabaseClient||!currentUser)return;
   const sale=saleById(editingSaleId);
   if(!sale)return;
   const ok=confirm(`Undo this sale of ${Number(sale.quantity||0).toLocaleString()} ${sale.product||'holding'}? The sold quantity and cost basis will be restored to Current Holdings, and this realized gain/loss entry will be removed.`);
   if(!ok)return;
   const btn=document.getElementById('saleUndoBtn');
+  saleMutationBusy=true;
+  const saveBtn=document.getElementById('saleSaveBtn');if(saveBtn)saveBtn.disabled=true;
   setButtonBusy(btn,true,'Undoing…');
   try{
-    const {error}=await supabaseClient.rpc('benza_undo_sale_atomic',{p_sale_id:editingSaleId});
+    const {error}=await supabaseClient.rpc('benza_undo_sale_atomic',{p_sale_id:saleId});
+    if(currentUser?.id!==userId)return;
     if(error){
       if(isAuthSessionError(error)){await handleExpiredSession();return;}
       alert(friendlyErrorMessage(error,'We could not undo this sale.'));
@@ -10496,22 +10543,28 @@ async function undoRecordedSale(){
     }
     closeSaleModal();
     await refreshAfterSaleCorrection();
+  }catch(error){
+    if(currentUser?.id===userId)alert(friendlyErrorMessage(error,'We could not undo this sale. Please refresh History before retrying.'));
   }finally{
+    saleMutationBusy=false;
     setButtonBusy(btn,false);
+    updateSalePreview();
   }
 }
 
 async function deleteHolding(i){
-  if(!confirm('Remove this holding from your portfolio? This will be recorded in Activity.')) return;
-  const portfolioValueBeforeMutation=currentPortfolioMarketValue();
   const h=holdings[i];
-  if(!h?.id){holdings.splice(i,1);renderHoldings();return}
+  if(!h?.id||holdingDeletes.has(h.id))return;
+  if(!confirm('Remove this holding from your portfolio? This will be recorded in Settings → History.')) return;
+  const userId=currentUser?.id;
+  const portfolioValueBeforeMutation=currentPortfolioMarketValue();
   if(!supabaseClient||!currentUser){alert('Please log in before removing a holding.');return}
-
+  holdingDeletes.add(h.id);
+  try{
   const {error}=await supabaseClient.rpc('benza_delete_holding_atomic',{
     p_holding_id:h.id
   });
-
+  if(currentUser?.id!==userId)return;
   if(error){
     if(isAuthSessionError(error)){await handleExpiredSession();return}
     alert(friendlyErrorMessage(error,'We could not remove this holding. Please try again.'));
@@ -10519,12 +10572,18 @@ async function deleteHolding(i){
   }
 
   await removePrivateHoldingFiles([h.photoPath,h.receiptPath,...(h.scannerPhotoPaths||[])]);
-  holdings.splice(i,1);
+  if(currentUser?.id!==userId)return;
+  holdings=holdings.filter(row=>row.id!==h.id);
   rebaseLiveChartForPortfolioFlow(portfolioValueBeforeMutation,currentPortfolioMarketValue());
   renderHoldings();
   await loadActivityFromSupabase();
+  if(currentUser?.id!==userId)return;
   await recordPortfolioSnapshot(true);
+  }catch(error){
+    if(currentUser?.id===userId)alert(friendlyErrorMessage(error,'We could not remove this holding. Refresh My Bullion before retrying.'));
+  }finally{holdingDeletes.delete(h.id);}
 }
+const holdingDeletes=new Set();
 function updatePortfolio(){
   let total=0,totalCost=0;
   const totalCostKnown=holdings.length===0||holdings.every(holdingHasCostBasis);
@@ -10718,17 +10777,20 @@ async function removePrivateHoldingFiles(paths=[]){
 
 async function finishHoldingAttachmentUploads({holdingId,photoFile,receiptFile,oldPhotoPath=null,oldReceiptPath=null}){
   if(!holdingId||(!photoFile&&!receiptFile))return;
+  const userId=currentUser?.id;
   const uploaded=[];
   try{
     const changes={};
     if(photoFile){
       const path=await uploadPrivateHoldingFile(photoFile,'photo');
       uploaded.push(path);
+      if(currentUser?.id!==userId)return;
       changes.photo_path=path;
     }
     if(receiptFile){
       const path=await uploadPrivateHoldingFile(receiptFile,'receipt');
       uploaded.push(path);
+      if(currentUser?.id!==userId)return;
       changes.receipt_path=path;
     }
     const {data,error}=await supabaseClient.rpc('benza_update_holding_documents',{
@@ -10736,6 +10798,7 @@ async function finishHoldingAttachmentUploads({holdingId,photoFile,receiptFile,o
       p_photo_path:photoFile?(changes.photo_path||null):null,
       p_receipt_path:receiptFile?(changes.receipt_path||null):null
     });
+    if(currentUser?.id!==userId)return;
     if(error)throw error;
     const row=Array.isArray(data)?data[0]:data;
     if(!row?.id)throw new Error('The attachment update completed without a valid response.');
@@ -10750,6 +10813,7 @@ async function finishHoldingAttachmentUploads({holdingId,photoFile,receiptFile,o
     if(receiptFile&&oldReceiptPath&&oldReceiptPath!==row.receipt_path)replaced.push(oldReceiptPath);
     await removePrivateHoldingFiles(replaced);
   }catch(error){
+    if(currentUser?.id!==userId)return;
     await removePrivateHoldingFiles(uploaded);
     console.warn('Pro attachment upload failed:',error);
     alert('Your holding was saved, but one or more private attachments could not be uploaded. You can edit the holding and try the attachment again.');
@@ -10758,16 +10822,19 @@ async function finishHoldingAttachmentUploads({holdingId,photoFile,receiptFile,o
 
 async function finishScannerPhotoUploads(holdingId,files=[]){
   if(!holdingId||!files.length)return [];
+  const userId=currentUser?.id;
   const uploaded=[];
   try{
     for(let index=0;index<files.length;index++){
       const file=files[index];
       const path=await uploadPrivateHoldingFile(file,`scan-${index+1}`);
       if(path){uploaded.push(path);}
+      if(currentUser?.id!==userId)return [];
     }
     if(!uploaded.length)return [];
     const {data:response,error}=await supabaseClient.rpc('benza_update_scanner_photos',{p_holding_id:holdingId,p_paths:uploaded});
     const data=Array.isArray(response)?response[0]:response;
+    if(currentUser?.id!==userId)return [];
     if(error)throw error;
     if(data?.id!==holdingId||!Array.isArray(data.scanner_photo_paths)||
       uploaded.some(path=>!data.scanner_photo_paths.includes(path))){
@@ -10780,6 +10847,7 @@ async function finishScannerPhotoUploads(holdingId,files=[]){
     }
     return uploaded;
   }catch(error){
+    if(currentUser?.id!==userId)return [];
     await removePrivateHoldingFiles(uploaded);
     console.warn('Bullion Scan Assist photo upload failed:',error);
     alert('Your holding was saved, but the Bullion Scan Assist photos could not be attached. You can add photos from Edit Holding.');
@@ -10864,7 +10932,9 @@ async function saveHolding(){
         return;
       }
 
-      holdings[editingHoldingIndex]={
+      const index=holdings.findIndex(h=>h.id===existing.id);
+      if(index<0){await loadHoldingsFromSupabase();return;}
+      holdings[index]={
         id:row.id,
         metal:row.metal,
         product:row.product,
@@ -10884,6 +10954,7 @@ async function saveHolding(){
       rebaseLiveChartForPortfolioFlow(portfolioValueBeforeMutation,currentPortfolioMarketValue());
       renderHoldings();
       if(scannerPhotoFiles.length)await finishScannerPhotoUploads(row.id,scannerPhotoFiles);
+      if(currentUser?.id!==userId)return;
       pendingScannerPhotoFiles=[];
       closeAdd({preserveScannerPhotos:true});
       setButtonBusy(button,false);
@@ -10933,6 +11004,7 @@ async function saveHolding(){
     rebaseLiveChartForPortfolioFlow(portfolioValueBeforeMutation,currentPortfolioMarketValue());
     renderHoldings();
     if(scannerPhotoFiles.length)await finishScannerPhotoUploads(row.id,scannerPhotoFiles);
+    if(currentUser?.id!==userId)return;
     pendingScannerPhotoFiles=[];
     closeAdd({preserveScannerPhotos:true});
     setButtonBusy(button,false);
@@ -11106,8 +11178,10 @@ function captureLiveChartPoint(time=new Date()){
 }
 
 async function loadLivePortfolioSnapshots(){
+  const userId=currentUser?.id;
   restoreLiveChartPoints();
   await loadLiveChartFromCloud();
+  if(currentUser?.id!==userId||activeChartRange!=='LIVE')return;
 
   // LIVE is intentionally built only from real high-frequency points
   // captured while Benza is open. Do not mix normal database snapshots
@@ -11346,17 +11420,12 @@ async function loadPortfolioSnapshots(range=activeChartRange){
   }
 
   const userId=currentUser.id;
-  let query=supabaseClient
-    .from('portfolio_snapshots')
-    .select('captured_at,total_value')
-    .order('captured_at',{ascending:true})
-    .limit(5000);
-
   const start=chartRangeStart(range);
-  if(start)query=query.gte('captured_at',start.toISOString());
-
-  const {data,error}=await query;
-  if(currentUser?.id!==userId)return;
+  const {data,error,aborted}=await fetchAllSupabaseRows('portfolio_snapshots',{
+    select:'captured_at,total_value',orderColumn:'captured_at',ascending:true,
+    expectedUserId:userId,since:start?start.toISOString():null
+  });
+  if(aborted||currentUser?.id!==userId||activeChartRange!==range)return;
   if(error){
     if(isAuthSessionError(error)){await handleExpiredSession();return}
     console.warn('Portfolio history unavailable:',error.message);
@@ -11859,37 +11928,8 @@ async function exportBenzaData(){
 
     const text=JSON.stringify(payload,null,2);
     const filename='benza-bullion-data-'+new Date().toISOString().slice(0,10)+'.json';
-    const file=new File([text],filename,{type:'application/json'});
-    let shared=false;
-
-    try{
-      if(navigator.share&&navigator.canShare?.({files:[file]})){
-        await navigator.share({
-          title:'Benza Bullion Data Export',
-          files:[file]
-        });
-        shared=true;
-      }
-    }catch(err){
-      if(err?.name==='AbortError'){
-        setAccountSettingsStatus('Export cancelled.');
-        return;
-      }
-      console.warn('Share export unavailable:',err);
-    }
-
-    if(!shared){
-      const url=URL.createObjectURL(file);
-      const link=document.createElement('a');
-      link.href=url;
-      link.download=filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(()=>URL.revokeObjectURL(url),1000);
-    }
-
-    setAccountSettingsStatus('Your Benza Bullion data export is ready.');
+    const message=await deliverExportFile(text,filename,'application/json');
+    if(currentUser?.id===exportUserId)setAccountSettingsStatus(message.replaceAll('Report','Data export'));
   }catch(error){
     console.error('Data export failed:',error);
     setAccountSettingsStatus(
@@ -11903,6 +11943,8 @@ async function exportBenzaData(){
 
 async function deleteBenzaAccount(){
   if(!supabaseClient||!currentUser) return;
+  const deleteUserId=currentUser.id;
+  if(document.getElementById('deleteAccountButton')?.disabled)return;
 
   const first=confirm('Delete your Benza Bullion account?\n\nThis permanently deletes your account and associated portfolio data. This cannot be undone.\n\nDeleting your account does not cancel Apple subscriptions. Billing continues until you cancel through Apple. Choose Cancel to manage subscriptions first, or OK to delete now.');
   if(!first) return;
@@ -11919,6 +11961,7 @@ async function deleteBenzaAccount(){
 
   try{
     const {data:{session},error:sessionError}=await supabaseClient.auth.getSession();
+    if(currentUser?.id!==deleteUserId)return;
     const token=session?.access_token;
     if(sessionError||!token) throw new Error('Your session has expired. Please sign in again before deleting your account.');
 
@@ -11939,6 +11982,7 @@ async function deleteBenzaAccount(){
       throw new Error(result?.error||'Unable to delete your account. Please try again.');
     }
 
+    if(currentUser?.id!==deleteUserId)return;
     try{await supabaseClient.auth.signOut({scope:'local'});}catch(_){}
     try{localStorage.removeItem(benzaWatchlistStorageKey());}catch(_){}
     clearBenzaAccountState();
@@ -11948,8 +11992,10 @@ async function deleteBenzaAccount(){
     setAuthError('');
     alert('Your Benza Bullion account has been permanently deleted.');
   }catch(error){
+    if(currentUser?.id!==deleteUserId)return;
     console.error('Account deletion failed:',error);
     setAccountSettingsStatus(error?.message||'Unable to delete your account. Please try again.',true);
+  }finally{
     if(button){button.disabled=false;button.textContent='Delete Account';}
   }
 }
@@ -12090,12 +12136,12 @@ function persistBenzaWatchlist(){
 async function syncWatchItemToSupabase(item){
   if(!supabaseClient||!currentUser)return;
   const {error}=await supabaseClient.from('price_alerts').upsert({user_id:currentUser.id,metal:item.metal,target:Number(item.target),direction:item.direction==='lower'?'lower':'higher',enabled:true,is_triggered:false},{onConflict:'user_id,metal,direction'});
-  if(error)console.warn('Could not sync price alert:',error.message);
+  if(error)throw error;
 }
 async function removeWatchItemFromSupabase(metal,direction){
   if(!supabaseClient||!currentUser)return;
   const {error}=await supabaseClient.from('price_alerts').delete().eq('user_id',currentUser.id).eq('metal',metal).eq('direction',direction==='lower'?'lower':'higher');
-  if(error)console.warn('Could not remove cloud price alert:',error.message);
+  if(error)throw error;
 }
 function openMarkets(){hideMainOverlays();setActiveNav('markets');document.getElementById('marketsScreen')?.classList.add('show');setMarketsTab(activeMarketsTab);renderMarkets()}
 function closeMarkets(){document.getElementById('marketsScreen')?.classList.remove('show');setActiveNav('portfolio')}
@@ -12110,6 +12156,9 @@ function setMarketsWatchDirection(direction){
   document.getElementById('marketsWatchLower')?.classList.toggle('active',marketsWatchDirection==='lower');
 }
 async function saveMarketsWatchItem(){
+  if(watchlistMutationBusy)return;
+  const userId=currentUser?.id;
+  if(!userId||!supabaseClient){alert('Please sign in before saving a price alert.');return;}
   const button=document.getElementById('marketsWatchSaveButton');if(button?.disabled)return;
   const metal=document.getElementById('marketsWatchMetal')?.value;
   const target=Number(document.getElementById('marketsWatchTarget')?.value);
@@ -12119,19 +12168,33 @@ async function saveMarketsWatchItem(){
   const replacingExisting=benzaWatchlist.some(x=>x.metal===metal&&(x.direction||'higher')===direction);
   if(!isProActive() && !replacingExisting && benzaWatchlist.length>=3){openProUpgrade('alerts');return}
   setButtonBusy(button,true,'Saving…');
+  watchlistMutationBusy=true;
   try{
+    await syncWatchItemToSupabase({metal,target,direction});
+    if(currentUser?.id!==userId)return;
     const old=benzaWatchlist.find(x=>x.metal===metal&&(x.direction||'higher')===direction);
     if(old)old.target=target;else benzaWatchlist.push({metal,target,direction});
-    persistBenzaWatchlist();await syncWatchItemToSupabase({metal,target,direction});
+    persistBenzaWatchlist();
     const input=document.getElementById('marketsWatchTarget');if(input)input.value='';renderMarketsWatchlist();
-  }finally{setButtonBusy(button,false);}
+  }catch(error){
+    if(currentUser?.id===userId)alert(friendlyErrorMessage(error,'We could not save this price alert. Please try again.'));
+  }finally{watchlistMutationBusy=false;setButtonBusy(button,false);}
 }
 async function removeMarketsWatchItem(metal,direction){
+  if(watchlistMutationBusy||!currentUser||!supabaseClient)return;
+  const userId=currentUser.id;
+  watchlistMutationBusy=true;
+  try{
+  await removeWatchItemFromSupabase(metal,direction);
+  if(currentUser?.id!==userId)return;
   benzaWatchlist=benzaWatchlist.filter(x=>!(x.metal===metal&&(x.direction||'higher')===direction));
   persistBenzaWatchlist();
-  await removeWatchItemFromSupabase(metal,direction);
   renderMarketsWatchlist();
+  }catch(error){
+    if(currentUser?.id===userId)alert(friendlyErrorMessage(error,'We could not remove this price alert. Please try again.'));
+  }finally{watchlistMutationBusy=false;}
 }
+let watchlistMutationBusy=false;
 function renderMarketsWatchlist(){
   const wrap=document.getElementById('marketsWatchList');
   const meter=document.getElementById('proAlertMeter');

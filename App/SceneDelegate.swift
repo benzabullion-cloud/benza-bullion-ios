@@ -21,7 +21,7 @@ final class BenzaExportPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func shareFile(_ call: CAPPluginCall) {
         guard let filename = call.getString("filename"),
               filename == URL(fileURLWithPath: filename).lastPathComponent,
-              filename.hasSuffix(".csv"),
+              ["csv", "json"].contains(URL(fileURLWithPath: filename).pathExtension.lowercased()),
               let text = call.getString("text") else {
             call.reject("The export file is invalid.")
             return
