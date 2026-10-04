@@ -10003,13 +10003,16 @@ async function restoreProPurchases(){
     return;
   }
 
+  const restoreUserId=currentUser.id;
   try{
-    const result=await plugin.restorePurchases();
+    const result=await plugin.restorePurchases({sync:true});
+    if(currentUser?.id!==restoreUserId)return;
     const transactions=sortStoreKitTransactionsForVerification(
       Array.isArray(result?.transactions)?result.transactions:[]
     );
     if(!transactions.length){
       await reconcileAppleAccountEntitlement();
+      if(currentUser?.id!==restoreUserId)return;
       alert(isProActive()
         ?'Benza Bullion Pro is active on this account.'
         :'Apple did not find an active Benza Bullion Pro purchase to restore.');
@@ -10019,6 +10022,7 @@ async function restoreProPurchases(){
     let verified=false;
     let verificationError='';
     for(const transaction of transactions){
+      if(currentUser?.id!==restoreUserId)return;
       try{
         await verifyNativeStoreTransaction(transaction);
         verified=true;
@@ -10028,7 +10032,9 @@ async function restoreProPurchases(){
       }
     }
 
+    if(currentUser?.id!==restoreUserId)return;
     await loadBenzaEntitlement();
+    if(currentUser?.id!==restoreUserId)return;
     if(verified&&isProActive()){
       renderProAnalytics();
       updateProIntegratedUI();
@@ -10038,6 +10044,7 @@ async function restoreProPurchases(){
     }
   }catch(error){
     console.error('Restore Purchases failed:',error);
+    if(currentUser?.id!==restoreUserId)return;
     alert(error?.message||'Restore Purchases could not be completed.');
   }
 }

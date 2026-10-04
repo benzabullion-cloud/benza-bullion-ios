@@ -58,3 +58,40 @@ test('pending receipt account conflicts clear retry intent without granting acce
  c.verifyNativeStoreTransaction=async()=>{calls++;throw Error('Purchase is linked to a different Benza Bullion account')};
  await c.handlePendingPurchase(tx);assert.equal(c.storage.size,0);assert.equal(c.messages.length,0);await c.handlePendingPurchase(tx);assert.equal(calls,1);
 });
+
+function restoreContext(plugin){
+ const c=storeContext();c.console.error=()=>{};
+ c.window.Capacitor.Plugins.BenzaStoreKit=plugin;
+ c.benzaEntitlement={tier:'pro'};c.isProActive=()=>true;
+ c.loadBenzaEntitlement=async()=>{};c.reconcileAppleAccountEntitlement=async()=>{};
+ c.renderProAnalytics=()=>{};c.updateProIntegratedUI=()=>{};
+ load(c,['sortStoreKitTransactionsForVerification','restoreProPurchases','refreshNativeProEntitlementSilently']);
+ return c;
+}
+test('explicit restore refreshes Apple first; silent refresh never requests authentication',async()=>{
+ const calls=[];const tx={productId:'benza_pro_monthly',signedTransaction:'monthly'};
+ const c=restoreContext({restorePurchases:async options=>{calls.push(options);return {transactions:[tx]}}});
+ let verified=0;c.verifyNativeStoreTransaction=async()=>{verified++};
+ await c.restoreProPurchases();assert.equal(calls[0].sync,true);assert.equal(verified,1);assert.match(c.messages[0],/has been restored/);
+ await c.refreshNativeProEntitlementSilently();assert.equal(calls[1],undefined);assert.equal(verified,2);
+});
+test('Apple refresh failure does not verify cached receipts or report restore success',async()=>{
+ const c=restoreContext({restorePurchases:async()=>{throw Error('Apple could not refresh purchases')}});
+ let verified=0;c.verifyNativeStoreTransaction=async()=>{verified++};
+ await c.restoreProPurchases();assert.equal(verified,0);assert.deepEqual(c.messages,['Apple could not refresh purchases']);
+});
+test('account changes during Apple authentication cancel restore verification',async()=>{
+ let resolve;const c=restoreContext({restorePurchases:()=>new Promise(r=>resolve=r)});
+ let verified=0;c.verifyNativeStoreTransaction=async()=>{verified++};
+ const request=c.restoreProPurchases();c.currentUser={id:'account-b'};
+ resolve({transactions:[{productId:'benza_pro_monthly',signedTransaction:'monthly'}]});
+ await request;assert.equal(verified,0);assert.equal(c.messages.length,0);
+});
+test('restore retains account ownership checks and succeeds when a matching receipt is also returned',async()=>{
+ const other={productId:'benza_pro_annual'},matching={productId:'benza_pro_monthly'};
+ const c=restoreContext({restorePurchases:async()=>({transactions:[other,matching]})});
+ const checked=[];c.verifyNativeStoreTransaction=async tx=>{checked.push(tx);if(tx===other)throw Error('Purchase is linked to a different Benza Bullion account')};
+ await c.restoreProPurchases();assert.equal(checked.length,2);assert.match(c.messages[0],/has been restored/);
+ c.window.Capacitor.Plugins.BenzaStoreKit.restorePurchases=async()=>({transactions:[other]});c.messages.length=0;
+ await c.restoreProPurchases();assert.match(c.messages[0],/linked to a different Benza Bullion account/);
+});

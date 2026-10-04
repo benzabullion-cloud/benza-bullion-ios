@@ -968,6 +968,18 @@ final class BenzaStoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func restorePurchases(_ call: CAPPluginCall) {
         Task { @MainActor in
+            // Only a user-initiated restore may prompt for Apple authentication.
+            // Refresh before enumerating receipts, especially after sandbox
+            // account changes. Do not verify cached receipts if syncing fails.
+            if call.getBool("sync", false) {
+                do {
+                    try await AppStore.sync()
+                } catch {
+                    call.reject("Apple could not refresh purchases. Please try Restore Purchases again. \(error.localizedDescription)")
+                    return
+                }
+            }
+
             var restored: [[String: Any]] = []
 
             for await verification in Transaction.currentEntitlements {
@@ -982,9 +994,6 @@ final class BenzaStoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
                 ])
             }
 
-            // On the same TestFlight device, currentEntitlements already contains
-            // completed sandbox purchases. Avoid forcing AppStore.sync(), which can
-            // surface a generic "Unable to Complete Request" sandbox error.
             call.resolve(["transactions": restored])
         }
     }
