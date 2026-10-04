@@ -6330,7 +6330,8 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
         <div class="settingsAccountTitle">Account</div>
 
         <label class="settingsAccountLabel" for="accountName">Display Name</label>
-        <input id="accountName" class="settingsAccountInput" type="text" autocomplete="name" placeholder="Your display name">
+        <input id="accountName" class="settingsAccountInput" type="text" autocomplete="name" placeholder="Bullion Builder" aria-describedby="accountNameHint">
+        <div id="accountNameHint" class="settingsHint">Make it yours—add your name or nickname.</div>
 
         <label class="settingsAccountLabel" for="accountEmail">Email</label>
         <input id="accountEmail" class="settingsAccountInput" type="email" autocomplete="email" placeholder="Email address">
@@ -8723,7 +8724,7 @@ async function handleAuth(){
     status.textContent=authMode==='login'?'Signing in…':'Creating account…';
     const result=authMode==='login'
       ? await supabaseClient.auth.signInWithPassword({email,password})
-      : await supabaseClient.auth.signUp({email,password});
+      : await supabaseClient.auth.signUp({email,password,options:{data:{name:'Bullion Builder'}}});
 
     if(result.error)throw result.error;
 
@@ -11745,10 +11746,15 @@ function setAccountSettingsStatus(message, isError=false){
   el.style.color=isError?'#d9534f':'var(--muted)';
 }
 
+function accountDisplayName(){
+  const metadata=currentUser?.user_metadata||{};
+  return [metadata.name,metadata.full_name].find(value=>typeof value==='string'&&value.trim())?.trim()||'Bullion Builder';
+}
+
 function updateWelcomeBack(){
   const el=document.getElementById('welcomeBack');
   if(!el) return;
-  const displayName=(currentUser?.user_metadata?.name || currentUser?.user_metadata?.full_name || '').trim();
+  const displayName=currentUser?accountDisplayName():'';
   if(displayName){
     el.textContent=`Welcome back, ${displayName}`;
     el.classList.add('show');
@@ -11767,7 +11773,7 @@ function populateAccountSettings(){
   const pwEl=document.getElementById('accountPassword');
   const pw2El=document.getElementById('accountPasswordConfirm');
 
-  if(nameEl) nameEl.value=currentUser.user_metadata?.name || currentUser.user_metadata?.full_name || '';
+  if(nameEl) nameEl.value=accountDisplayName();
   if(emailEl) emailEl.value=currentUser.email || '';
   if(pwEl) pwEl.value='';
   if(pw2El) pw2El.value='';
@@ -11778,7 +11784,7 @@ async function saveAccountProfile(){
   if(!supabaseClient||!currentUser) return;
   const button=document.getElementById('saveProfileButton');
   if(button?.disabled)return;
-  const name=(document.getElementById('accountName')?.value||'').trim();
+  const name=(document.getElementById('accountName')?.value||'').trim()||'Bullion Builder';
   const email=(document.getElementById('accountEmail')?.value||'').trim();
   if(name.length>60){setAccountSettingsStatus('Display Name must be 60 characters or fewer.',true);return}
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){setAccountSettingsStatus('Please enter a valid email address.',true);return}
@@ -11842,7 +11848,7 @@ async function exportBenzaData(){
       account:{
         id:currentUser.id,
         email:currentUser.email||null,
-        display_name:currentUser.user_metadata?.name||currentUser.user_metadata?.full_name||null
+        display_name:accountDisplayName()
       },
       holdings:results[0].data||[],
       activity:results[1].data||[],

@@ -110,6 +110,26 @@ window.supabase={createClient:()=>({
   await page.locator('#proExportReportButton').click();
   assert.equal((await download).suggestedFilename(),'Benza_Bullion_Pro_Portfolio_Report.csv');
   await page.evaluate(()=>{hideMainOverlays();goPortfolio();window.Capacitor={isNativePlatform:()=>true,Plugins:{}};});
+  console.log('Check default and personalized account names in '+engineName);
+  await page.evaluate(()=>{currentUser.user_metadata={};updateWelcomeBack();populateAccountSettings();});
+  assert.equal(await page.locator('#welcomeBack').textContent(),'Welcome back, Bullion Builder');
+  assert.equal(await page.locator('#accountName').inputValue(),'Bullion Builder');
+  assert.equal(await page.locator('#accountNameHint').isVisible(),false);
+  await page.evaluate(()=>openSettings());
+  assert.equal(await page.locator('#accountNameHint').isVisible(),true);
+  await page.evaluate(async()=>{
+    supabaseClient.auth.updateUser=async attrs=>({data:{user:{...currentUser,user_metadata:attrs.data}},error:null});
+    document.getElementById('accountName').value='Gabriel';await saveAccountProfile();
+  });
+  assert.equal(await page.locator('#welcomeBack').textContent(),'Welcome back, Gabriel');
+  await page.evaluate(()=>{hideMainOverlays();currentUser.user_metadata={name:'',full_name:'Existing Name'};updateWelcomeBack();});
+  assert.equal(await page.locator('#welcomeBack').textContent(),'Welcome back, Existing Name');
+  await page.evaluate(async()=>{
+    supabaseClient.auth.signUp=async attrs=>{sweep.signup=attrs;return {data:{session:null,user:null},error:null};};
+    document.getElementById('authEmail').value='new@example.test';document.getElementById('authPassword').value='test-password';
+    setAuthMode('signup');await handleAuth();setAuthMode('login');
+  });
+  assert.equal(await page.evaluate(()=>sweep.signup.options.data.name),'Bullion Builder');
   console.log('Check password field controls in '+engineName);
   await page.evaluate(()=>{document.getElementById('authScreen').style.display='flex';});
   await page.locator('#authPassword').fill('example-password');

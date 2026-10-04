@@ -13,13 +13,13 @@ function context(){
 function load(ctx,names,prefix=''){vm.runInContext(prefix+'\n'+names.map(fn).join('\n'),ctx)}
 test('profile keeps email confirmation instructions; thrown errors recover buttons',async()=>{
  const c=context();c.supabaseClient={auth:{updateUser:async()=>({data:{user:{id:'account-a',email:'old@example.test',user_metadata:{name:'Test'}}}})}};
- load(c,['populateAccountSettings','saveAccountProfile','changeAccountPassword']);
+ load(c,['accountDisplayName','populateAccountSettings','saveAccountProfile','changeAccountPassword']);
  await c.saveAccountProfile();assert.match(c.status,/Check your new email/);assert.equal(c.els.saveProfileButton.disabled,false);
  c.supabaseClient.auth.updateUser=async()=>{throw Error('Network unavailable')};await c.saveAccountProfile();assert.equal(c.status,'Network unavailable');assert.equal(c.els.saveProfileButton.disabled,false);
  c.els.accountPassword.value='abcdefgh';c.els.accountPasswordConfirm.value='abcdefgh';await c.changeAccountPassword();assert.equal(c.status,'Network unavailable');assert.equal(c.els.changePasswordButton.disabled,false);
 });
 test('a profile response cannot replace the next signed-in account',async()=>{
- const c=context();let resolve;c.supabaseClient={auth:{updateUser:()=>new Promise(r=>resolve=r)}};load(c,['populateAccountSettings','saveAccountProfile']);const request=c.saveAccountProfile();c.currentUser={id:'account-b'};resolve({data:{user:{id:'account-a'}}});await request;assert.equal(c.currentUser.id,'account-b');
+ const c=context();let resolve;c.supabaseClient={auth:{updateUser:()=>new Promise(r=>resolve=r)}};load(c,['accountDisplayName','populateAccountSettings','saveAccountProfile']);const request=c.saveAccountProfile();c.currentUser={id:'account-b'};resolve({data:{user:{id:'account-a'}}});await request;assert.equal(c.currentUser.id,'account-b');
 });
 test('notification failures roll back and concurrent changes save only their own column',async()=>{
  const c=context();const updates=[];
