@@ -8300,7 +8300,7 @@ function editHolding(i){
   update();
   addScreen.classList.add('show');
 }
-function syncPurchaseDateDisplay(inputId='date',displayId='dateDisplay'){
+function syncDateFieldDisplay(inputId,displayId){
   const input=document.getElementById(inputId);
   const display=document.getElementById(displayId);
   if(!input||!display)return;
@@ -8309,6 +8309,8 @@ function syncPurchaseDateDisplay(inputId='date',displayId='dateDisplay'){
   const parsed=new Date(value+'T12:00:00');
   display.textContent=parsed.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
 }
+function syncPurchaseDateDisplay(){syncDateFieldDisplay('date','dateDisplay');}
+function syncSaleDateDisplay(){syncDateFieldDisplay('saleDate','saleDateDisplay');}
 document.getElementById('date')?.addEventListener('input',syncPurchaseDateDisplay);
 document.getElementById('date')?.addEventListener('change',syncPurchaseDateDisplay);
 
@@ -10436,7 +10438,7 @@ function setSaleAll(){
   updateSalePreview();
 }
 function updateSalePreview(){
-  syncPurchaseDateDisplay('saleDate','saleDateDisplay');
+  syncSaleDateDisplay();
   const base=saleBaseState();
   const quantity=document.getElementById('saleQuantity');
   if(base){
@@ -12538,7 +12540,7 @@ loadBenzaWatchlist();
       <p id="saleQuantityHint" class="holdingDetailHint">Enter pieces sold, not ounces. To sell one 10 oz bar, enter 1.</p>
       <label>Total sale proceeds ($ for all pieces sold)<input id="saleProceeds" type="number" min="0" step="0.01" placeholder="Total amount received" inputmode="decimal" oninput="updateSalePreview()" aria-describedby="saleValidation"></label>
       <p id="saleValidation" class="holdingDetailHint neg" role="status" aria-live="polite" hidden></p>
-      <label for="saleDate">Sale date<div class="dateField"><span id="saleDateDisplay" aria-hidden="true"></span><input id="saleDate" type="date" aria-label="Sale date" oninput="syncPurchaseDateDisplay('saleDate','saleDateDisplay')" onchange="syncPurchaseDateDisplay('saleDate','saleDateDisplay')"></div></label>
+      <label for="saleDate">Sale date<div class="dateField"><span id="saleDateDisplay" aria-hidden="true"></span><input id="saleDate" type="date" aria-label="Sale date" oninput="syncSaleDateDisplay()" onchange="syncSaleDateDisplay()"></div></label>
       <div class="salePreview">
         <div><span>Cost basis sold</span><strong id="saleCostPreview">$0.00</strong></div>
         <div><span>Estimated realized P/L</span><strong id="saleGainPreview">$0.00</strong></div>

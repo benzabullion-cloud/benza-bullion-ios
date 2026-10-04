@@ -87,6 +87,7 @@ window.supabase={createClient:()=>({
     activities=[{id:'sale-date-fixture',type:'sell',holding_id:holdings[0].id,product:holdings[0].product,quantity:.5,weight_oz:1,cost_basis_removed:1000,sale_proceeds:2000,transaction_date:'2026-09-18'}];
     if(editing)openEditSaleModal('sale-date-fixture');else openSaleModal(0);
    },{theme,editing});
+   if(editing)assert.match(await page.locator('#saleDateDisplay').textContent(),/18.*2026/);
    await page.locator('#saleDate').fill('2026-10-04');
    assert.match(await page.locator('#saleDateDisplay').textContent(),/2026/);
    const bounds=await page.evaluate(()=>{
@@ -100,7 +101,10 @@ window.supabase={createClient:()=>({
    if(viewport.width===390&&!editing){await page.locator('#saleDate').scrollIntoViewIfNeeded();await page.screenshot({path:'ui-artifacts/sale-date-'+engineName+'-'+theme+'.png'});}
   }
   await page.setViewportSize({width:390,height:844});
-  await page.evaluate(()=>{closeSaleModal();applyTheme('dark');});
+  await page.evaluate(()=>{closeSaleModal();applyTheme('dark');openManualAdd();});
+  await page.locator('#date').fill('2027-02-03');
+  assert.match(await page.locator('#dateDisplay').textContent(),/3.*2027/);
+  await page.evaluate(()=>closeAdd());
   console.log('Check both native report entry points in '+engineName);
   await page.evaluate(()=>{
     closeAdd();hideMainOverlays();
