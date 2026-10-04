@@ -1,0 +1,31 @@
+const assert=require('node:assert/strict'),fs=require('node:fs');const{PGlite}=require('@electric-sql/pglite');
+(async()=>{
+ const db=new PGlite();await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create schema storage;
+ create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql as $$select current_setting('test.user_id',true)::uuid$$;
+ create table holdings(id uuid primary key,user_id uuid references auth.users(id),photo_path text,receipt_path text,scanner_photo_paths text[]);
+ create table transactions(id uuid primary key,holding_snapshot jsonb,type text default 'sell',user_id uuid,holding_id uuid,created_at timestamptz default now());
+ create table storage.objects(name text,bucket_id text,created_at timestamptz);
+ create table user_entitlements(user_id uuid primary key references auth.users(id) on delete cascade,tier text,status text,product_id text,original_transaction_id text,expires_at timestamptz,trial_ends_at timestamptz,last_verified_at timestamptz,updated_at timestamptz);
+ insert into auth.users values('00000000-0000-0000-0000-000000000001'),('00000000-0000-0000-0000-000000000002');set test.user_id='00000000-0000-0000-0000-000000000001';`);
+ const migration=fs.readdirSync('supabase/migrations').find(x=>x.endsWith('_final_launch_hardening.sql'));await db.exec(fs.readFileSync('supabase/migrations/'+migration,'utf8'));
+ const a='00000000-0000-0000-0000-000000000001',b='00000000-0000-0000-0000-000000000002';
+ async function apply(user,family,product,status,when,expiry,token=user){return(await db.query('select benza_apply_apple_entitlement($1,$2,$3,$4,$5,$6,$7,$8) as e',[user,family,product,when,expiry,status,'Sandbox',token])).rows[0].e}
+ const t0=new Date(Date.now()-10000).toISOString(),t1=new Date(Date.now()-5000).toISOString(),t2=new Date().toISOString(),future=new Date(Date.now()+86400000).toISOString();
+ await assert.rejects(apply(a,'unbound','benza_pro_founder_lifetime','active',t0,null,null),/linked to this account/);
+ assert.equal((await apply(a,'founder','benza_pro_founder_lifetime','active',t0,null)).tier,'pro');
+ await assert.rejects(apply(b,'founder','benza_pro_founder_lifetime','active',t1,null),/another account/);
+ assert.equal((await apply(a,'founder','benza_pro_founder_lifetime','revoked',t1,null)).tier,'free');
+ assert.equal((await apply(a,'founder','benza_pro_founder_lifetime','active',t0,null)).tier,'free');
+ assert.equal((await apply(a,'annual','benza_pro_annual','active',t1,future)).tier,'pro');
+ assert.equal((await apply(a,'monthly','benza_pro_monthly','expired',t2,new Date(Date.now()-1000).toISOString())).product_id,'benza_pro_annual');
+ await assert.rejects(apply(a,'bad','benza_pro_monthly','active',t2,null),/expiry required/);
+ assert.equal((await apply(a,'annual','benza_pro_annual','grace',t2,new Date(Date.now()-1).toISOString())).tier,'free');
+ const path=a+'/inventory/x/front.jpg';await db.query('insert into holdings values($1,$2,$3,null,$4)',[a,a,path,[]]);
+ await db.query('delete from holdings where id=$1',[a]);assert.equal((await db.query('select count(*)::int as n from benza_file_cleanup')).rows[0].n,1);
+ await db.query('insert into transactions(id,holding_snapshot) values($1,$2)',[a,JSON.stringify({scanner_photo_paths:[path]})]);assert.equal((await db.query('select benza_file_is_referenced($1) as ok',[path])).rows[0].ok,true);
+ await assert.rejects(db.query('select benza_queue_file_cleanup($1)',[[b+'/inventory/x.jpg']]),/owner/);
+ await db.exec('set role authenticated');await assert.rejects(db.query('select benza_apply_apple_entitlement($1,$2,$3,$4,$5,$6,$7,$8)',[a,'bad','benza_pro_monthly',t2,future,'active','Sandbox',a]),/permission denied/);await db.exec('reset role');
+ await db.query('delete from transactions');await db.query('delete from auth.users where id=$1',[a]);assert.equal((await db.query("select user_id from benza_purchase_ownership where original_transaction_id='founder'")).rows[0].user_id,null);
+ await assert.rejects(apply(b,'founder','benza_pro_founder_lifetime','active',t2,null),/another account/);
+ await db.close();console.log('PASS atomic purchase ownership, stale replay/revocation, multi-plan access, expiry validation, file deletion queue, sale reference protection, cross-account rejection and service-only permissions');
+})().catch(e=>{console.error(e);process.exit(1)});

@@ -9,6 +9,9 @@ on:
       - 'tests/holding-base-edits.cjs'
       - 'App/public/supabase_bullion_details.sql'
       - 'supabase/migrations/**'
+      - 'supabase/functions/**'
+      - 'storekit-verifier/**'
+      - 'tests/final-launch*'
       - '.github/workflows/statistics-accuracy.yml'
 permissions:
   contents: read
@@ -20,9 +23,17 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
       - name: Run statistics regression suite
-        run: node --test tests/statistics-accuracy.test.cjs tests/launch-account-purchases.test.cjs
+        run: node --test tests/statistics-accuracy.test.cjs tests/launch-account-purchases.test.cjs tests/final-launch-hardening.test.cjs
       - name: Verify basic holding edits against PostgreSQL
         run: |
           npm install --no-save --ignore-scripts @electric-sql/pglite@0.5.8
           node tests/holding-base-edits.cjs
+          node tests/final-launch-database.cjs
+      - name: Verify Apple lifecycle logic
+        run: |
+          npm ci --prefix storekit-verifier --ignore-scripts
+          node --test tests/apple-entitlements.test.cjs

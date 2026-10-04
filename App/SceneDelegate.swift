@@ -805,12 +805,12 @@ final class BenzaStoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
             for await verification in Transaction.updates {
                 guard !Task.isCancelled else { return }
                 guard let self, case .verified(let transaction) = verification,
-                      self.allowedProducts.contains(transaction.productID),
-                      transaction.revocationDate == nil else { continue }
+                      self.allowedProducts.contains(transaction.productID) else { continue }
                 self.notifyListeners("transactionUpdated", data: [
                     "productId": transaction.productID,
                     "transactionId": String(transaction.id),
                     "appAccountToken": transaction.appAccountToken?.uuidString.lowercased() ?? "",
+                    "revoked": transaction.revocationDate != nil,
                     "signedTransaction": verification.jwsRepresentation
                 ], retainUntilConsumed: true)
             }
@@ -872,7 +872,10 @@ final class BenzaStoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        let accountToken = call.getString("appAccountToken").flatMap(UUID.init(uuidString:))
+        guard let accountToken = call.getString("appAccountToken").flatMap(UUID.init(uuidString:)) else {
+            call.reject("A signed-in account is required.")
+            return
+        }
 
         Task { @MainActor in
             do {
@@ -882,11 +885,7 @@ final class BenzaStoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
 
                 let result: Product.PurchaseResult
-                if let accountToken {
-                    result = try await product.purchase(options: [.appAccountToken(accountToken)])
-                } else {
-                    result = try await product.purchase()
-                }
+                result = try await product.purchase(options: [.appAccountToken(accountToken)])
 
                 switch result {
                 case .success(let verification):

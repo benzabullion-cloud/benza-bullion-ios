@@ -1,136 +1,44 @@
 import { createClient } from '@supabase/supabase-js';
-import { SignedDataVerifier, Environment } from '@apple/app-store-server-library';
-
-const BUNDLE_ID = 'com.benzabullion.app';
-const PRODUCTS = new Set([
-  'benza_pro_monthly',
-  'benza_pro_annual',
-  'benza_pro_founder_lifetime'
-]);
-
-let cachedRoots;
-
-async function getRoots() {
-  if (cachedRoots) return cachedRoots;
-  const urls = [
-    'https://www.apple.com/appleca/AppleIncRootCertificate.cer',
-    'https://www.apple.com/certificateauthority/AppleRootCA-G2.cer',
-    'https://www.apple.com/certificateauthority/AppleRootCA-G3.cer'
-  ];
-  const roots = [];
-  for (const url of urls) {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Unable to load Apple root certificate');
-    roots.push(Buffer.from(await response.arrayBuffer()));
-  }
-  cachedRoots = roots;
-  return roots;
-}
-
-function decodePayload(jws) {
-  const parts = String(jws || '').split('.');
-  if (parts.length !== 3) throw new Error('Invalid signed transaction');
-  return JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-}
-
-function isoFromMillis(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return new Date(n).toISOString();
-}
-
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-  try {
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const anonKey = process.env.SUPABASE_ANON_KEY;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !anonKey || !serviceKey) throw new Error('Server configuration is incomplete');
-
-    const authHeader = req.headers.authorization || '';
-    const token = authHeader.replace(/^Bearer\s+/i, '');
-    if (!token) throw new Error('Missing authentication');
-
-    const authClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-      auth: { persistSession: false, autoRefreshToken: false }
-    });
-    const { data: userData, error: userError } = await authClient.auth.getUser(token);
-    if (userError || !userData?.user) throw new Error('Invalid authentication');
-
-    const signedTransaction = String(req.body?.signedTransaction || '');
-    if (!signedTransaction) throw new Error('Missing signed transaction');
-
-    const unverified = decodePayload(signedTransaction);
-    const envName = String(unverified.environment || '');
-    const environment = envName === 'Production' ? Environment.PRODUCTION : Environment.SANDBOX;
-
-    let appAppleId;
-    if (environment === Environment.PRODUCTION) {
-      const configured = Number(process.env.APPLE_APP_ID || '6811639929');
-      if (!Number.isFinite(configured) || configured <= 0) {
-        throw new Error('Production App Store verification is not configured');
+import { appleContext,decodePayload,currentAppleState,applyAppleState } from '../lib/apple-entitlements.js';
+export default async function handler(req,res){
+  res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Headers','authorization, content-type');res.setHeader('Access-Control-Allow-Methods','POST, OPTIONS');
+  if(req.method==='OPTIONS')return res.status(200).end();
+  if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
+  // Capture before network reads so a delayed older request cannot replace a
+  // newer authoritative observation of this purchase family.
+  const observedAt=new Date().toISOString();
+  try{
+    const {SUPABASE_URL:url,SUPABASE_ANON_KEY:anon,SUPABASE_SERVICE_ROLE_KEY:service}=process.env;
+    if(!url||!anon||!service)throw new Error('Server configuration is incomplete');
+    const token=String(req.headers.authorization||'').replace(/^Bearer\s+/i,'');if(!token)throw new Error('Missing authentication');
+    const auth=createClient(url,anon,{global:{headers:{Authorization:`Bearer ${token}`}},auth:{persistSession:false,autoRefreshToken:false}});
+    const {data:userData,error}=await auth.auth.getUser(token);if(error||!userData?.user)throw new Error('Invalid authentication');
+    const admin=createClient(url,service,{auth:{persistSession:false,autoRefreshToken:false}});
+    if(req.body?.action==='reconcile'){
+      const {data:families,error:familyError}=await admin.from('benza_purchase_ownership').select('original_transaction_id,environment').eq('user_id',userData.user.id);
+      if(familyError)throw familyError;
+      for(const family of families||[]){
+        let reconciled=false,lastError;
+        for(const environment of family.environment?[family.environment]:['Production','Sandbox']){
+          try{
+            const apple=await appleContext(environment);
+            const info=await apple.client.getTransactionInfo(family.original_transaction_id);
+            const input=await apple.verifier.verifyAndDecodeTransaction(info.signedTransactionInfo);
+            const state=await currentAppleState(input,environment,apple);
+            await applyAppleState(admin,userData.user.id,state,environment,observedAt);
+            reconciled=true;break;
+          }catch(error){lastError=error;}
+        }
+        if(!reconciled)throw lastError;
       }
-      appAppleId = configured;
+      const {data:entitlement,error:entitlementError}=await admin.from('user_entitlements').select('*').eq('user_id',userData.user.id).maybeSingle();
+      if(entitlementError)throw entitlementError;
+      return res.status(200).json({ok:true,entitlement});
     }
-
-    const verifier = new SignedDataVerifier(
-      await getRoots(),
-      true,
-      environment,
-      BUNDLE_ID,
-      appAppleId
-    );
-    const tx = await verifier.verifyAndDecodeTransaction(signedTransaction);
-
-    const productId = String(tx.productId || '');
-    if (!PRODUCTS.has(productId)) throw new Error('Unknown Benza Bullion product');
-
-    const tokenFromApple = String(tx.appAccountToken || '').toLowerCase();
-    if (tokenFromApple && tokenFromApple !== String(userData.user.id).toLowerCase()) {
-      throw new Error('Purchase is linked to a different Benza Bullion account');
-    }
-
-    const revoked = Number(tx.revocationDate || 0) > 0;
-    const expiresAt = isoFromMillis(tx.expiresDate);
-    const expired = expiresAt ? new Date(expiresAt).getTime() <= Date.now() : false;
-    const isFounder = productId === 'benza_pro_founder_lifetime';
-    const active = !revoked && (isFounder || !expired);
-    const introductory = Number(tx.offerType || 0) === 1;
-
-    const record = {
-      user_id: userData.user.id,
-      tier: active ? 'pro' : 'free',
-      status: active ? (introductory ? 'trial' : 'active') : 'inactive',
-      product_id: productId,
-      original_transaction_id: tx.originalTransactionId ? String(tx.originalTransactionId) : null,
-      expires_at: isFounder ? null : expiresAt,
-      trial_ends_at: active && introductory ? expiresAt : null,
-      last_verified_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-
-    const admin = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false, autoRefreshToken: false }
-    });
-    const { error: upsertError } = await admin
-      .from('user_entitlements')
-      .upsert(record, { onConflict: 'user_id' });
-    if (upsertError) throw upsertError;
-
-    return res.status(200).json({
-      ok: true,
-      entitlement: record,
-      environment: envName,
-      transactionId: tx.transactionId ? String(tx.transactionId) : null
-    });
-  } catch (error) {
-    console.error('StoreKit verifier error:', error);
-    return res.status(400).json({ error: error?.message || String(error) });
-  }
+    const jws=String(req.body?.signedTransaction||'');const environment=decodePayload(jws).environment;
+    const apple=await appleContext(environment);const input=await apple.verifier.verifyAndDecodeTransaction(jws);
+    const state=await currentAppleState(input,environment,apple);
+    const entitlement=await applyAppleState(admin,userData.user.id,state,environment,observedAt);
+    return res.status(200).json({ok:true,entitlement,environment,transactionId:String(state.tx.transactionId)});
+  }catch(error){console.error('Apple verification failed:',error?.message);return res.status(400).json({error:error?.message||'Purchase verification failed'});}
 }

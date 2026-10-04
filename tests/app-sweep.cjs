@@ -43,6 +43,17 @@ window.supabase={createClient:()=>({
     states++;
    }
   }
+  console.log('Check password field controls in '+engineName);
+  await page.evaluate(()=>{document.getElementById('authScreen').style.display='flex';});
+  await page.locator('#authPassword').fill('example-password');
+  await page.locator('#authPasswordVisibility').click();
+  assert.equal(await page.locator('#authPassword').getAttribute('type'),'text');
+  assert.equal(await page.locator('#authPasswordVisibility').getAttribute('aria-label'),'Hide password');
+  await page.locator('#authPasswordVisibility').click();
+  assert.equal(await page.locator('#authPassword').getAttribute('type'),'password');
+  await page.locator('#authPasswordClear').click();
+  assert.equal(await page.locator('#authPassword').inputValue(),'');
+  await page.evaluate(()=>{document.getElementById('authScreen').style.display='none';});
   console.log('Check localized Pro plans and trial eligibility in '+engineName);
   for(const width of [320,390,768]){
    await page.setViewportSize({width,height:844});
@@ -198,9 +209,9 @@ window.supabase={createClient:()=>({
    supabaseClient.rpc=async()=>({data:null,error:null});
    const result=await finishScannerPhotoUploads('sweep-holding',[new File(['fixture'],'coin.dat',{type:'application/octet-stream'})]);
    supabaseClient.rpc=rpc;
-   return {paths:result.length,removed:sweep.removed.length,warning:sweep.alerts.at(-1)};
+   return {paths:result.length,queued:sweep.writes.filter(x=>x.name==='benza_queue_file_cleanup').length,warning:sweep.alerts.at(-1)};
   });
-  assert.equal(uploadFailure.paths,0);assert.equal(uploadFailure.removed,1);assert.match(uploadFailure.warning,/could not be attached/);
+  assert.equal(uploadFailure.paths,0);assert.ok(uploadFailure.queued>=1);assert.match(uploadFailure.warning,/could not be attached/);
   // Reproduce delayed responses from account A after B signs in.
   const stale=await page.evaluate(async()=>{
    const original=supabaseClient;const callbacks=[];
