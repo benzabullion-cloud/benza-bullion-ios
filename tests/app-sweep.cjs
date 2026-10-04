@@ -206,7 +206,7 @@ window.supabase={createClient:()=>({
   await page.evaluate(()=>{sweep.failRpc=false;});
   const uploadFailure=await page.evaluate(async()=>{
    const rpc=supabaseClient.rpc;
-   supabaseClient.rpc=async()=>({data:null,error:null});
+   supabaseClient.rpc=async(name,args)=>name==='benza_queue_file_cleanup'?rpc(name,args):({data:null,error:null});
    const result=await finishScannerPhotoUploads('sweep-holding',[new File(['fixture'],'coin.dat',{type:'application/octet-stream'})]);
    supabaseClient.rpc=rpc;
    return {paths:result.length,queued:sweep.writes.filter(x=>x.name==='benza_queue_file_cleanup').length,warning:sweep.alerts.at(-1)};

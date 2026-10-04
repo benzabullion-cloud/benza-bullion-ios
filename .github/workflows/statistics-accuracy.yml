@@ -37,3 +37,5 @@ jobs:
         run: |
           npm ci --prefix storekit-verifier --ignore-scripts
           node --test tests/apple-entitlements.test.cjs
+      - name: Typecheck deployed worker sources
+        run: npx --yes deno@2.5.6 check supabase/functions/benza-price-alerts/index.ts supabase/functions/benza-portfolio-snapshots/index.ts supabase/functions/benza-delete-account/index.ts
