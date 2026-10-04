@@ -9,6 +9,60 @@ import BenzaPrivateVision
 import BackgroundAssets
 import System
 
+@objc(BenzaExportPlugin)
+final class BenzaExportPlugin: CAPPlugin, CAPBridgedPlugin {
+    let identifier = "BenzaExportPlugin"
+    let jsName = "BenzaExport"
+    let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "shareFile", returnType: CAPPluginReturnPromise)
+    ]
+    private var sharing = false
+
+    @objc func shareFile(_ call: CAPPluginCall) {
+        guard let filename = call.getString("filename"),
+              filename == URL(fileURLWithPath: filename).lastPathComponent,
+              filename.hasSuffix(".csv"),
+              let text = call.getString("text") else {
+            call.reject("The export file is invalid.")
+            return
+        }
+        DispatchQueue.main.async {
+            guard !self.sharing, let presenter = self.bridge?.viewController,
+                  presenter.viewIfLoaded?.window != nil,
+                  presenter.presentedViewController == nil else {
+                call.reject("Close the open dialog and try exporting again.")
+                return
+            }
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("benza-export-" + UUID().uuidString, isDirectory: true)
+            let file = directory.appendingPathComponent(filename)
+            do {
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                try Data(text.utf8).write(to: file, options: [.atomic, .completeFileProtection])
+                self.sharing = true
+                let sheet = UIActivityViewController(activityItems: [file], applicationActivities: nil)
+                sheet.completionWithItemsHandler = { _, completed, _, error in
+                    DispatchQueue.main.async {
+                        self.sharing = false
+                        try? FileManager.default.removeItem(at: directory)
+                        if let error { call.reject(error.localizedDescription) }
+                        else { call.resolve(["completed": completed]) }
+                    }
+                }
+                if let popover = sheet.popoverPresentationController {
+                    popover.sourceView = presenter.view
+                    popover.sourceRect = CGRect(x: presenter.view.bounds.midX, y: presenter.view.bounds.midY, width: 1, height: 1)
+                    popover.permittedArrowDirections = []
+                }
+                presenter.present(sheet, animated: true)
+            } catch {
+                try? FileManager.default.removeItem(at: directory)
+                call.reject(error.localizedDescription)
+            }
+        }
+    }
+}
+
 @objc(BenzaNotificationsPlugin)
 final class BenzaNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
     let identifier = "BenzaNotificationsPlugin"
@@ -974,6 +1028,7 @@ final class BenzaBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
         bridge?.registerPluginInstance(BenzaStoreKitPlugin())
+        bridge?.registerPluginInstance(BenzaExportPlugin())
         bridge?.registerPluginInstance(BenzaNotificationsPlugin())
         bridge?.registerPluginInstance(BenzaSmartCameraPlugin())
     }

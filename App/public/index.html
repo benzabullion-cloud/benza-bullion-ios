@@ -6135,7 +6135,8 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
           <div class="analyticsSectionHead"><h2>Pro portfolio report</h2><span>Detailed inventory summary</span></div>
           <div class="proCard proReportCard">
             <div><strong>Export a detailed Benza Bullion report</strong><p>Includes current value, cost basis, gain/loss, metal allocation and itemized holdings.</p></div>
-            <button class="proPrimaryBtn compact" onclick="exportProReport()">Export report</button>
+            <button id="proExportReportButton" type="button" class="proPrimaryBtn compact" onclick="exportProReport()">Export report</button>
+            <p class="reportExportStatus" role="status" aria-live="polite" hidden></p>
           </div>
         </div>
       </div>
@@ -6442,13 +6443,14 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
         <div id="settingsProPricing" class="settingsProPricing">
           <div><strong data-store-price="monthly">Monthly subscription</strong><span data-store-offer="monthly">View App Store pricing</span></div>
           <div><strong data-store-price="annual">Annual subscription</strong><span data-store-offer="annual">View App Store pricing</span></div>
-          <div class="settingsFounderPrice"><div class="founderOfferBadge">LIMITED LAUNCH OFFER</div><strong data-store-price="founder">Founder lifetime access</strong><span data-store-offer="founder">One-time purchase · never renews</span><span class="founderBadgeBonus">Includes the exclusive Founding Member badge on Home</span></div>
+          <div class="settingsFounderPrice"><div class="founderOfferBadge">LIMITED LAUNCH OFFER</div><strong data-store-price="founder">Founder lifetime access</strong><span data-store-offer="founder">One-time purchase · never renews</span><span class="founderBadgeBonus">Includes the exclusive Founding Member badge on the Portfolio Home Screen</span></div>
         </div>
 
         <div class="settingsProPageActions">
           <button id="settingsProPagePrimary" class="primary" type="button" onclick="openProUpgrade('settings')">View Pro Plans</button>
           <button id="settingsProAnalyticsButton" type="button" onclick="closeSettings();openAnalytics();setAnalyticsTab('pro')">Open Advanced Analytics</button>
           <button id="settingsProReportButton" type="button" onclick="handlePremiumReport()">Create Portfolio Report</button>
+          <p class="reportExportStatus" role="status" aria-live="polite" hidden></p>
           <button id="settingsProManageButton" type="button" onclick="manageProSubscription()">Manage Subscription</button>
         </div>
         <div class="settingsProFine">Billing will be handled by Apple in the native iPhone app. Monthly and annual plans renew until canceled; Founder is a limited-time, non-renewing purchase for permanent Pro access. Your plan stays tied to your Benza Bullion account. Marketplace transactions and separately identified services are not included.</div>
@@ -10103,8 +10105,7 @@ function updateProScenario(){
   }
 }
 
-function exportProReport(){
-  if(!isProActive())return openProUpgrade();
+function buildProReportCsv(){
   const stats=Object.fromEntries(METALS.map(m=>[m,metalStats(m)]));
   const totalValue=METALS.reduce((s,m)=>s+stats[m].value,0);
   const totalCost=METALS.reduce((s,m)=>s+stats[m].cost,0);
@@ -10114,6 +10115,7 @@ function exportProReport(){
     h.product,
     Number(h.qty)||0,
     Number(h.oz)||0,
+    h.metal==='copper'?'avoirdupois oz':'troy oz',
     holdingHasCostBasis(h)?Number(h.cost):'',
     (Number(h.oz)||0)*(livePrices[h.metal]||0),
     h.date||'',
@@ -10129,16 +10131,49 @@ function exportProReport(){
     ['Cost Basis',totalCostKnown?totalCost.toFixed(2):'Unavailable'],
     ['Unrealized Gain/Loss',totalCostKnown?(totalValue-totalCost).toFixed(2):'Unavailable'],
     [],
-    ['Metal','Product','Pieces','Ounces','Cost Basis','Current Metal Value','Purchase Date','Serial / Certificate','Notes','Photo Attached','Receipt Attached'],
+    ['Metal allocation'],
+    ['Metal','Current Metal Value','Allocation (%)'],
+    ...METALS.map(m=>[METAL_NAMES[m],stats[m].value.toFixed(2),totalValue>0?(stats[m].value/totalValue*100).toFixed(2):'0.00']),
+    [],
+    ['Itemized holdings'],
+    ['Metal','Product','Pieces','Ounces','Weight Unit','Cost Basis','Current Metal Value','Purchase Date','Serial / Certificate','Notes','Photo Attached','Receipt Attached'],
     ...rows
   ].map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(',')).join('\n');
-  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;
-  a.download='Benza_Bullion_Pro_Portfolio_Report.csv';
-  document.body.appendChild(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  return csv;
+}
+let proReportExportBusy=false;
+function setReportExportStatus(message){
+  document.querySelectorAll('.reportExportStatus').forEach(el=>{el.textContent=message;el.hidden=!message;});
+}
+async function deliverProReport(csv){
+  const filename='Benza_Bullion_Pro_Portfolio_Report.csv';
+  if(isBenzaNativeRuntime()){
+    const plugin=window.Capacitor?.Plugins?.BenzaExport;
+    if(!plugin?.shareFile)throw new Error('Report sharing is unavailable. Please update the app and try again.');
+    const result=await plugin.shareFile({filename,text:csv});
+    return result?.completed?'Report shared or saved.':'Export cancelled.';
+  }
+  const file=new File([csv],filename,{type:'text/csv;charset=utf-8'});
+  if(navigator.share&&navigator.canShare?.({files:[file]})){
+    try{await navigator.share({title:'Benza Bullion Portfolio Report',files:[file]});return 'Report shared or saved.';}
+    catch(error){if(error?.name==='AbortError')return 'Export cancelled.';throw error;}
+  }
+  const url=URL.createObjectURL(file);
+  const link=document.createElement('a');link.href=url;link.download=filename;
+  document.body.appendChild(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+  return 'Report download started. Check your downloads.';
+}
+async function exportProReport(){
+  if(!isProActive())return openProUpgrade('report');
+  if(proReportExportBusy)return;
+  proReportExportBusy=true;
+  const buttons=['proExportReportButton','settingsProReportButton'].map(id=>document.getElementById(id));
+  buttons.forEach(button=>setButtonBusy(button,true,'Preparing report…'));
+  setReportExportStatus('Preparing your portfolio report…');
+  try{setReportExportStatus(await deliverProReport(buildProReportCsv()));}
+  catch(error){setReportExportStatus(error?.message||'We could not export your report. Please try again.');}
+  finally{proReportExportBusy=false;buttons.forEach(button=>setButtonBusy(button,false));}
 }
 
 function renderAnalytics(){
@@ -12456,7 +12491,7 @@ loadBenzaWatchlist();
       <div class="proUpgradeBenefit"><i>✓</i><span>Future Pro releases included with an active subscription or permanent Founder access</span></div>
     </div>
     <div class="proFutureFine">Planned additions include Future Potential historical scenarios with optional contributions, richer premium analysis, expanded alerts, reports, and new stack tools. Timing and availability may change.</div>
-    <div class="proUpgradePrices"><button class="proUpgradePrice selected" id="proPlanMonthly" type="button" onclick="selectProPlan('monthly')"><strong data-store-price="monthly">Monthly subscription</strong><span data-store-offer="monthly">View App Store pricing</span></button><button class="proUpgradePrice" id="proPlanAnnual" type="button" onclick="selectProPlan('annual')"><strong data-store-price="annual">Annual subscription</strong><span data-store-offer="annual">View App Store pricing</span></button><button class="proUpgradePrice founder" id="proPlanFounder" type="button" onclick="selectProPlan('founder')"><span class="founderOfferBadge">LIMITED LAUNCH OFFER</span><strong data-store-price="founder">Founder lifetime access</strong><span data-store-offer="founder">One-time purchase · never renews</span><span class="founderBadgeBonus">Includes the exclusive Founding Member badge on Home</span></button></div>
+    <div class="proUpgradePrices"><button class="proUpgradePrice selected" id="proPlanMonthly" type="button" onclick="selectProPlan('monthly')"><strong data-store-price="monthly">Monthly subscription</strong><span data-store-offer="monthly">View App Store pricing</span></button><button class="proUpgradePrice" id="proPlanAnnual" type="button" onclick="selectProPlan('annual')"><strong data-store-price="annual">Annual subscription</strong><span data-store-offer="annual">View App Store pricing</span></button><button class="proUpgradePrice founder" id="proPlanFounder" type="button" onclick="selectProPlan('founder')"><span class="founderOfferBadge">LIMITED LAUNCH OFFER</span><strong data-store-price="founder">Founder lifetime access</strong><span data-store-offer="founder">One-time purchase · never renews</span><span class="founderBadgeBonus">Includes the exclusive Founding Member badge on the Portfolio Home Screen</span></button></div>
     <div class="proUpgradeActions"><button class="primary" id="proStartTrialBtn" type="button" onclick="startNativeProPurchase()">Continue</button><button class="secondary" type="button" onclick="restoreProPurchases()">Restore Purchases</button><button class="secondary" type="button" onclick="closeProUpgrade()">Not now</button></div><p class="proFutureFine">Subscriptions renew automatically unless cancelled through Apple. <a href="terms.html">Terms of Use</a> · <a href="privacy.html">Privacy Policy</a></p>
   </div>
 </div>
