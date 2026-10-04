@@ -93,13 +93,22 @@ window.supabase={createClient:()=>({
    const bounds=await page.evaluate(()=>{
     const field=document.querySelector('#saleModal .dateField').getBoundingClientRect(),input=document.getElementById('saleDate').getBoundingClientRect(),proceeds=document.getElementById('saleProceeds').getBoundingClientRect();
     const text=document.getElementById('saleDateDisplay').getBoundingClientRect(),sheet=document.querySelector('.saleSheet');
-    return {height:field.height,aligned:Math.abs(field.left-proceeds.left)<1&&Math.abs(field.width-proceeds.width)<1,centered:Math.abs((text.left+text.right)-(field.left+field.right))<2&&Math.abs((text.top+text.bottom)-(field.top+field.bottom))<2,inputFits:input.width<=field.width&&input.height<=field.height,overflow:sheet.scrollWidth>sheet.clientWidth+1};
+    return {height:field.height,aligned:Math.abs(field.left-proceeds.left)<1&&Math.abs(field.width-proceeds.width)<1,centered:Math.abs((text.left+text.right)-(field.left+field.right))<2&&Math.abs((text.top+text.bottom)-(field.top+field.bottom))<2,inputFits:input.width<=field.width&&input.height<=field.height,overflow:sheet.scrollWidth>sheet.clientWidth+1,themeMatches:getComputedStyle(document.querySelector('#saleModal .dateField')).backgroundColor===getComputedStyle(document.getElementById('saleProceeds')).backgroundColor,dialogCentered:Math.abs((sheet.getBoundingClientRect().top+sheet.getBoundingClientRect().bottom)-window.innerHeight)<2,backgroundLocked:getComputedStyle(document.body).position==='fixed'};
    });
-   assert.equal(bounds.height,48);assert.equal(bounds.aligned,true);assert.equal(bounds.centered,true);assert.equal(bounds.inputFits,true);assert.equal(bounds.overflow,false,JSON.stringify({engineName,viewport,theme,editing,bounds}));
+   assert.equal(bounds.themeMatches,true);assert.equal(bounds.dialogCentered,true);assert.equal(bounds.backgroundLocked,true);assert.equal(bounds.height,48);assert.equal(bounds.aligned,true);assert.equal(bounds.centered,true);assert.equal(bounds.inputFits,true);assert.equal(bounds.overflow,false,JSON.stringify({engineName,viewport,theme,editing,bounds}));
+   if(viewport.height===390){
+    await page.locator('.saleSheet').evaluate(el=>{el.scrollTop=0;});
+    const background=await page.evaluate(()=>({x:window.scrollX,y:window.scrollY,top:document.body.getBoundingClientRect().top}));
+    await page.locator('.saleSheet').hover();await page.mouse.wheel(0,500);await page.waitForTimeout(150);
+    assert.ok(await page.locator('.saleSheet').evaluate(el=>el.scrollTop)>0,'Sale contents should scroll');
+    assert.deepEqual(await page.evaluate(()=>({x:window.scrollX,y:window.scrollY,top:document.body.getBoundingClientRect().top})),background,'Background should stay still');
+   }
    await page.locator('#saleDate').fill('');assert.equal(await page.locator('#saleDateDisplay').textContent(),'');
    await page.locator('#saleDate').fill('2026-10-04');
    if(viewport.width===390&&!editing){await page.locator('#saleDate').scrollIntoViewIfNeeded();await page.screenshot({path:'ui-artifacts/sale-date-'+engineName+'-'+theme+'.png'});}
   }
+  await page.evaluate(()=>closeSaleModal());
+  assert.equal(await page.evaluate(()=>document.documentElement.classList.contains('sale-dialog-open')),false);
   await page.setViewportSize({width:390,height:844});
   await page.evaluate(()=>{closeSaleModal();applyTheme('dark');openManualAdd();});
   await page.locator('#date').fill('2027-02-03');
