@@ -3664,7 +3664,8 @@ html:not([data-theme="dark"]) #addScreen{--holding-accent:#a9550a}
 #addScreen .holdingDetailHint{font-size:12px;line-height:1.5;color:var(--muted);margin:12px 0 0}
 #addScreen input,#addScreen select,#addScreen textarea{font-size:16px}
 #addScreen .row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-#addScreen .row label{display:block;line-height:1.35;min-height:34px}
+#addScreen .row>div{display:flex;flex-direction:column}
+#addScreen .row label{display:block;line-height:1.35;min-height:34px;flex:1}
 #addScreen .row input,#addScreen select,#addScreen .money,#addScreen .dateField{min-height:48px}
 #addScreen .proRecordBadge{display:inline-block;margin-left:8px;padding:3px 7px;border-radius:6px;background:rgba(245,154,53,.16);color:var(--holding-accent);font-size:10px;vertical-align:middle}
 #addScreen #holdingScannerPhotoPreviews{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
