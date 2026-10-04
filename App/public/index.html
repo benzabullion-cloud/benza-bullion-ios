@@ -9599,6 +9599,12 @@ function setPendingPurchase(userId,productId,pending){
 const pendingPurchaseIntents=new Set();
 const pendingPurchaseVerifications=new Set();
 let pendingPurchaseListener=null;
+function isStoreKitAccountConflict(error){
+  return /Purchase is linked to a different Benza Bullion account|Purchase (?:already )?belongs to another account/i.test(String(error?.message||error||''));
+}
+function storeKitAccountConflictMessage(){
+  return 'Apple returned a purchase linked to a different Benza Bullion account. Sign in to the Benza Bullion account that originally purchased this plan. Restore Purchases must also use that account. For TestFlight testing, reset the Sandbox Apple Account purchase history or use a fresh Sandbox Apple Account, then try again. Contact support if you need help identifying your purchasing account.';
+}
 async function handlePendingPurchase(transaction){
   const userId=currentUser?.id;
   if(!userId||String(transaction?.appAccountToken||'').toLowerCase()!==userId.toLowerCase()||!Object.values(storeKitPlanIds).includes(transaction?.productId))return;
@@ -9611,7 +9617,10 @@ async function handlePendingPurchase(transaction){
     await verifyNativeStoreTransaction(transaction);
     setPendingPurchase(userId,transaction.productId,false);
     if(currentUser?.id===userId)alert('Your approved Apple purchase is verified. Benza Bullion Pro is now active.');
-  }catch(error){console.warn('Pending purchase verification will retry when connected:',error);}
+  }catch(error){
+    if(isStoreKitAccountConflict(error))setPendingPurchase(userId,transaction.productId,false);
+    else console.warn('Pending purchase verification will retry when connected:',error);
+  }
   finally{pendingPurchaseVerifications.delete(key);}
 }
 async function handleStoreKitTransactionUpdate(transaction){
@@ -9795,7 +9804,13 @@ async function startNativeProPurchase(){
       :'Benza Bullion Pro is now active.');
   }catch(error){
     console.error('StoreKit purchase failed:',error);
-    alert((error?.message||'Purchase verification is unavailable.')+' If Apple completed your payment, activation will retry when connected. You can also use Restore Purchases.');
+    if(currentUser?.id!==purchaseUserId)return;
+    if(isStoreKitAccountConflict(error)){
+      setPendingPurchase(purchaseUserId,productId,false);
+      alert(storeKitAccountConflictMessage());
+    }else{
+      alert((error?.message||'Purchase verification is unavailable.')+' If Apple completed your payment, activation will retry when connected. You can also use Restore Purchases.');
+    }
   }finally{
     if(button){delete button.dataset.purchaseBusy;button.disabled=false;button.textContent=previousText;renderStoreKitProducts();}
   }
@@ -10005,7 +10020,7 @@ async function restoreProPurchases(){
         await verifyNativeStoreTransaction(transaction);
         verified=true;
       }catch(error){
-        verificationError=verificationError||String(error?.message||error||'');
+        verificationError=verificationError||(isStoreKitAccountConflict(error)?storeKitAccountConflictMessage():String(error?.message||error||''));
         console.warn('Restore verification failed:',error);
       }
     }
