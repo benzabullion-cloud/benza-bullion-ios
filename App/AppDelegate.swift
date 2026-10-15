@@ -6,6 +6,8 @@ import UserNotifications
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
+    private var founderValueRetryCount = 0
+    private var founderValueInstalled = false
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         UNUserNotificationCenter.current().delegate = self
@@ -13,7 +15,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
-        // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
+        // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background.
         // Use this method to pause ongoing tasks, disable timers, and invalidate graphics rendering callbacks. Games should use this method to pause the game.
     }
 
@@ -30,7 +32,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Re-assert Benza Bullion as the notification-center delegate whenever
         // the app becomes active so foreground APNs alerts can present banners.
         UNUserNotificationCenter.current().delegate = self
-        scheduleFounderLaunchValueCopy()
+        founderValueRetryCount = 0
+        founderValueInstalled = false
+        installFounderLaunchValueCopyWhenReady()
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
@@ -46,27 +50,24 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return config
     }
 
-    private func scheduleFounderLaunchValueCopy() {
-        // Keep Apple/StoreKit as the single source of truth for the actual purchase
-        // price. This additional line only communicates the planned post-Founder
-        // lifetime price and the resulting Founder savings.
-        for delay in [0.8, 1.8, 3.0] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                self?.injectFounderLaunchValueCopy()
-            }
-        }
-    }
+    private func installFounderLaunchValueCopyWhenReady() {
+        guard !founderValueInstalled, founderValueRetryCount < 60 else { return }
+        founderValueRetryCount += 1
 
-    private func injectFounderLaunchValueCopy() {
         let activeScene = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
             .first { $0.activationState == .foregroundActive }
+
         guard let root = activeScene?.windows.first(where: { $0.isKeyWindow })?.rootViewController,
               let bridge = findBridgeController(from: root),
-              let webView = bridge.webView else { return }
+              let webView = bridge.webView else {
+            retryFounderValueCopy()
+            return
+        }
 
         let script = #"""
         (() => {
+          if (!document || !document.documentElement) return false;
           const copy = 'Future lifetime price: $74.99 · Founder savings: $49.99';
           const install = () => {
             document.querySelectorAll('#proPlanFounder, .settingsFounderPrice').forEach(card => {
@@ -93,9 +94,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             window.__benzaFounderValueObserver = new MutationObserver(install);
             window.__benzaFounderValueObserver.observe(document.documentElement, {childList:true, subtree:true});
           }
+          window.__benzaFounderValueInstalled = true;
+          return true;
         })();
         """#
-        webView.evaluateJavaScript(script, completionHandler: nil)
+
+        webView.evaluateJavaScript(script) { [weak self] result, error in
+            guard let self else { return }
+            if error == nil, (result as? Bool) == true {
+                self.founderValueInstalled = true
+            } else {
+                self.retryFounderValueCopy()
+            }
+        }
+    }
+
+    private func retryFounderValueCopy() {
+        guard !founderValueInstalled, founderValueRetryCount < 60 else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.installFounderLaunchValueCopyWhenReady()
+        }
     }
 
     private func findBridgeController(from controller: UIViewController) -> CAPBridgeViewController? {
