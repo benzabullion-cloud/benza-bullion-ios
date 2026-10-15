@@ -1,0 +1,53 @@
+name: Build 114 final review audit
+
+on:
+  push:
+    branches:
+      - chatgpt/build-114-final-review-audit
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chatgpt/build-114-final-review-audit
+          fetch-depth: 0
+
+      - name: Apply Founder savings correction
+        run: python3 .github/scripts/build114_patch.py
+
+      - name: Static App Review checks
+        shell: bash
+        run: |
+          set -e
+          grep -F 'Planned future lifetime price: $74.99 · Save $50 at launch' App/public/index.html
+          test "$(grep -Foc 'Planned future lifetime price: $74.99 · Save $50 at launch' App/public/index.html)" -eq 2
+          grep -F 'Restore Purchases' App/public/index.html
+          grep -F 'Terms of Use' App/public/index.html
+          grep -F 'Privacy Policy' App/public/index.html
+          grep -F 'Delete Account' App/public/index.html
+          grep -F 'Continue without account' App/public/index.html
+          grep -F 'Manage Apple Subscriptions' App/public/index.html
+          grep -F 'NSCameraUsageDescription' App/Info.plist
+          grep -F 'NSPhotoLibraryUsageDescription' App/Info.plist
+          grep -F '<false/>' App/PrivacyInfo.xcprivacy
+
+      - name: Run launch regression suite
+        shell: bash
+        run: |
+          set -e
+          for f in tests/*.cjs; do node "$f"; done
+
+      - name: Commit final source and remove one-time audit files
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add App/public/index.html
+          git rm .github/scripts/build114_patch.py .github/workflows/build114-final-audit.yml
+          git commit -m 'Correct Founder savings copy for Build 114'
+          git push origin HEAD:chatgpt/build-114-final-review-audit
