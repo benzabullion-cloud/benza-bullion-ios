@@ -1,3 +1,0 @@
-Explicit TestFlight scanner validation build.
-Bundle the fixed model files in main-branch Xcode Cloud builds only.
-Remove this marker before a public App Store release.
