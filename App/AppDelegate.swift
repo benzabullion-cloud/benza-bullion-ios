@@ -20,7 +20,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationDidEnterBackground(_ application: UIApplication) {
-        // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
+        // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information in case the app is terminated later.
         // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
     }
 
@@ -43,7 +43,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication,
                      configurationForConnecting connectingSceneSession: UISceneSession,
-                     options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+                     options connectionOptions: UIScene.ConnectionOptions) -> UISceneConfiguration {
         let config = UISceneConfiguration(name: "Default Configuration",
                                           sessionRole: connectingSceneSession.role)
         config.delegateClass = SceneDelegate.self
@@ -68,6 +68,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         let script = #"""
         (() => {
           if (!document || !document.documentElement) return false;
+          const cards = Array.from(document.querySelectorAll('#proPlanFounder, .settingsFounderPrice'));
+          if (cards.length === 0) return false;
           const copy = 'Future lifetime price: $74.99 · Founder savings: $49.99';
           const install = () => {
             document.querySelectorAll('#proPlanFounder, .settingsFounderPrice').forEach(card => {
@@ -95,7 +97,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             window.__benzaFounderValueObserver.observe(document.documentElement, {childList:true, subtree:true});
           }
           window.__benzaFounderValueInstalled = true;
-          return true;
+          return document.querySelectorAll('.founderFutureValue').length > 0;
         })();
         """#
 
