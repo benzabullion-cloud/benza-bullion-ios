@@ -2,7 +2,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const html=fs.readFileSync('App/public/index.html','utf8');
 const nodes=new Map();const get=id=>{if(!nodes.has(id))nodes.set(id,{value:'old',disabled:false,textContent:'',options:[],selectedIndex:0,classList:{values:new Set(),add(v){this.values.add(v)},remove(v){this.values.delete(v)},contains(v){return this.values.has(v)}},setAttribute(){}});return nodes.get(id)};
 let queued=[],calls=[],resetCalls=0,resetOptions=[],resetHook=async()=>{};const plugin={reset:async options=>{resetCalls++;resetOptions.push(options||{});await resetHook();},scan:async options=>{calls.push(options);return await queued.shift()}};
-const context=vm.createContext({Date,console,document:{getElementById:get,querySelectorAll:()=>[get('smartAnalysisUseButton')]},
+const context=vm.createContext({requestAccountAccess:()=>true,Date,console,document:{getElementById:get,querySelectorAll:()=>[get('smartAnalysisUseButton')]},
   isProActive:()=>true,isBenzaNativeRuntime:()=>true,smartCameraPlugin:()=>plugin,ensureGlobalAddPortals(){},closeAddChoice(){},isFounderPro:()=>false,openAdd(){},selectMetal(){},update(){},fillBullionDetails(){},previewPendingScannerPhotos(){}});
 vm.runInContext(html.slice(html.indexOf('const GOLD_PRODUCTS='),html.indexOf('const METAL_SYMBOLS='))+html.slice(html.indexOf('let pendingSmartCameraSuggestion='),html.indexOf('function clearAttachmentObjectUrls')),context);
 vm.runInContext('renderSmartCameraAnalysis=(suggestion)=>{pendingSmartCameraSuggestion=suggestion;globalThis.lastSuggestion=suggestion;}',context);
