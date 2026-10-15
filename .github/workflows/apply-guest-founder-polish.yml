@@ -1,0 +1,167 @@
+name: Apply guest and Founder UI polish
+
+on:
+  push:
+    branches:
+      - chatgpt/founder-card-and-guest-polish
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chatgpt/founder-card-and-guest-polish
+          fetch-depth: 0
+
+      - name: Patch real app UI source
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('App/public/index.html')
+          s = path.read_text()
+
+          # 1) Founder value belongs in the real card markup, not runtime Swift injection.
+          old_founder = '<span data-store-offer="founder">One-time purchase · never renews</span><span class="founderBadgeBonus">Includes the exclusive Founding Member badge on the Portfolio Home Screen</span>'
+          new_founder = '<span data-store-offer="founder">One-time purchase · never renews</span><span class="founderFutureValue">Future lifetime price: $74.99 · Founder savings: $49.99</span><span class="founderBadgeBonus">Includes the exclusive Founding Member badge on the Portfolio Home Screen</span>'
+          count = s.count(old_founder)
+          if count != 1:
+              raise SystemExit(f'Expected exactly 1 Founder card marker, found {count}')
+          s = s.replace(old_founder, new_founder, 1)
+
+          # 2) Add themed guest/conversion styles directly to the application stylesheet.
+          style_marker = '.authStatus{font-size:12px;color:var(--muted);margin-top:10px;min-height:16px}'
+          if style_marker not in s:
+              raise SystemExit('Guest CSS insertion marker not found')
+          guest_css = r'''
+.founderFutureValue{display:block;margin-top:6px;color:#c88719;font-size:9px;font-weight:900;line-height:1.35;letter-spacing:.12px}
+.guestBrowseTools.benzaGuestCard{position:relative;overflow:hidden;border:1px solid color-mix(in srgb,var(--border) 72%,#c88719 28%);border-radius:18px;background:linear-gradient(145deg,var(--surface2),var(--surface));padding:16px;margin-bottom:18px;box-shadow:0 10px 28px rgba(0,0,0,.08)}
+.guestBrowseTools.benzaGuestCard:before{content:"";position:absolute;inset:0 auto auto 0;width:100%;height:2px;background:linear-gradient(90deg,transparent,#c88719,transparent);opacity:.9}
+.benzaGuestEyebrow{font-size:10px;font-weight:900;letter-spacing:1.35px;color:#c88719;margin-bottom:7px}
+.benzaGuestTitle{font-size:18px;font-weight:900;letter-spacing:-.25px;color:var(--text);margin:0 0 5px}
+.benzaGuestCopy{font-size:12.5px!important;line-height:1.48;color:var(--muted)!important;margin:0!important}
+.benzaGuestIncluded{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}
+.benzaGuestIncluded span{font-size:10px;font-weight:800;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:6px 8px;white-space:nowrap}
+.benzaGuestUnlock{font-size:11.5px;line-height:1.45;color:var(--muted);border-top:1px solid var(--border);padding-top:11px;margin-top:2px}
+.benzaGuestUnlock strong{color:var(--text)}
+.guestBrowseTools.benzaGuestCard .guestBrowseActions{margin-top:12px;display:grid;grid-template-columns:1.35fr 1fr;gap:8px}
+.guestBrowseTools.benzaGuestCard .guestBrowseActions button{min-height:43px;border-radius:12px;font-size:12px;font-weight:850}
+.guestBrowseTools.benzaGuestCard .benzaGuestPrimary{border-color:#c88719;background:#c88719;color:#111}
+.guestBrowseTools.benzaGuestCard .benzaGuestSecondary{border:1px solid var(--border);background:var(--surface);color:var(--text)}
+.guestBrowseTools.benzaGuestCard .guestBrowseLinks{margin-top:10px;gap:14px;font-size:10px}
+#benzaGuestLockOverlay{display:none;position:fixed;inset:0;z-index:2147483646;background:rgba(0,0,0,.58);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);align-items:flex-end;justify-content:center;padding:16px}
+#benzaGuestLockOverlay.show{display:flex}
+#benzaGuestLockCard{width:100%;max-width:410px;background:var(--surface);border:1px solid var(--border);border-radius:22px;padding:20px 18px calc(18px + env(safe-area-inset-bottom));box-shadow:0 26px 70px rgba(0,0,0,.35);animation:benzaGuestRise .22s ease-out}
+@keyframes benzaGuestRise{from{transform:translateY(22px);opacity:.4}to{transform:translateY(0);opacity:1}}
+.benzaGuestLockIcon{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;margin-bottom:13px;background:#c8871924;border:1px solid #c8871970;font-size:21px;color:#c88719}
+.benzaGuestLockEyebrow{font-size:10px;font-weight:900;letter-spacing:1.25px;color:#c88719;margin-bottom:5px}
+.benzaGuestLockTitle{font-size:21px;font-weight:900;letter-spacing:-.35px;color:var(--text);margin:0 0 7px}
+.benzaGuestLockCopy{font-size:13px;line-height:1.5;color:var(--muted);margin:0 0 14px}
+.benzaGuestLockBenefits{display:grid;gap:8px;margin:0 0 16px}
+.benzaGuestLockBenefit{display:flex;gap:9px;align-items:flex-start;font-size:12px;line-height:1.4;color:var(--text)}
+.benzaGuestLockBenefit i{font-style:normal;color:#c88719;font-weight:900}
+.benzaGuestLockActions{display:grid;gap:8px}
+.benzaGuestLockActions button{width:100%;min-height:47px;border-radius:13px;font-size:14px;font-weight:850}
+.benzaGuestLockCreate{border:1px solid #c88719;background:#c88719;color:#111}
+.benzaGuestLockSignIn{border:1px solid var(--border);background:var(--surface2);color:var(--text)}
+.benzaGuestLockLater{border:0;background:transparent;color:var(--muted);min-height:38px!important}
+body.guest-mode #marketsWatchTab:after{content:"  •";color:#c88719;font-size:9px;vertical-align:2px}
+'''
+          s = s.replace(style_marker, guest_css + '\n' + style_marker, 1)
+
+          # 3) Replace both generic guest banners (Markets + News) with a themed preview card.
+          old_guest = '''    <div class="guestBrowseTools">
+      <p>Browse prices and news. Sign in to save your bullion portfolio.</p>
+      <div class="guestBrowseActions"><button type="button" onclick="requestAccountAccess('save your bullion portfolio')">Sign in / Create account</button><button type="button" onclick="openProUpgrade()">Pro plans</button></div>
+      <div class="guestBrowseLinks"><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="support.html">Support</a></div>
+    </div>'''
+          new_guest = '''    <div class="guestBrowseTools benzaGuestCard">
+      <div class="benzaGuestEyebrow">GUEST PREVIEW</div>
+      <div class="benzaGuestTitle">Explore Benza Bullion</div>
+      <p class="benzaGuestCopy">See what the bullion market is doing before you create an account. These tools stay open while you browse.</p>
+      <div class="benzaGuestIncluded"><span>✓ Live Markets</span><span>✓ Calculator</span><span>✓ Market Insights</span></div>
+      <div class="benzaGuestUnlock"><strong>Want the full experience?</strong> A free account unlocks your personal bullion portfolio, saved holdings, watchlist and portfolio analytics.</div>
+      <div class="guestBrowseActions"><button class="benzaGuestPrimary" type="button" onclick="showGuestAccountSheet('build and save your personal bullion portfolio','portfolio')">Create free account</button><button class="benzaGuestSecondary" type="button" onclick="openProUpgrade()">Explore Pro</button></div>
+      <div class="guestBrowseLinks"><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="support.html">Support</a></div>
+    </div>'''
+          guest_count = s.count(old_guest)
+          if guest_count != 2:
+              raise SystemExit(f'Expected 2 guest banner blocks, found {guest_count}')
+          s = s.replace(old_guest, new_guest)
+
+          # 4) Put the locked-feature explanation in the app source and make guest taps use it.
+          request_marker = "function requestAccountAccess(reason='use your personal portfolio',route='portfolio'){\n  if(currentUser)return true;"
+          if request_marker not in s:
+              raise SystemExit('requestAccountAccess marker not found')
+          helper_js = r'''function ensureGuestAccountSheet(){
+  let overlay=document.getElementById('benzaGuestLockOverlay');
+  if(overlay)return overlay;
+  if(!document.createElement)return null;
+  overlay=document.createElement('div');
+  overlay.id='benzaGuestLockOverlay';
+  overlay.setAttribute('role','dialog');
+  overlay.setAttribute('aria-modal','true');
+  overlay.innerHTML=`<div id="benzaGuestLockCard"><div class="benzaGuestLockIcon">✦</div><div class="benzaGuestLockEyebrow">FULL BENZA BULLION EXPERIENCE</div><h2 class="benzaGuestLockTitle">Make this portfolio yours</h2><p class="benzaGuestLockCopy" id="benzaGuestLockCopy">Create a free account to save your bullion and unlock your personal portfolio.</p><div class="benzaGuestLockBenefits"><div class="benzaGuestLockBenefit"><i>✓</i><span>Track your own gold, silver, platinum, palladium and copper holdings</span></div><div class="benzaGuestLockBenefit"><i>✓</i><span>Save watchlists and build portfolio history over time</span></div><div class="benzaGuestLockBenefit"><i>✓</i><span>Unlock personal analytics and keep your data synced securely</span></div></div><div class="benzaGuestLockActions"><button class="benzaGuestLockCreate" type="button" onclick="openGuestAuth('signup')">Create free account</button><button class="benzaGuestLockSignIn" type="button" onclick="openGuestAuth('login')">Already have an account? Sign in</button><button class="benzaGuestLockLater" type="button" onclick="closeGuestAccountSheet()">Keep exploring</button></div></div>`;
+  overlay.addEventListener('click',event=>{if(event.target===overlay)closeGuestAccountSheet()});
+  document.body.appendChild(overlay);
+  return overlay;
+}
+function closeGuestAccountSheet(){document.getElementById('benzaGuestLockOverlay')?.classList.remove('show')}
+function openGuestAuth(mode='login'){
+  closeGuestAccountSheet();
+  setAuthMode(mode==='signup'?'signup':'login');
+  const screen=document.getElementById('authScreen');if(screen)screen.style.display='flex';
+  const status=document.getElementById('authStatus');if(status)status.textContent=mode==='signup'?'Create your free account to save your portfolio and continue where you left off.':'Sign in to continue where you left off.';
+}
+function showGuestAccountSheet(reason='use your personal portfolio',route='portfolio'){
+  if(currentUser)return true;
+  pendingAccountRoute=route;
+  const normalized=String(reason||'').replace(/^to\s+/i,'').replace(/\.$/,'');
+  const status=document.getElementById('authStatus');if(status)status.textContent='Create a free account to '+normalized+'. You can keep browsing Markets, Calculator and Market Insights without one.';
+  const overlay=ensureGuestAccountSheet();
+  const copy=document.getElementById('benzaGuestLockCopy');if(copy)copy.textContent='Create a free account to '+normalized+'. Your guest market browsing stays available.';
+  overlay?.classList.add('show');
+  return false;
+}
+'''
+          replacement = helper_js + request_marker.replace("\n  if(currentUser)return true;", "\n  if(currentUser)return true;\n  if(guestBrowsing)return showGuestAccountSheet(reason,route);")
+          s = s.replace(request_marker, replacement, 1)
+
+          # Guardrails: this job should never silently create another ineffective build.
+          required = [
+              'Future lifetime price: $74.99 · Founder savings: $49.99',
+              'GUEST PREVIEW',
+              'Make this portfolio yours',
+              "if(guestBrowsing)return showGuestAccountSheet(reason,route);",
+              'Create free account',
+              'Keep exploring'
+          ]
+          for text in required:
+              if text not in s:
+                  raise SystemExit(f'Missing required UI text: {text}')
+
+          path.write_text(s)
+          PY
+
+      - name: Verify source and guest regression tests
+        shell: bash
+        run: |
+          grep -F 'Future lifetime price: $74.99 · Founder savings: $49.99' App/public/index.html
+          grep -F 'if(guestBrowsing)return showGuestAccountSheet(reason,route);' App/public/index.html
+          node --test tests/guest-access.test.cjs
+
+      - name: Commit real source changes and remove one-time workflow
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/apply-guest-founder-polish.yml
+          git add App/public/index.html
+          git commit -m 'Polish guest conversion and Founder value in app source'
+          git push origin HEAD:chatgpt/founder-card-and-guest-polish
