@@ -21,6 +21,7 @@ const stub=vm.runInNewContext(sweep.slice(sweep.indexOf('const stub='),sweep.ind
     });
     await page.goto('https://guest.test/');
     for(const theme of ['dark','light']){
+     const writesBeforeGuest=await page.evaluate(()=>sweep.writes.length);
      await page.evaluate(t=>applyTheme(t),theme);
      await page.locator('#guestBrowseButton').click();
      assert.equal(await page.locator('#marketsScreen').isVisible(),true);
@@ -41,7 +42,7 @@ const stub=vm.runInNewContext(sweep.slice(sweep.indexOf('const stub='),sweep.ind
      assert.equal(await page.locator('#proUpgradeModal').isVisible(),true);
      await page.evaluate(()=>closeProUpgrade());
      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);
-     assert.equal(await page.evaluate(()=>sweep.writes.length),0,'guests must not write user data');
+     assert.equal(await page.evaluate(()=>sweep.writes.length),writesBeforeGuest,'guests must not write user data');
      // Sign-in loads only the selected account, and sign-out clears it before guest entry.
      await page.evaluate(async()=>{currentUser={id:'account-a',email:'test@example.test',user_metadata:{}};await onSignedIn();});
      assert.equal(await page.evaluate(()=>guestBrowsing),false);
