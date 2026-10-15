@@ -37,6 +37,9 @@ jobs:
           grep -F 'NSPhotoLibraryUsageDescription' App/Info.plist
           test ! -e App/PrivateVisionModels/TESTFLIGHT_BETA
 
+      - name: Install verifier dependencies
+        run: npm ci --prefix storekit-verifier
+
       - name: Run release regression suite
         shell: bash
         run: |
