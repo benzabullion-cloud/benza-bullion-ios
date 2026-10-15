@@ -30,6 +30,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Re-assert Benza Bullion as the notification-center delegate whenever
         // the app becomes active so foreground APNs alerts can present banners.
         UNUserNotificationCenter.current().delegate = self
+        scheduleFounderLaunchValueCopy()
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
@@ -43,6 +44,79 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                                           sessionRole: connectingSceneSession.role)
         config.delegateClass = SceneDelegate.self
         return config
+    }
+
+    private func scheduleFounderLaunchValueCopy() {
+        // Keep Apple/StoreKit as the single source of truth for the actual purchase
+        // price. This additional line only communicates the planned post-Founder
+        // lifetime price and the resulting Founder savings.
+        for delay in [0.8, 1.8, 3.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                self?.injectFounderLaunchValueCopy()
+            }
+        }
+    }
+
+    private func injectFounderLaunchValueCopy() {
+        let activeScene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+        guard let root = activeScene?.windows.first(where: { $0.isKeyWindow })?.rootViewController,
+              let bridge = findBridgeController(from: root),
+              let webView = bridge.webView else { return }
+
+        let script = #"""
+        (() => {
+          const copy = 'Future lifetime price: $74.99 · Founder savings: $49.99';
+          const install = () => {
+            document.querySelectorAll('#proPlanFounder, .settingsFounderPrice').forEach(card => {
+              let value = card.querySelector('.founderFutureValue');
+              if (!value) {
+                value = document.createElement('span');
+                value.className = 'founderFutureValue';
+                value.style.display = 'block';
+                value.style.marginTop = '6px';
+                value.style.color = '#d6a53a';
+                value.style.fontSize = '9px';
+                value.style.fontWeight = '900';
+                value.style.lineHeight = '1.35';
+                value.style.letterSpacing = '.12px';
+                const badge = card.querySelector('.founderBadgeBonus');
+                if (badge) card.insertBefore(value, badge);
+                else card.appendChild(value);
+              }
+              value.textContent = copy;
+            });
+          };
+          install();
+          if (!window.__benzaFounderValueObserver) {
+            window.__benzaFounderValueObserver = new MutationObserver(install);
+            window.__benzaFounderValueObserver.observe(document.documentElement, {childList:true, subtree:true});
+          }
+        })();
+        """#
+        webView.evaluateJavaScript(script, completionHandler: nil)
+    }
+
+    private func findBridgeController(from controller: UIViewController) -> CAPBridgeViewController? {
+        if let bridge = controller as? CAPBridgeViewController { return bridge }
+        if let navigation = controller as? UINavigationController {
+            for child in navigation.viewControllers {
+                if let bridge = findBridgeController(from: child) { return bridge }
+            }
+        }
+        if let tab = controller as? UITabBarController {
+            for child in tab.viewControllers ?? [] {
+                if let bridge = findBridgeController(from: child) { return bridge }
+            }
+        }
+        for child in controller.children {
+            if let bridge = findBridgeController(from: child) { return bridge }
+        }
+        if let presented = controller.presentedViewController {
+            return findBridgeController(from: presented)
+        }
+        return nil
     }
 }
 
