@@ -35,20 +35,21 @@ jobs:
           grep -F 'Manage Apple Subscriptions' App/public/index.html
           grep -F 'NSCameraUsageDescription' App/Info.plist
           grep -F 'NSPhotoLibraryUsageDescription' App/Info.plist
-          grep -F '<false/>' App/PrivacyInfo.xcprivacy
+          test ! -e App/PrivateVisionModels/TESTFLIGHT_BETA
 
-      - name: Run launch regression suite
+      - name: Run release regression suite
         shell: bash
         run: |
           set -e
-          for f in tests/*.cjs; do node "$f"; done
+          node --test tests/*.test.cjs
+          node tests/scanner-release-benchmark.cjs
 
       - name: Commit final source and remove one-time audit files
         shell: bash
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add App/public/index.html
+          git add App/public/index.html App/PrivateVisionModels/TESTFLIGHT_BETA
           git rm .github/scripts/build114_patch.py .github/workflows/build114-final-audit.yml .github/BUILD114_AUDIT_TRIGGER
-          git commit -m 'Correct Founder savings copy for Build 114'
+          git commit -m 'Finalize Build 114 App Review hardening'
           git push origin HEAD:chatgpt/build-114-final-review-audit
