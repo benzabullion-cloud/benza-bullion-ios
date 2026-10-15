@@ -57,8 +57,8 @@ select,input{width:100%;height:48px;border:1px solid var(--border);border-radius
 .empty{text-align:center;color:var(--muted);padding:25px 0;font-size:14px}.empty button{margin-top:9px;border:0;background:var(--surface3);border-radius:10px;padding:9px 13px;font-weight:650}
 .card .delete{border:0;background:var(--surface3);border-radius:8px;padding:5px 7px;color:var(--muted);margin-left:8px}.holdingActions{display:flex;align-items:center}
 
-.authScreen{position:fixed;inset:0;background:var(--page);z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:22px}
-.authCard{width:100%;max-width:430px;background:var(--surface);border-radius:24px;padding:28px 22px;box-shadow:0 10px 40px #0002}
+.authScreen{overflow-y:auto;position:fixed;inset:0;background:var(--page);z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:22px}
+.authCard{margin:auto;width:100%;max-width:430px;background:var(--surface);border-radius:24px;padding:28px 22px;box-shadow:0 10px 40px #0002}
 .authBrand{font-weight:800;font-size:28px;letter-spacing:-1px;margin-bottom:6px;color:#e7e9ec;background:linear-gradient(180deg,#ffffff 0%,#eef0f2 30%,#bfc4c9 58%,#f8f9fa 82%,#c9cdd1 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}.authBrand span{color:#c88719;background:none;-webkit-text-fill-color:#c88719}
 .authSub{color:var(--muted);font-size:14px;margin-bottom:22px;line-height:1.45}
 .authTitle{font-size:24px;margin:0 0 16px}.authLabel{display:block;font-size:13px;font-weight:650;color:var(--muted);margin:14px 0 7px}
@@ -67,6 +67,14 @@ select,input{width:100%;height:48px;border:1px solid var(--border);border-radius
 .authToggle{border:0;background:none;width:100%;margin-top:14px;color:#b26d00;font-weight:650;font-size:14px}
 .authNote{font-size:11px;color:var(--muted);line-height:1.45;margin-top:16px}
 .authError{display:none;background:var(--surface)0f0;color:#b42318;border-radius:10px;padding:10px;font-size:13px;margin-top:12px}
+.guestBrowseButton{width:100%;min-height:48px;margin-top:16px;border:1px solid var(--border);border-radius:13px;background:var(--surface2);color:var(--text);font-size:15px;font-weight:700;padding:10px}
+.authLegalLinks,.guestBrowseLinks{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:14px;font-size:12px}
+.authLegalLinks a,.guestBrowseLinks a{color:var(--muted);padding:6px 0}
+.guestBrowseTools{display:none;border:1px solid var(--border);border-radius:16px;background:var(--surface2);padding:12px;margin-bottom:16px}
+body.guest-mode .guestBrowseTools{display:block}
+.guestBrowseTools p{font-size:13px;color:var(--muted);margin:0 0 8px}
+.guestBrowseActions{display:flex;flex-wrap:wrap;gap:8px}
+.guestBrowseActions button{flex:1;min-height:44px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);font-weight:700;padding:8px}
 .authStatus{font-size:12px;color:var(--muted);margin-top:10px;min-height:16px}
 
 .activityOverlay{display:none;position:fixed;inset:0;background:var(--surface);z-index:30;max-width:430px;margin:0 auto;overflow:auto;padding-bottom:88px}
@@ -5688,6 +5696,8 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
     </form>
     <button class="authToggle" id="authToggle" type="button" onclick="toggleAuthMode()">Need an account? Create one</button>
     <button class="authRecoveryButton" id="authRecoveryButton" type="button" onclick="requestPasswordReset()">Forgot password?</button>
+    <button id="guestBrowseButton" class="guestBrowseButton" type="button" onclick="continueAsGuest()">Continue without an account</button>
+    <div class="authLegalLinks"><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="support.html">Support</a></div>
     <div id="authError" role="alert" aria-live="assertive" class="authError"></div>
     <div id="authStatus" role="status" aria-live="polite" class="authStatus"></div>
   </div>
@@ -6165,6 +6175,12 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
     </div>
   </div>
   <div class="marketsBody">
+    <div class="guestBrowseTools">
+      <p>Browse prices and news. Sign in to save your bullion portfolio.</p>
+      <div class="guestBrowseActions"><button type="button" onclick="requestAccountAccess('save your bullion portfolio')">Sign in / Create account</button><button type="button" onclick="openProUpgrade()">Pro plans</button></div>
+      <div class="guestBrowseLinks"><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="support.html">Support</a></div>
+    </div>
+
     <div class="marketsTabs">
       <button id="marketsMarketTab" class="active" onclick="setMarketsTab('market')">Market</button>
       <button id="marketsWatchTab" onclick="setMarketsTab('watchlist')">Watchlist</button>
@@ -6291,6 +6307,12 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
     <button class="newsRefresh" onclick="loadMarketNews(true)">Refresh</button>
   </div>
   <div class="newsBody">
+    <div class="guestBrowseTools">
+      <p>Browse prices and news. Sign in to save your bullion portfolio.</p>
+      <div class="guestBrowseActions"><button type="button" onclick="requestAccountAccess('save your bullion portfolio')">Sign in / Create account</button><button type="button" onclick="openProUpgrade()">Pro plans</button></div>
+      <div class="guestBrowseLinks"><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="support.html">Support</a></div>
+    </div>
+
     <div class="newsEyebrow">Bullion news</div>
     <div class="newsIntro">Current stories that may matter to physical precious-metal owners. Swipe or use the arrows to browse, then open the original article for full context.</div>
     <div id="newsStatus" class="newsStatus">Loading current bullion news…</div>
@@ -6643,6 +6665,7 @@ function ensureGlobalAddPortals(){
   });
 }
 function openAddChoice(){
+  if(!requestAccountAccess('save bullion holdings','portfolio'))return;
   ensureGlobalAddPortals();
   const backdrop=document.getElementById('addChoiceBackdrop');
   const sheet=document.getElementById('addChoiceSheet');
@@ -8051,6 +8074,7 @@ async function runSmartCameraScan(append=false,source='camera'){
   }
 }
 async function openSmartCamera(){
+  if(!requestAccountAccess('scan bullion into your portfolio','portfolio'))return;
   ensureGlobalAddPortals();
   closeAddChoice();
   const screen=document.getElementById('smartCameraScreen');
@@ -8240,6 +8264,7 @@ function syncProInventoryVisibility(){
   if(teaser)teaser.hidden=active;
 }
 function openAdd(){
+  if(!requestAccountAccess('save bullion holdings','portfolio'))return;
   ensureGlobalAddPortals();
   editingHoldingIndex=null;
   setHoldingSheetMode('add');
@@ -8379,6 +8404,9 @@ const benzaRecoveryRedirect =
   /(?:^|[&#])type=recovery(?:&|$)/.test(location.hash) ||
   new URLSearchParams(location.search).get('type')==='recovery';
 let currentUser=null;
+let guestBrowsing=false;
+let authRequestGeneration=0;
+let pendingAccountRoute=null;
 let benzaEntitlement={tier:'free',status:'inactive',expires_at:null,trial_ends_at:null};
 let proScenarioMoves={gold:0,silver:0,platinum:0,palladium:0,copper:0};
 let saleHoldingIndex=null;
@@ -8522,6 +8550,32 @@ function renderLiveFeedStatus(data,{problem=false,offline=false,date=new Date()}
 
   el.textContent='Updated live at '+timeText;
 }
+function requestAccountAccess(reason='use your personal portfolio',route='portfolio'){
+  if(currentUser)return true;
+  pendingAccountRoute=route;
+  setAuthMode('login');
+  document.getElementById('authScreen').style.display='flex';
+  document.getElementById('authStatus').textContent='Sign in or create an account to '+reason+'. You can still browse prices and news without one.';
+  return false;
+}
+function continueAsGuest(){
+  // Recovery links must complete or explicitly sign out before browsing.
+  if(currentUser){
+    if(authMode==='recovery')return;
+    document.getElementById('authScreen').style.display='none';
+    return;
+  }
+  authRequestGeneration++;
+  pendingAccountRoute=null;
+  clearBenzaAccountState();
+  guestBrowsing=true;
+  document.body.classList.add('guest-mode');
+  clearAuthPassword();setAuthError('');
+  document.getElementById('authStatus').textContent='';
+  document.getElementById('authScreen').style.display='none';
+  activeMarketsTab='market';openMarkets();
+  fetchLivePrices();
+}
 function setAuthError(msg){const e=document.getElementById('authError');e.textContent=msg||'';e.style.display=msg?'block':'none'}
 function setConnectionBanner(message='',online=false,autoHide=false){
   const banner=document.getElementById('connectionBanner');
@@ -8613,6 +8667,8 @@ function setAuthMode(mode){
   const password=document.getElementById('authPassword');
   const remember=document.querySelector('.authRememberRow');
 
+  const guestButton=document.getElementById('guestBrowseButton');
+  if(guestButton)guestButton.hidden=authMode==='recovery';
   if(authMode==='recovery'){
     if(title)title.textContent='Set new password';
     if(button)button.textContent='Update password';
@@ -8737,12 +8793,17 @@ async function handleAuth(){
 
   try{
     initSupabase();
+    const generation=++authRequestGeneration;
     status.textContent=authMode==='login'?'Signing in…':'Creating account…';
     const result=authMode==='login'
       ? await supabaseClient.auth.signInWithPassword({email,password})
       : await supabaseClient.auth.signUp({email,password,options:{data:{name:'Bullion Builder'}}});
 
     if(result.error)throw result.error;
+    if(generation!==authRequestGeneration){
+      if(guestBrowsing)await supabaseClient.auth.signOut({scope:'local'});
+      return;
+    }
 
     saveRememberedLogin(email);
 
@@ -8762,6 +8823,11 @@ async function handleAuth(){
 async function onSignedIn(){
   const userId=currentUser?.id;
   if(!userId)return;
+  guestBrowsing=false;
+  document.body.classList.remove('guest-mode');
+  closeProUpgrade();
+  const route=pendingAccountRoute;pendingAccountRoute=null;
+  if(route==='pro')openProUpgrade();else goPortfolio();
   document.getElementById('authScreen').style.display='none';
   updateWelcomeBack();
 
@@ -8788,6 +8854,8 @@ async function onSignedIn(){
   await loadNotificationPreferences();
   if(currentUser?.id!==userId)return;
   await updateNotificationUI();
+  if(currentUser?.id!==userId)return;
+  if(route==='watchlist'){openMarkets();setMarketsTab('watchlist');}
 }
 const SUPABASE_PAGE_SIZE=1000;
 const AVOIR_OZ_TO_TROY_OZ=28.349523125/31.1034768;
@@ -8867,6 +8935,7 @@ function renderActivity(){
   });
 }
 async function openActivity(){
+  if(!requestAccountAccess('view your saved history','portfolio'))return;
   openSettings('activity');
   await loadActivityFromSupabase();
   renderActivity();
@@ -8876,7 +8945,9 @@ function closeActivity(){
 }
 
 function clearBenzaAccountState(){
+  guestBrowsing=false;
   currentUser=null;
+  document.body.classList.remove('guest-mode');
   benzaEntitlement={tier:'free',status:'inactive',expires_at:null,trial_ends_at:null};
   holdings=[];holdingsLoaded=false;activities=[];chartSnapshots=[];liveChartPoints=[];
   liveCloudLoaded=false;lastLiveCloudSync=0;
@@ -8933,9 +9004,15 @@ function handleBenzaDeepLink(){
 window.addEventListener('hashchange',()=>{ if(currentUser) handleBenzaDeepLink(); });
 
 async function restoreSession(){
+  const generation=authRequestGeneration;
   try{
     if(!supabaseClient)initSupabase();
     const {data}=await supabaseClient.auth.getSession();
+    if(generation!==authRequestGeneration){
+      // A guest chose public browsing before session restoration completed.
+      if(guestBrowsing)await supabaseClient.auth.signOut({scope:'local'});
+      return;
+    }
 
     if(data.session&&benzaRecoveryRedirect){
       showPasswordRecovery(data.session);
@@ -9766,7 +9843,7 @@ async function startNativeProPurchase(){
     return;
   }
   if(!currentUser){
-    alert('Please sign in before purchasing Benza Bullion Pro.');
+    closeProUpgrade();requestAccountAccess('purchase Pro for your account','pro');
     return;
   }
 
@@ -9999,7 +10076,7 @@ async function restoreProPurchases(){
     return;
   }
   if(!currentUser){
-    alert('Please sign in before restoring purchases.');
+    closeProUpgrade();requestAccountAccess('restore purchases for your account','pro');
     return;
   }
 
@@ -10377,6 +10454,7 @@ function renderAnalytics(){
   insights.innerHTML=insightList.slice(0,7).map((x,i)=>`<div class="insightItem"><div class="insightIcon">${['◆','↗','◎','Pt','Pd','Cu','•'][i]||'•'}</div><div>${x}</div></div>`).join('');
 }
 function openAnalytics(){
+  if(!requestAccountAccess('view your portfolio analytics','portfolio'))return;
   hideMainOverlays();
   setActiveNav('analytics');
   document.getElementById('analyticsScreen').classList.add('show');
@@ -10408,6 +10486,7 @@ function saleBaseState(){
   };
 }
 function openSaleModal(i){
+  if(!requestAccountAccess('record a sale','portfolio'))return;
   if(saleMutationBusy)return;
   if(!isProActive()){openProUpgrade('sale');return;}
   const h=holdings[i]; if(!h)return;
@@ -10428,6 +10507,7 @@ function openSaleModal(i){
   showSaleModal();
 }
 function openEditSaleModal(saleId){
+  if(!requestAccountAccess('edit your sale history','portfolio'))return;
   if(saleMutationBusy)return;
   if(!isProActive()){openProUpgrade('sale');return;}
   const sale=saleById(saleId);
@@ -10917,6 +10997,7 @@ async function openPrivateHoldingFile(path){
 }
 
 async function saveHolding(){
+  if(!requestAccountAccess('save bullion holdings','portfolio'))return;
   const button=document.getElementById('holdingSaveBtn');
   if(button?.disabled)return;
   const q=Number(document.getElementById('qty').value);
@@ -11841,6 +11922,7 @@ function hideMainOverlays(){
   });
 }
 function goPortfolio(){
+  if(!requestAccountAccess('save your bullion portfolio','portfolio'))return;
   hideMainOverlays();
   setActiveNav('portfolio');
 }
@@ -11848,7 +11930,7 @@ function goPortfolio(){
 function openNews(){
   hideMainOverlays();
   setActiveNav('news');document.getElementById('newsScreen').classList.add('show');loadMarketNews(false)}
-function closeNews(){document.getElementById('newsScreen').classList.remove('show');setActiveNav('portfolio')}
+function closeNews(){if(guestBrowsing){activeMarketsTab='market';openMarkets();return;}document.getElementById('newsScreen').classList.remove('show');setActiveNav('portfolio')}
 
 function applyTheme(theme){
   const t=theme==='dark'?'dark':'light';
@@ -12088,6 +12170,7 @@ function setSettingsTab(tab){
 }
 
 function openSettings(tab='settings'){
+  if(!currentUser){if(tab==='pro')openProUpgrade();else requestAccountAccess('manage your account');return;}
   hideMainOverlays();
   const screen=document.getElementById('settingsScreen');
   if(screen)screen.classList.add('show');
@@ -12196,8 +12279,8 @@ async function removeWatchItemFromSupabase(metal,direction){
   if(error)throw error;
 }
 function openMarkets(){hideMainOverlays();setActiveNav('markets');document.getElementById('marketsScreen')?.classList.add('show');setMarketsTab(activeMarketsTab);renderMarkets()}
-function closeMarkets(){document.getElementById('marketsScreen')?.classList.remove('show');setActiveNav('portfolio')}
-function setMarketsTab(tab){activeMarketsTab=['market','watchlist','calculator','coming'].includes(tab)?tab:'market';const a=document.getElementById('marketsMarketPanel'),b=document.getElementById('marketsWatchPanel'),c=document.getElementById('marketsComingPanel'),d=document.getElementById('marketsCalculatorPanel');if(a)a.style.display=activeMarketsTab==='market'?'block':'none';if(b)b.style.display=activeMarketsTab==='watchlist'?'block':'none';if(c)c.style.display=activeMarketsTab==='coming'?'block':'none';if(d)d.style.display=activeMarketsTab==='calculator'?'block':'none';document.getElementById('marketsMarketTab')?.classList.toggle('active',activeMarketsTab==='market');document.getElementById('marketsWatchTab')?.classList.toggle('active',activeMarketsTab==='watchlist');document.getElementById('marketsCalculatorTab')?.classList.toggle('active',activeMarketsTab==='calculator');document.getElementById('marketsComingTab')?.classList.toggle('active',activeMarketsTab==='coming');if(activeMarketsTab==='calculator')updateBullionCalculator();renderMarkets()}
+function closeMarkets(){if(guestBrowsing){openNews();return;}document.getElementById('marketsScreen')?.classList.remove('show');setActiveNav('portfolio')}
+function setMarketsTab(tab){if(tab==='watchlist'&&!requestAccountAccess('save watchlists and price alerts','watchlist'))return;activeMarketsTab=['market','watchlist','calculator','coming'].includes(tab)?tab:'market';const a=document.getElementById('marketsMarketPanel'),b=document.getElementById('marketsWatchPanel'),c=document.getElementById('marketsComingPanel'),d=document.getElementById('marketsCalculatorPanel');if(a)a.style.display=activeMarketsTab==='market'?'block':'none';if(b)b.style.display=activeMarketsTab==='watchlist'?'block':'none';if(c)c.style.display=activeMarketsTab==='coming'?'block':'none';if(d)d.style.display=activeMarketsTab==='calculator'?'block':'none';document.getElementById('marketsMarketTab')?.classList.toggle('active',activeMarketsTab==='market');document.getElementById('marketsWatchTab')?.classList.toggle('active',activeMarketsTab==='watchlist');document.getElementById('marketsCalculatorTab')?.classList.toggle('active',activeMarketsTab==='calculator');document.getElementById('marketsComingTab')?.classList.toggle('active',activeMarketsTab==='coming');if(activeMarketsTab==='calculator')updateBullionCalculator();renderMarkets()}
 function setMarketsFocus(metal){if(MARKETS_META[metal]){marketsFocusMetal=metal;renderMarkets()}}
 function marketsPrice(metal){const p=Number(livePrices?.[metal]||0);return Number.isFinite(p)&&p>0?p:0}
 function renderMarkets(){const selector=document.getElementById('marketsMetalSelector');if(!selector)return;selector.innerHTML=Object.keys(MARKETS_META).map(m=>`<button class="${m===marketsFocusMetal?'active':''}" onclick="setMarketsFocus('${m}')">${MARKETS_META[m].symbol.replace('X','')}</button>`).join('');const meta=MARKETS_META[marketsFocusMetal],price=marketsPrice(marketsFocusMetal);const n=document.getElementById('marketsFocusName'),t=document.getElementById('marketsFocusTicker'),p=document.getElementById('marketsFocusPrice');if(n)n.textContent=meta.name;if(t)t.textContent=meta.symbol+' • USD / '+meta.unit;if(p)p.textContent=price?money(price):'—';const g=marketsPrice('gold'),s=marketsPrice('silver');const ratio=document.getElementById('marketsGoldSilverRatio');if(ratio)ratio.textContent=g&&s?(g/s).toFixed(2):'—';const sorted=Object.keys(MARKETS_META).map(m=>({m,p:marketsPrice(m)})).filter(x=>x.p>0).sort((a,b)=>b.p-a.p);const hi=document.getElementById('marketsHighestSpot');if(hi)hi.textContent=sorted.length?MARKETS_META[sorted[0].m].name:'—';const list=document.getElementById('marketsPriceList');if(list)list.innerHTML=Object.keys(MARKETS_META).map(m=>{const a=MARKETS_META[m],v=marketsPrice(m);return `<div class="marketsPriceRow" onclick="setMarketsFocus('${m}')"><div class="holdingMetalEmblem ${m}" data-metal="${m}"><span class="metalBadge"><i></i><i></i><i></i></span></div><div><div class="marketsPriceName">${a.name}</div><div class="marketsPriceSymbol">${a.symbol}</div></div><div class="marketsPriceValue">${v?money(v):'—'}</div></div>`}).join('');renderMarketsWatchlist()}

@@ -53,7 +53,7 @@ test('late private photo and receipt responses do not overwrite the next holding
  const receipt=c.hydrateExistingAttachmentPreviews({receiptPath:'old.pdf'});c.currentUser={id:'b'};resolve('old-url');await receipt;assert.equal(shown.length,0);
 });
 test('account initialization stops after sign-out while holdings are loading and reuses auth client',async()=>{
- const c=ctx(['onSignedIn','initSupabase']);c.updateWelcomeBack=()=>{};c.handleBenzaDeepLink=()=>{};let resolve;c.loadHoldingsFromSupabase=()=>new Promise(r=>resolve=r);c.loadBenzaEntitlement=()=>{throw Error('Must not continue after account changes')};
+ const c=ctx(['onSignedIn','initSupabase']);c.document.body={classList:{remove(){}}};c.pendingAccountRoute=null;c.closeProUpgrade=()=>{};c.goPortfolio=()=>{};c.updateWelcomeBack=()=>{};c.handleBenzaDeepLink=()=>{};let resolve;c.loadHoldingsFromSupabase=()=>new Promise(r=>resolve=r);c.loadBenzaEntitlement=()=>{throw Error('Must not continue after account changes')};
  const request=c.onSignedIn();c.currentUser=null;resolve();await request;c.window={supabase:{createClient:()=>{throw Error('Must not recreate client')}}};c.initSupabase();
 });
 test('an old account deletion response cannot sign out or clear the next account',async()=>{

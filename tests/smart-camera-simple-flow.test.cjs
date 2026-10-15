@@ -12,7 +12,7 @@ const get=id=>{
  return nodes.get(id);
 };
 let active=true,updates=0;
-const context=vm.createContext({Date,Number,console,document:{getElementById:get,querySelectorAll:()=>[]},
+const context=vm.createContext({requestAccountAccess:()=>true,Date,Number,console,document:{getElementById:get,querySelectorAll:()=>[]},
  isProActive:()=>active,isBenzaNativeRuntime:()=>false,smartCameraPlugin:()=>null,
  ensureGlobalAddPortals(){},resetProInventoryForm(){get('holdingNotes').value='';get('holdingSerial').value=''},update(){updates++},
  addScreen:get('addScreen'),weight:get('weight'),cost:get('cost')});
