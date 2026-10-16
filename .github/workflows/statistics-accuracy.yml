@@ -14,6 +14,7 @@ on:
       - 'supabase/functions/**'
       - 'storekit-verifier/**'
       - 'tests/final-launch*'
+      - 'tests/market-news.test.cjs'
       - '.github/workflows/statistics-accuracy.yml'
 permissions:
   contents: read
@@ -30,6 +31,11 @@ jobs:
           node-version: 24
       - name: Run statistics regression suite
         run: node --test tests/statistics-accuracy.test.cjs tests/launch-account-purchases.test.cjs tests/final-launch-hardening.test.cjs tests/launch-sweep.test.cjs
+      - name: Verify public market news and failure recovery
+        run: |
+          node --test tests/market-news.test.cjs
+          npm ci --prefix supabase/functions/benza-market-news --ignore-scripts
+          npx --yes deno@2.5.6 test --node-modules-dir=manual --config supabase/functions/benza-market-news/deno.json supabase/functions/benza-market-news/index_test.ts
       - name: Verify basic holding edits against PostgreSQL
         run: |
           npm install --no-save --ignore-scripts @electric-sql/pglite@0.5.8

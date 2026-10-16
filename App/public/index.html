@@ -6343,7 +6343,7 @@ html:not([data-theme="dark"]) #marketsComingTab.active{
 <div id="newsScreen" class="newsOverlay">
   <div class="newsHeader">
     <div class="newsHeaderLeft"><button onclick="closeNews()">‹</button><h1>Market Insights</h1></div>
-    <button class="newsRefresh" onclick="loadMarketNews(true)">Refresh</button>
+    <button id="newsRefreshButton" class="newsRefresh" type="button" aria-busy="false" onclick="loadMarketNews(true)">Refresh</button>
   </div>
   <div class="newsBody">
     <div class="guestBrowseTools benzaGuestCard" data-benza-guest-card="1">
@@ -11836,9 +11836,10 @@ function initChartInteraction(){
 
 
 let lastNewsLoad=0;
-const BENZA_NEWS_RSS='https://news.google.com/rss/search?q='+encodeURIComponent('precious metals bullion gold silver platinum palladium copper inflation rates central bank mining')+'&hl=en-US&gl=US&ceid=US:en';
-const BENZA_NEWS_JSON='https://api.rss2json.com/v1/api.json?rss_url='+encodeURIComponent(BENZA_NEWS_RSS);
+let newsLoadInFlight=null;
+const BENZA_NEWS_JSON=SUPABASE_URL+'/functions/v1/benza-market-news';
 const BENZA_NEWS_CACHE='benzaMarketNewsCacheV70';
+const BENZA_NEWS_MAX_AGE=7*24*60*60*1000;
 const BENZA_TIPS=[
   ['Know spot vs. premium','Spot is the metal reference price. Coins and bars usually trade above spot because fabrication, distribution, dealer margin, demand, and scarcity can add a premium.'],
   ['Track cost per ounce','Your total purchase price matters more than the sticker price alone. Total cost per ounce helps show your real break-even level.'],
@@ -11931,8 +11932,30 @@ function renderNewsCards(items){
   items.forEach(item=>{const card=document.createElement('article');card.className='newsCard';card.innerHTML=`<div class="newsTag">${escapeHtml(item.tag||'Bullion')}</div><div class="newsTitle">${escapeHtml(item.title)}</div><div class="newsMeta">${escapeHtml(item.source||'News source')}${item.date?' · '+escapeHtml(item.date):''}</div><div class="newsWhy"><strong style="color:var(--text)">Why it matters</strong><br>${escapeHtml(item.why||'')}</div>${item.url?'<button class="newsOpen">Open original article</button>':''}`;const btn=card.querySelector('.newsOpen');if(btn)btn.addEventListener('click',()=>window.open(item.url,'_blank','noopener,noreferrer'));slider.appendChild(card);});
   slider.scrollLeft=0;refreshMarketRailArrows();
 }
-function saveNewsCache(items){try{localStorage.setItem(BENZA_NEWS_CACHE,JSON.stringify({savedAt:Date.now(),items}))}catch(e){}}
-function readNewsCache(){try{const c=JSON.parse(localStorage.getItem(BENZA_NEWS_CACHE)||'null');return c&&Array.isArray(c.items)&&c.items.length?c:null}catch(e){return null}}
+function safeNewsUrl(value){try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password?u.href:''}catch(_){return ''}}
+function normalizeNewsItems(items){
+  const now=Date.now(),seen=new Set();
+  return (Array.isArray(items)?items:[]).map(x=>{
+    const published=Date.parse(x.publishedAt||x.pubDate||'');
+    const title=(x.publishedAt?String(x.title||''):cleanNewsTitle(String(x.title||''))).trim();
+    return {title,source:String(x.source||newsSource(String(x.title||''))),
+      date:Number.isFinite(published)?new Date(published).toLocaleDateString([],{month:'short',day:'numeric'}):'',
+      publishedAt:Number.isFinite(published)?new Date(published).toISOString():'',
+      tag:newsTagFor(title),url:safeNewsUrl(x.url||x.link||''),why:whyItMatters(title)};
+  }).filter(x=>x.title&&x.url&&x.publishedAt&&Date.parse(x.publishedAt)>=now-BENZA_NEWS_MAX_AGE&&Date.parse(x.publishedAt)<=now+300000)
+    .sort((a,b)=>b.publishedAt.localeCompare(a.publishedAt))
+    .filter(x=>{const key=x.title.toLowerCase();if(seen.has(key)||seen.has(x.url))return false;seen.add(key);seen.add(x.url);return true}).slice(0,12);
+}
+function saveNewsCache(items,fetchedAt){try{localStorage.setItem(BENZA_NEWS_CACHE,JSON.stringify({savedAt:fetchedAt,items}))}catch(e){}}
+function readNewsCache(){try{
+  const c=JSON.parse(localStorage.getItem(BENZA_NEWS_CACHE)||'null');
+  if(!c||!Number.isFinite(c.savedAt)||c.savedAt>Date.now()||Date.now()-c.savedAt>BENZA_NEWS_MAX_AGE)return null;
+  const items=normalizeNewsItems(c.items);return items.length?{savedAt:c.savedAt,items}:null;
+}catch(e){return null}}
+function savedNewsStatus(savedAt){
+  const age=Math.max(0,Math.round((Date.now()-savedAt)/60000));
+  return 'Live refresh unavailable · showing saved headlines'+(age?' from '+(age<60?age+' min':Math.round(age/60)+' hr')+' ago':'');
+}
 function renderRotatingTips(){
   const slider=document.getElementById('tipSlider');if(!slider)return;
   const d=new Date();const dayKey=Math.floor(new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime()/86400000);
@@ -11941,15 +11964,41 @@ function renderRotatingTips(){
   slider.scrollLeft=0;refreshMarketRailArrows();
 }
 async function loadMarketNews(force=false){
-  renderRotatingTips();const now=Date.now();if(!force&&now-lastNewsLoad<30*60*1000)return;
-  const status=document.getElementById('newsStatus');if(!status)return;status.textContent='Updating current bullion headlines…';
-  try{
-    const r=await fetch(BENZA_NEWS_JSON,{cache:'no-store'});if(!r.ok)throw new Error('News unavailable');const data=await r.json();if(data.status!=='ok'||!Array.isArray(data.items))throw new Error('News feed unavailable');
-    const seen=new Set();const items=data.items.map(x=>{const title=cleanNewsTitle(x.title||'').trim();const d=x.pubDate?new Date(x.pubDate):null;return {title,source:newsSource(x.title||''),date:d&&!isNaN(d)?d.toLocaleDateString([],{month:'short',day:'numeric'}):'',publishedAt:d&&!isNaN(d)?d.toISOString():'',tag:newsTagFor(title),url:x.link||'',why:whyItMatters(title)}}).filter(x=>x.title&&!seen.has(x.title.toLowerCase())&&seen.add(x.title.toLowerCase())).sort((a,b)=>String(b.publishedAt).localeCompare(String(a.publishedAt))).slice(0,12);
-    if(!items.length)throw new Error('No current stories');renderNewsCards(items);saveNewsCache(items);lastNewsLoad=now;status.textContent='Live headlines · refreshed '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+' · auto-refreshes every 30 min';
-  }catch(e){
-    console.warn('Market news unavailable:',e);const cached=readNewsCache();if(cached){renderNewsCards(cached.items);const age=Math.max(0,Math.round((now-cached.savedAt)/60000));status.textContent=`Live refresh unavailable · showing saved headlines${age?` from ${age<60?age+' min':Math.round(age/60)+' hr'} ago`:''}`;}else{renderNewsCards(fallbackNewsCards());status.textContent='Live news temporarily unavailable · showing Benza Bullion guidance';}
+  renderRotatingTips();
+  if(newsLoadInFlight)return newsLoadInFlight;
+  if(!force&&Date.now()-lastNewsLoad<30*60*1000)return;
+  const status=document.getElementById('newsStatus');if(!status)return;
+  const cached=readNewsCache();if(cached)renderNewsCards(cached.items);
+  status.textContent='Updating current bullion headlines…';
+  const button=document.getElementById('newsRefreshButton');
+  if(button){button.disabled=true;button.setAttribute('aria-busy','true')}
+  newsLoadInFlight=performMarketNewsRefresh(status);
+  try{return await newsLoadInFlight}finally{
+    newsLoadInFlight=null;if(button){button.disabled=false;button.setAttribute('aria-busy','false')}
   }
+}
+async function performMarketNewsRefresh(status){
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),15000);
+  try{
+    const r=await fetch(BENZA_NEWS_JSON,{cache:'no-store',credentials:'omit',signal:controller.signal});
+    if(!r.ok)throw new Error('News unavailable');
+    const data=await r.json();if(data.status!=='ok')throw new Error('News feed unavailable');
+    const items=normalizeNewsItems(data.items);if(!items.length)throw new Error('No current stories');
+    const fetchedAt=Date.parse(data.fetched_at);
+    if(!Number.isFinite(fetchedAt)||fetchedAt>Date.now()+300000||Date.now()-fetchedAt>BENZA_NEWS_MAX_AGE)throw new Error('News timestamp unavailable');
+    renderNewsCards(items);saveNewsCache(items,Math.min(Date.now(),fetchedAt));
+    // Saved upstream results must not reset the 30-minute successful-refresh clock.
+    if(data.stale){status.textContent=savedNewsStatus(fetchedAt);return}
+    lastNewsLoad=Date.now();
+    status.textContent='Live headlines · updated '+new Date(fetchedAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+
+      (data.partial?' · some sources unavailable':'')+' · auto-refreshes every 30 min';
+  }catch(e){
+    console.warn('Market news unavailable:',e);
+    const cached=readNewsCache();
+    if(cached){renderNewsCards(cached.items);status.textContent=savedNewsStatus(cached.savedAt)}
+    else{renderNewsCards(fallbackNewsCards());status.textContent='Live news temporarily unavailable · showing Benza Bullion guidance'}
+  }finally{clearTimeout(timeout)}
 }
 
 function setActiveNav(tab){
@@ -12253,7 +12302,10 @@ setInterval(()=>{
   if(lastMarketFeedData)renderLiveFeedStatus(lastMarketFeedData,lastMarketFeedStatusState);
 },60000); 
 initChartInteraction();
-setInterval(()=>{if(document.getElementById('newsScreen')?.classList.contains('show'))loadMarketNews(true)},30*60*1000);
+function refreshVisibleMarketNews(){if(!document.hidden&&document.getElementById('newsScreen')?.classList.contains('show'))loadMarketNews(false)}
+setInterval(refreshVisibleMarketNews,30*60*1000);
+window.addEventListener('online',refreshVisibleMarketNews);
+document.addEventListener('visibilitychange',refreshVisibleMarketNews);
 renderHoldings();
 </script>
 

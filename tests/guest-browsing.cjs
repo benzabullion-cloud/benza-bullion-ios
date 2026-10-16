@@ -16,7 +16,7 @@ const stub=vm.runInNewContext(sweep.slice(sweep.indexOf('const stub='),sweep.ind
      if(url==='https://guest.test/')return route.fulfill({contentType:'text/html',body:html});
      if(url.endsWith('/vendor/supabase.js'))return route.fulfill({contentType:'text/javascript',body:stub});
      if(url.includes('benza-market-prices'))return route.fulfill({contentType:'application/json',body:JSON.stringify({success:true,prices:{gold:4000,silver:50,platinum:1500,palladium:1400,copper:.3},fetched_at:new Date().toISOString()})});
-     if(url.includes('rss2json'))return route.fulfill({contentType:'application/json',body:JSON.stringify({status:'ok',items:[{title:'Bullion market headline',link:'https://example.test/news',pubDate:new Date().toISOString()}]})});
+     if(url.includes('benza-market-news'))return route.fulfill({contentType:'application/json',body:JSON.stringify({status:'ok',fetched_at:new Date().toISOString(),items:[{title:'Bullion market headline',link:'https://example.test/news',pubDate:new Date().toISOString()}]})});
      return route.fulfill({status:200,body:''});
     });
     await page.goto('https://guest.test/');
@@ -32,12 +32,15 @@ const stub=vm.runInNewContext(sweep.slice(sweep.indexOf('const stub='),sweep.ind
      await page.evaluate(()=>openNews());await page.getByText('Bullion market headline',{exact:true}).waitFor();
      for(const fn of ['goPortfolio','openAnalytics','openAddChoice','openSettings']){
       await page.evaluate(f=>window[f](),fn);
-      assert.equal(await page.locator('#authScreen').isVisible(),true,fn);
-      await page.locator('#guestBrowseButton').click();
+      assert.equal(await page.locator('#benzaGuestLockOverlay').isVisible(),true,fn);
+      assert.equal(await page.locator('#authScreen').isVisible(),false,fn);
+      await page.getByRole('button',{name:'Keep exploring',exact:true}).click();
      }
+     await page.evaluate(()=>openMarkets());
      await page.locator('#marketsWatchTab').click();
-     assert.equal(await page.locator('#authScreen').isVisible(),true);
-     await page.locator('#guestBrowseButton').click();
+     assert.equal(await page.locator('#benzaGuestLockOverlay').isVisible(),true);
+     assert.equal(await page.locator('#authScreen').isVisible(),false);
+     await page.getByRole('button',{name:'Keep exploring',exact:true}).click();
      await page.evaluate(()=>openProUpgrade());
      assert.equal(await page.locator('#proUpgradeModal').isVisible(),true);
      await page.evaluate(()=>closeProUpgrade());
@@ -48,7 +51,7 @@ const stub=vm.runInNewContext(sweep.slice(sweep.indexOf('const stub='),sweep.ind
      assert.equal(await page.evaluate(()=>guestBrowsing),false);
      await page.evaluate(()=>signOut());await page.locator('#guestBrowseButton').click();
      assert.deepEqual(await page.evaluate(()=>({user:currentUser,holdings:holdings.length,activities:activities.length,pro:isProActive()})),{user:null,holdings:0,activities:0,pro:false});
-     await page.evaluate(()=>requestAccountAccess());
+     await page.evaluate(()=>openGuestAuth('login'));
     }
     assert.deepEqual(errors,[],name+JSON.stringify(viewport));
     await page.close();
