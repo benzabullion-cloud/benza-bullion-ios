@@ -47,14 +47,23 @@ window.supabase={createClient:()=>({
      const surface=await page.locator('#portfolioChart').evaluate(el=>{const s=getComputedStyle(el);return {background:s.backgroundColor,shadow:s.boxShadow,border:s.borderTopWidth}});
      assert.equal(surface.background,'rgba(0, 0, 0, 0)',engineName+' '+theme+' chart blends into page');
      assert.equal(surface.shadow,'none');assert.equal(surface.border,'0px');
+     const clipped=await page.locator('.marketCard>strong').evaluateAll(es=>es.filter(e=>e.scrollWidth>e.clientWidth+1).map(e=>e.textContent));
+     assert.deepEqual(clipped,[],engineName+' '+width+' complete ticker prices');
     }
     if(theme==='light'){
      const checks=await page.evaluate(()=>{
-      const samples=['.label','.marketIdentity span','.marketIdentity b','.newsIntro','.newsMeta','.newsTag','.marketsMuted','.settingsHint','.periods button.active'];
+      const samples=['.label','.marketIdentity span','.marketIdentity b','.newsIntro','.newsMeta','.newsTag','.marketsMuted','.settingsHint','.settingsAccountButton','.settingsSectionTabs button','.marketsMetalSelector button','.tipNum','.smartCameraEyebrow','.periods button.active'];
       return samples.flatMap(selector=>[...document.querySelectorAll(selector)].filter(el=>el.getClientRects().length&&getComputedStyle(el).visibility!=='hidden').map(el=>{
-       const style=getComputedStyle(el);let parent=el,bg='rgba(0, 0, 0, 0)';
-       while(parent&&bg==='rgba(0, 0, 0, 0)'){bg=getComputedStyle(parent).backgroundColor;parent=parent.parentElement;}
-       return {selector,color:style.color,bg:bg==='rgba(0, 0, 0, 0)'?'rgb(246, 243, 236)':bg};
+       const style=getComputedStyle(el);let parent=el;const layers=[];
+       while(parent){
+        const rgba=getComputedStyle(parent).backgroundColor.match(/[\d.]+/g).map(Number);
+        const alpha=rgba.length===4?rgba[3]:1;
+        if(alpha>0)layers.push({rgb:rgba.slice(0,3),alpha});
+        if(alpha===1)break;parent=parent.parentElement;
+       }
+       let backdrop=[246,243,236];
+       for(const layer of layers.reverse())backdrop=layer.rgb.map((c,i)=>c*layer.alpha+backdrop[i]*(1-layer.alpha));
+       return {selector,color:style.color,bg:'rgb('+backdrop.map(Math.round).join(', ')+')'};
       }));
      });
      for(const check of checks)assert.ok(contrast(check.color,check.bg)>=4.5,JSON.stringify({engineName,open,...check,ratio:contrast(check.color,check.bg)}));

@@ -3854,7 +3854,7 @@ html:not([data-theme="dark"]) #addScreen{--holding-accent:#a9550a}
     top:69px !important;
     left:1px !important;
     right:1px !important;
-    font-size:14px !important;
+    font-size:clamp(10px,3.2vw,14px) !important;
     letter-spacing:-.35px !important;
   }
   .marketCard>em{
@@ -4028,6 +4028,14 @@ html:not([data-theme="dark"]) .newsEyebrow,
 html:not([data-theme="dark"]) .newsTag,
 html:not([data-theme="dark"]) .marketsEyebrow{color:var(--gold)}
 html:not([data-theme="dark"]) .milestoneItem.unlocked .milestoneIcon{color:#FFFDF8 !important}
+html:not([data-theme="dark"]) .settingsAccountButton{background:var(--button);color:var(--buttonText)}
+html:not([data-theme="dark"]) .tipNum,
+html:not([data-theme="dark"]) .smartCameraEyebrow,
+html:not([data-theme="dark"]) .smartCameraBadge,
+html:not([data-theme="dark"]) .settingsSectionTabs button.active,
+html:not([data-theme="dark"]) .marketsMetalSelector button.active,
+html:not([data-theme="dark"]) #settingsProTab:not(.active){color:var(--gold) !important}
+
 </style>
 
 
