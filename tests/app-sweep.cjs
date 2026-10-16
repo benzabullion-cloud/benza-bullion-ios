@@ -16,6 +16,10 @@ window.supabase={createClient:()=>({
 (async()=>{
  sweepDeadline=setTimeout(()=>{console.error('Full-app sweep exceeded 120 seconds');process.exit(1)},120000);
  let states=0;
+ const contrast=(a,b)=>{
+  const lum=s=>{const rgb=s.match(/[\d.]+/g).slice(0,3).map(Number).map(c=>{c/=255;return c<=.04045?c/12.92:((c+.055)/1.055)**2.4});return rgb.reduce((v,c,i)=>v+c*[.2126,.7152,.0722][i],0)};
+  const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);
+ };
  for(const [engineName,engine] of Object.entries({chromium,webkit})){
   const browser=await engine.launch({headless:true});
   sweepBrowsers.push(browser);
@@ -30,6 +34,7 @@ window.supabase={createClient:()=>({
    return route.fulfill({status:200,contentType:'text/plain',body:''});
   });
   await page.goto('https://sweep.test/');
+  await page.addStyleTag({content:'*,*::before,*::after{transition:none!important;animation:none!important}'});
   console.log('Loaded bundled app in '+engineName);
   await page.evaluate(()=>{currentUser={id:'account-a',email:'sweep@example.test',user_metadata:{}};document.getElementById('authScreen').style.display='none';});
   for(const width of [320,390,768])for(const theme of ['dark','light'])for(const pro of [false,true]){
@@ -38,8 +43,37 @@ window.supabase={createClient:()=>({
    await page.evaluate(({theme,pro})=>{applyTheme(theme);benzaEntitlement={tier:pro?'pro':'free',status:pro?'active':'inactive'};updateProIntegratedUI();},{theme,pro});
    for(const open of ['goPortfolio','openAnalytics','openMarkets','openNews','openSettings','openManualAdd','openSmartCamera']){
     await page.evaluate(async name=>{closeAdd();closeAddChoice();closeSmartCamera();hideMainOverlays();await Promise.race([Promise.resolve(window[name]()),new Promise((_,reject)=>setTimeout(()=>reject(Error(name+' did not finish')),5000))]);},open);
+    if(open==='goPortfolio'){
+     const surface=await page.locator('#portfolioChart').evaluate(el=>{const s=getComputedStyle(el);return {background:s.backgroundColor,shadow:s.boxShadow,border:s.borderTopWidth}});
+     assert.equal(surface.background,'rgba(0, 0, 0, 0)',engineName+' '+theme+' chart blends into page');
+     assert.equal(surface.shadow,'none');assert.equal(surface.border,'0px');
+     const clipped=await page.locator('.marketCard>strong').evaluateAll(es=>es.filter(e=>e.scrollWidth>e.clientWidth+1).map(e=>e.textContent));
+     assert.deepEqual(clipped,[],engineName+' '+width+' complete ticker prices');
+    }
+    if(theme==='light'){
+     const checks=await page.evaluate(()=>{
+      const samples=['.label','.marketIdentity span','.marketIdentity b','.newsIntro','.newsMeta','.newsTag','.marketsMuted','.settingsHint','.settingsAccountButton','.settingsSectionTabs button','.marketsMetalSelector button','.tipNum','.smartCameraEyebrow','.periods button.active'];
+      return samples.flatMap(selector=>[...document.querySelectorAll(selector)].filter(el=>el.getClientRects().length&&getComputedStyle(el).visibility!=='hidden').map(el=>{
+       const style=getComputedStyle(el);let parent=el;const layers=[];
+       while(parent){
+        const rgba=getComputedStyle(parent).backgroundColor.match(/[\d.]+/g).map(Number);
+        const alpha=rgba.length===4?rgba[3]:1;
+        if(alpha>0)layers.push({rgb:rgba.slice(0,3),alpha});
+        if(alpha===1)break;parent=parent.parentElement;
+       }
+       let backdrop=[246,243,236];
+       for(const layer of layers.reverse())backdrop=layer.rgb.map((c,i)=>c*layer.alpha+backdrop[i]*(1-layer.alpha));
+       return {selector,color:style.color,bg:'rgb('+backdrop.map(Math.round).join(', ')+')'};
+      }));
+     });
+     for(const check of checks)assert.ok(contrast(check.color,check.bg)>=4.5,JSON.stringify({engineName,open,...check,ratio:contrast(check.color,check.bg)}));
+    }
     const metric=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth+1,visible:[...document.querySelectorAll('.show')].map(n=>n.id).filter(Boolean)}));
     assert.equal(metric.overflow,false,JSON.stringify({engineName,width,theme,pro,open,metric}));
+    if(width===390&&theme==='light'&&!pro){
+     fs.mkdirSync('ui-artifacts',{recursive:true});
+     await page.screenshot({path:'ui-artifacts/light-zone-'+engineName+'-'+open+'.png',animations:'disabled'});
+    }
     states++;
    }
   }
@@ -368,6 +402,22 @@ window.supabase={createClient:()=>({
   const cleared=await page.evaluate(()=>({user:currentUser,pro:isProActive(),holdings:holdings.length,watchlist:benzaWatchlist.length,scannerFiles:pendingScannerPhotoFiles.length,overlays:[...document.querySelectorAll('#addScreen.show,#settingsScreen.show,#smartCameraScreen.show,#proUpgradeModal.show')].length}));
   assert.deepEqual(cleared,{user:null,pro:false,holdings:0,watchlist:0,scannerFiles:0,overlays:0});
   assert.deepEqual(errors,[],engineName+' runtime errors');
+  // Visual evidence uses deterministic portfolio values; no production data is changed.
+  await page.setViewportSize({width:390,height:844});
+  await page.evaluate(()=>{
+   currentUser={id:'visual-fixture',user_metadata:{display_name:'Bullion Builder'}};
+   guestBrowsing=false;document.body.classList.remove('guest-mode');
+   holdings=[{id:'visual-silver',metal:'silver',product:'Silver bullion',qty:5,weight:1,oz:5,cost:130,costKnown:true}];
+   document.getElementById('authScreen').style.display='none';hideMainOverlays();renderHoldings();updatePortfolio();
+   activeChartRange='1D';
+   chartSnapshots=[180,178,185,192,190,205,210,208,226,232,229,250].map((value,i)=>({time:new Date(Date.now()-(11-i)*3600000),value}));
+   drawPortfolioRangeChart();
+  });
+  fs.mkdirSync('ui-artifacts',{recursive:true});
+  for(const theme of ['light','dark']){
+   await page.evaluate(t=>applyTheme(t),theme);
+   await page.screenshot({path:'ui-artifacts/portfolio-polish-'+engineName+'-'+theme+'.png',animations:'disabled'});
+  }
   await browser.close();
  }
  clearTimeout(sweepDeadline);
