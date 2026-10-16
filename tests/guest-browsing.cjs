@@ -16,7 +16,7 @@ const stub=vm.runInNewContext(sweep.slice(sweep.indexOf('const stub='),sweep.ind
      if(url==='https://guest.test/')return route.fulfill({contentType:'text/html',body:html});
      if(url.endsWith('/vendor/supabase.js'))return route.fulfill({contentType:'text/javascript',body:stub});
      if(url.includes('benza-market-prices'))return route.fulfill({contentType:'application/json',body:JSON.stringify({success:true,prices:{gold:4000,silver:50,platinum:1500,palladium:1400,copper:.3},fetched_at:new Date().toISOString()})});
-     if(url.includes('rss2json'))return route.fulfill({contentType:'application/json',body:JSON.stringify({status:'ok',items:[{title:'Bullion market headline',link:'https://example.test/news',pubDate:new Date().toISOString()}]})});
+     if(url.includes('benza-market-news'))return route.fulfill({contentType:'application/json',body:JSON.stringify({status:'ok',fetched_at:new Date().toISOString(),items:[{title:'Bullion market headline',link:'https://example.test/news',pubDate:new Date().toISOString()}]})});
      return route.fulfill({status:200,body:''});
     });
     await page.goto('https://guest.test/');
