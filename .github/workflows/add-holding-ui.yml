@@ -6,6 +6,7 @@ on:
       - 'tests/add-holding-layout.cjs'
       - 'tests/app-sweep.cjs'
       - 'tests/guest-browsing.cjs'
+      - 'tests/market-news-live.cjs'
       - 'tests/guest-access.test.cjs'
       - '.github/workflows/add-holding-ui.yml'
 permissions:
@@ -23,6 +24,7 @@ jobs:
       - run: node tests/add-holding-layout.cjs
       - run: node tests/app-sweep.cjs
       - run: node tests/guest-browsing.cjs
+      - run: node tests/market-news-live.cjs
       - run: node --test tests/guest-access.test.cjs
       - uses: actions/upload-artifact@v4
         if: always()

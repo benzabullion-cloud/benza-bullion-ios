@@ -35,7 +35,7 @@ jobs:
         run: |
           node --test tests/market-news.test.cjs
           npm ci --prefix supabase/functions/benza-market-news --ignore-scripts
-          npx --yes deno@2.5.6 test --config supabase/functions/benza-market-news/deno.json supabase/functions/benza-market-news/index_test.ts
+          npx --yes deno@2.5.6 test --node-modules-dir=manual --config supabase/functions/benza-market-news/deno.json supabase/functions/benza-market-news/index_test.ts
       - name: Verify basic holding edits against PostgreSQL
         run: |
           npm install --no-save --ignore-scripts @electric-sql/pglite@0.5.8

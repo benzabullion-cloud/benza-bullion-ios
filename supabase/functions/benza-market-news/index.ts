@@ -5,6 +5,10 @@ export const QUERIES = [
   "gold bullion when:7d", "silver bullion when:7d",
   "(platinum OR palladium) bullion when:7d", "copper price when:7d",
 ];
+export const FEED_URLS = [
+  ...QUERIES.map(q => "https://news.google.com/rss/search?" + new URLSearchParams({q, hl:"en-US", gl:"US", ceid:"US:en"})),
+  "https://www.bing.com/news/search?q=gold+silver+bullion&format=rss",
+];
 const MAX_AGE = 7 * 86400000;
 const FRESH_FOR = 10 * 60000;
 const STALE_FOR = 24 * 3600000;
@@ -29,11 +33,15 @@ export function parseFeed(xml: string, now: number): Item[] {
   const raw = parser.parse(xml)?.rss?.channel?.item;
   return (Array.isArray(raw) ? raw : raw ? [raw] : []).flatMap((x) => {
     const title = text(x.title).slice(0, 500);
-    const source = text(x.source).slice(0, 150);
+    const source = text(x.source || x["News:Source"]).slice(0, 150);
     const link = text(x.link);
     const published = Date.parse(text(x.pubDate));
     try {
-      const url = new URL(link);
+      let url = new URL(link);
+      // Bing RSS wraps publisher links; unwrap only this fixed provider path.
+      if (url.hostname === "www.bing.com" && url.pathname === "/news/apiclick.aspx") {
+        url = new URL(url.searchParams.get("url") || "");
+      }
       if (url.protocol !== "https:" || url.username || url.password ||
           !title || !Number.isFinite(published) || published < now - MAX_AGE || published > now + 300000) return [];
       return [{ title, source, link: url.href, pubDate: new Date(published).toISOString() }];
@@ -78,14 +86,25 @@ export function createNewsHandler(fetcher: typeof fetch = fetch, clock = Date.no
   }
   async function refresh(): Promise<Feed> {
     const now = clock();
-    const results = await Promise.allSettled(QUERIES.map(async (q) => {
-      const url = new URL("https://news.google.com/rss/search");
-      url.search = new URLSearchParams({ q, hl: "en-US", gl: "US", ceid: "US:en" }).toString();
-      const response = await fetcher(url, { signal: AbortSignal.timeout(10000), redirect: "error" });
-      if (!response.ok) { await response.body?.cancel(); throw Error("Upstream unavailable"); }
-      const items = parseFeed(await readBounded(response), now);
-      if (!items.length) throw Error("No recent articles");
-      return items;
+    const results = await Promise.allSettled(FEED_URLS.map(async (url) => {
+      // Fixed sources, at most two attempts each. Parallel feeds bound total latency.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const response = await fetcher(url, { signal: AbortSignal.timeout(4000), redirect: "error" });
+          if (!response.ok) {
+            await response.body?.cancel();
+            if (response.status === 429) throw new Error("Rate limited", {cause: "no-retry"});
+            throw Error("Upstream unavailable");
+          }
+          const items = parseFeed(await readBounded(response), now);
+          if (!items.length) throw Error("No recent articles");
+          return items;
+        } catch (error) {
+          if (attempt === 1 || (error instanceof Error && error.cause === "no-retry")) throw error;
+          await new Promise(resolve => setTimeout(resolve, 250));
+        }
+      }
+      throw Error("News unavailable");
     }));
     const items = combineFeeds(results.flatMap((r) => r.status === "fulfilled" ? [r.value] : []));
     if (!items.length) { failedAt = clock(); throw Error("News unavailable"); }

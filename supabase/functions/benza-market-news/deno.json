@@ -2,5 +2,5 @@
   "imports": {
     "fast-xml-parser": "npm:fast-xml-parser@5.11.2"
   },
-  "nodeModulesDir": "manual"
+  "nodeModulesDir": "auto"
 }
