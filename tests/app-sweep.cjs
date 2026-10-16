@@ -34,6 +34,7 @@ window.supabase={createClient:()=>({
    return route.fulfill({status:200,contentType:'text/plain',body:''});
   });
   await page.goto('https://sweep.test/');
+  await page.addStyleTag({content:'*,*::before,*::after{transition:none!important;animation:none!important}'});
   console.log('Loaded bundled app in '+engineName);
   await page.evaluate(()=>{currentUser={id:'account-a',email:'sweep@example.test',user_metadata:{}};document.getElementById('authScreen').style.display='none';});
   for(const width of [320,390,768])for(const theme of ['dark','light'])for(const pro of [false,true]){
@@ -60,6 +61,10 @@ window.supabase={createClient:()=>({
     }
     const metric=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth+1,visible:[...document.querySelectorAll('.show')].map(n=>n.id).filter(Boolean)}));
     assert.equal(metric.overflow,false,JSON.stringify({engineName,width,theme,pro,open,metric}));
+    if(width===390&&theme==='light'&&!pro){
+     fs.mkdirSync('ui-artifacts',{recursive:true});
+     await page.screenshot({path:'ui-artifacts/light-zone-'+engineName+'-'+open+'.png',animations:'disabled'});
+    }
     states++;
    }
   }
