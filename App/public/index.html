@@ -3870,12 +3870,15 @@ html:not([data-theme="dark"]) #addScreen{--holding-accent:#a9550a}
 <style id="benza-light-mode-refresh">
 html:not([data-theme="dark"]){
   --bg:#F6F3EC;
+  --page:#F6F3EC;
+  --surface3:#E7E1D6;
+  --nav:rgba(255,253,248,.97);
   --surface:#FFFDF8;
-  --surface2:#F1EDE4;
+  --surface2:#EDE8DE;
   --text:#1E2024;
-  --muted:#73767D;
-  --border:#DED8CC;
-  --gold:#B98522;
+  --muted:#5F636B;
+  --border:#CCC3B4;
+  --gold:#885E16;
   --shadow:rgba(51,45,34,.10);
 }
 
@@ -3896,7 +3899,7 @@ html:not([data-theme="dark"]) .analyticsCard,
 html:not([data-theme="dark"]) .marketsCard,
 html:not([data-theme="dark"]) .settingsCard{
   background:#FFFDF8 !important;
-  border-color:#DED8CC !important;
+  border-color:#CCC3B4 !important;
   box-shadow:0 8px 24px rgba(51,45,34,.06) !important;
 }
 
@@ -3914,22 +3917,22 @@ html:not([data-theme="dark"]) .label,
 html:not([data-theme="dark"]) .muted,
 html:not([data-theme="dark"]) .brandTagline,
 html:not([data-theme="dark"]) .marketIdentity span{
-  color:#73767D !important;
+  color:#5F636B !important;
 }
 
 /* Navigation */
 html:not([data-theme="dark"]) nav{
   background:rgba(255,253,248,.96) !important;
-  border-color:#DED8CC !important;
+  border-color:#CCC3B4 !important;
   box-shadow:0 -6px 24px rgba(51,45,34,.06) !important;
 }
 html:not([data-theme="dark"]) nav [data-tab],
 html:not([data-theme="dark"]) nav .icon{
-  color:#73767D !important;
+  color:#5F636B !important;
 }
 html:not([data-theme="dark"]) nav [data-tab].active,
 html:not([data-theme="dark"]) nav [data-tab].active .icon{
-  color:#B98522 !important;
+  color:#885E16 !important;
 }
 
 /* Buttons/chips */
@@ -3938,22 +3941,22 @@ html:not([data-theme="dark"]) .chip,
 html:not([data-theme="dark"]) .bullionFilter,
 html:not([data-theme="dark"]) .analyticsSubtab,
 html:not([data-theme="dark"]) .marketsTabs button{
-  border-color:#DED8CC !important;
+  border-color:#CCC3B4 !important;
 }
 
 html:not([data-theme="dark"]) .bullionFilter:not(.active),
 html:not([data-theme="dark"]) .analyticsSubtab:not(.active),
 html:not([data-theme="dark"]) .marketsTabs button:not(.active){
   background:#FFFDF8 !important;
-  color:#73767D !important;
+  color:#5F636B !important;
 }
 
 html:not([data-theme="dark"]) .bullionFilter.active,
 html:not([data-theme="dark"]) .analyticsSubtab.active,
 html:not([data-theme="dark"]) .marketsTabs button.active{
-  background:#B98522 !important;
+  background:#885E16 !important;
   color:#FFFDF8 !important;
-  border-color:#B98522 !important;
+  border-color:#885E16 !important;
 }
 
 /* Option Z ticker: same structure, light-specific palette only */
@@ -3988,11 +3991,11 @@ html:not([data-theme="dark"]) .marketIdentity b{
 html:not([data-theme="dark"]) .marketCard>strong{
   color:#1E2024 !important;
 }
-html:not([data-theme="dark"]) .marketCard.gold .marketIdentity b{color:#B98A24 !important}
-html:not([data-theme="dark"]) .marketCard.silver .marketIdentity b{color:#8E949C !important}
-html:not([data-theme="dark"]) .marketCard.platinum .marketIdentity b{color:#5E91B8 !important}
-html:not([data-theme="dark"]) .marketCard.palladium .marketIdentity b{color:#5E9D83 !important}
-html:not([data-theme="dark"]) .marketCard.copper .marketIdentity b{color:#B76D42 !important}
+html:not([data-theme="dark"]) .marketCard.gold .marketIdentity b{color:#805714 !important}
+html:not([data-theme="dark"]) .marketCard.silver .marketIdentity b{color:#545D68 !important}
+html:not([data-theme="dark"]) .marketCard.platinum .marketIdentity b{color:#326487 !important}
+html:not([data-theme="dark"]) .marketCard.palladium .marketIdentity b{color:#32684F !important}
+html:not([data-theme="dark"]) .marketCard.copper .marketIdentity b{color:#8E4C2B !important}
 
 /* Chart + secondary surfaces */
 html:not([data-theme="dark"]) #portfolioChart{
@@ -4001,10 +4004,10 @@ html:not([data-theme="dark"]) #portfolioChart{
   box-shadow:none !important;
 }
 html:not([data-theme="dark"]) .periods button{
-  color:#73767D !important;
+  color:#5F636B !important;
 }
 html:not([data-theme="dark"]) .periods button.active{
-  background:#B98522 !important;
+  background:#885E16 !important;
   color:#FFFDF8 !important;
 }
 
@@ -4014,8 +4017,17 @@ html:not([data-theme="dark"]) select,
 html:not([data-theme="dark"]) textarea{
   background:#FFFDF8 !important;
   color:#1E2024 !important;
-  border-color:#DED8CC !important;
+  border-color:#CCC3B4 !important;
 }
+/* Keep semantic colors legible on light surfaces, including tinted metal tiles. */
+html:not([data-theme="dark"]) .marketCard>em.dayChangePositive{color:#147443 !important}
+html:not([data-theme="dark"]) .marketCard>em.dayChangeNegative{color:#B32F29 !important}
+html:not([data-theme="dark"]) #historyLine{stroke:var(--gold)}
+html:not([data-theme="dark"]) #fill stop{stop-color:var(--gold)}
+html:not([data-theme="dark"]) .newsEyebrow,
+html:not([data-theme="dark"]) .newsTag,
+html:not([data-theme="dark"]) .marketsEyebrow{color:var(--gold)}
+html:not([data-theme="dark"]) .milestoneItem.unlocked .milestoneIcon{color:#FFFDF8 !important}
 </style>
 
 
@@ -5696,6 +5708,7 @@ body.guest-mode .guestLegalFooter{display:flex}
 .benzaGuestLockActions{display:grid;gap:8px}
 .benzaGuestLockActions button{width:100%;min-height:47px;border-radius:13px;font-size:14px;font-weight:850}
 .benzaGuestLockCreate{border:1px solid var(--gold);background:var(--gold);color:#111}
+html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
 .benzaGuestLockSignIn{border:1px solid var(--border);background:var(--surface2);color:var(--text)}
 .benzaGuestLockLater{border:0;background:transparent;color:var(--muted);min-height:38px!important}
 </style>

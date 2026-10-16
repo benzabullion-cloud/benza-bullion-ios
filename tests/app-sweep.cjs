@@ -16,6 +16,10 @@ window.supabase={createClient:()=>({
 (async()=>{
  sweepDeadline=setTimeout(()=>{console.error('Full-app sweep exceeded 120 seconds');process.exit(1)},120000);
  let states=0;
+ const contrast=(a,b)=>{
+  const lum=s=>{const rgb=s.match(/[\d.]+/g).slice(0,3).map(Number).map(c=>{c/=255;return c<=.04045?c/12.92:((c+.055)/1.055)**2.4});return rgb.reduce((v,c,i)=>v+c*[.2126,.7152,.0722][i],0)};
+  const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);
+ };
  for(const [engineName,engine] of Object.entries({chromium,webkit})){
   const browser=await engine.launch({headless:true});
   sweepBrowsers.push(browser);
@@ -42,6 +46,17 @@ window.supabase={createClient:()=>({
      const surface=await page.locator('#portfolioChart').evaluate(el=>{const s=getComputedStyle(el);return {background:s.backgroundColor,shadow:s.boxShadow,border:s.borderTopWidth}});
      assert.equal(surface.background,'rgba(0, 0, 0, 0)',engineName+' '+theme+' chart blends into page');
      assert.equal(surface.shadow,'none');assert.equal(surface.border,'0px');
+    }
+    if(theme==='light'){
+     const checks=await page.evaluate(()=>{
+      const samples=['.label','.marketIdentity span','.marketIdentity b','.newsIntro','.newsMeta','.newsTag','.marketsMuted','.settingsHint','.periods button.active'];
+      return samples.flatMap(selector=>[...document.querySelectorAll(selector)].filter(el=>el.getClientRects().length&&getComputedStyle(el).visibility!=='hidden').map(el=>{
+       const style=getComputedStyle(el);let parent=el,bg='rgba(0, 0, 0, 0)';
+       while(parent&&bg==='rgba(0, 0, 0, 0)'){bg=getComputedStyle(parent).backgroundColor;parent=parent.parentElement;}
+       return {selector,color:style.color,bg:bg==='rgba(0, 0, 0, 0)'?'rgb(246, 243, 236)':bg};
+      }));
+     });
+     for(const check of checks)assert.ok(contrast(check.color,check.bg)>=4.5,JSON.stringify({engineName,open,...check,ratio:contrast(check.color,check.bg)}));
     }
     const metric=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth+1,visible:[...document.querySelectorAll('.show')].map(n=>n.id).filter(Boolean)}));
     assert.equal(metric.overflow,false,JSON.stringify({engineName,width,theme,pro,open,metric}));
@@ -379,7 +394,7 @@ window.supabase={createClient:()=>({
    currentUser={id:'visual-fixture',user_metadata:{display_name:'Bullion Builder'}};
    guestBrowsing=false;document.body.classList.remove('guest-mode');
    holdings=[{id:'visual-silver',metal:'silver',product:'Silver bullion',qty:5,weight:1,oz:5,cost:130,costKnown:true}];
-   document.getElementById('authScreen').style.display='none';hideMainOverlays();render();
+   document.getElementById('authScreen').style.display='none';hideMainOverlays();renderHoldings();updatePortfolio();
    activeChartRange='1D';
    chartSnapshots=[180,178,185,192,190,205,210,208,226,232,229,250].map((value,i)=>({time:new Date(Date.now()-(11-i)*3600000),value}));
    drawPortfolioRangeChart();
