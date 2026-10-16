@@ -38,6 +38,11 @@ window.supabase={createClient:()=>({
    await page.evaluate(({theme,pro})=>{applyTheme(theme);benzaEntitlement={tier:pro?'pro':'free',status:pro?'active':'inactive'};updateProIntegratedUI();},{theme,pro});
    for(const open of ['goPortfolio','openAnalytics','openMarkets','openNews','openSettings','openManualAdd','openSmartCamera']){
     await page.evaluate(async name=>{closeAdd();closeAddChoice();closeSmartCamera();hideMainOverlays();await Promise.race([Promise.resolve(window[name]()),new Promise((_,reject)=>setTimeout(()=>reject(Error(name+' did not finish')),5000))]);},open);
+    if(open==='goPortfolio'){
+     const surface=await page.locator('#portfolioChart').evaluate(el=>{const s=getComputedStyle(el);return {background:s.backgroundColor,shadow:s.boxShadow,border:s.borderTopWidth}});
+     assert.equal(surface.background,'rgba(0, 0, 0, 0)',engineName+' '+theme+' chart blends into page');
+     assert.equal(surface.shadow,'none');assert.equal(surface.border,'0px');
+    }
     const metric=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth+1,visible:[...document.querySelectorAll('.show')].map(n=>n.id).filter(Boolean)}));
     assert.equal(metric.overflow,false,JSON.stringify({engineName,width,theme,pro,open,metric}));
     states++;
@@ -368,6 +373,22 @@ window.supabase={createClient:()=>({
   const cleared=await page.evaluate(()=>({user:currentUser,pro:isProActive(),holdings:holdings.length,watchlist:benzaWatchlist.length,scannerFiles:pendingScannerPhotoFiles.length,overlays:[...document.querySelectorAll('#addScreen.show,#settingsScreen.show,#smartCameraScreen.show,#proUpgradeModal.show')].length}));
   assert.deepEqual(cleared,{user:null,pro:false,holdings:0,watchlist:0,scannerFiles:0,overlays:0});
   assert.deepEqual(errors,[],engineName+' runtime errors');
+  // Visual evidence uses deterministic portfolio values; no production data is changed.
+  await page.setViewportSize({width:390,height:844});
+  await page.evaluate(()=>{
+   currentUser={id:'visual-fixture',user_metadata:{display_name:'Bullion Builder'}};
+   guestBrowsing=false;document.body.classList.remove('guest-mode');
+   holdings=[{id:'visual-silver',metal:'silver',product:'Silver bullion',qty:5,weight:1,oz:5,cost:130,costKnown:true}];
+   document.getElementById('authScreen').style.display='none';hideMainOverlays();render();
+   activeChartRange='1D';
+   chartSnapshots=[180,178,185,192,190,205,210,208,226,232,229,250].map((value,i)=>({time:new Date(Date.now()-(11-i)*3600000),value}));
+   drawPortfolioRangeChart();
+  });
+  fs.mkdirSync('ui-artifacts',{recursive:true});
+  for(const theme of ['light','dark']){
+   await page.evaluate(t=>applyTheme(t),theme);
+   await page.screenshot({path:'ui-artifacts/portfolio-polish-'+engineName+'-'+theme+'.png',animations:'disabled'});
+  }
   await browser.close();
  }
  clearTimeout(sweepDeadline);

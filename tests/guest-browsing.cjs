@@ -25,11 +25,20 @@ const stub=vm.runInNewContext(sweep.slice(sweep.indexOf('const stub='),sweep.ind
      await page.evaluate(t=>applyTheme(t),theme);
      await page.locator('#guestBrowseButton').click();
      assert.equal(await page.locator('#marketsScreen').isVisible(),true);
+     assert.equal(await page.locator('[data-benza-guest-card]').count(),0);
+     assert.equal(await page.locator('#benzaGuestLockOverlay').isVisible(),false);
+     assert.equal(await page.locator('#marketsScreen .guestLegalFooter a').count(),3);
+     assert.equal(await page.locator('#marketsScreen .guestLegalFooter').isVisible(),true);
      assert.equal(await page.evaluate(()=>currentUser),null);
      await page.waitForFunction(()=>document.getElementById('marketsFocusPrice').textContent!=='—');
      await page.locator('#marketsCalculatorTab').click();
      assert.equal(await page.locator('#marketsCalculatorPanel').isVisible(),true);
      await page.evaluate(()=>openNews());await page.getByText('Bullion market headline',{exact:true}).waitFor();
+     assert.equal(await page.locator('#newsScreen .guestLegalFooter a').count(),3);
+     assert.equal(await page.locator('#newsScreen .guestLegalFooter').isVisible(),true);
+     if(viewport.width===390){fs.mkdirSync('ui-artifacts',{recursive:true});await page.screenshot({path:'ui-artifacts/guest-news-'+name+'-'+theme+'.png',animations:'disabled'});}
+     const cardTop=await page.locator('#newsScreen .newsCard').first().evaluate(el=>el.getBoundingClientRect().top);
+     assert.ok(cardTop<viewport.height-100,'news begins above the bottom navigation');
      for(const fn of ['goPortfolio','openAnalytics','openAddChoice','openSettings']){
       await page.evaluate(f=>window[f](),fn);
       assert.equal(await page.locator('#benzaGuestLockOverlay').isVisible(),true,fn);
