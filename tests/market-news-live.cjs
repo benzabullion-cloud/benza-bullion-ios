@@ -22,10 +22,11 @@ const stub=vm.runInNewContext(sweep.slice(sweep.indexOf('const stub='),sweep.ind
     if(url.includes('benza-market-prices'))return route.fulfill({contentType:'application/json',body:JSON.stringify({success:true,prices:{gold:4000,silver:50,platinum:1500,palladium:1400,copper:.3},fetched_at:new Date().toISOString()})});
     return route.fulfill({status:200,body:''});
    });
-   page.on('response',async response=>{if(response.url().includes('/functions/v1/benza-market-news')&&response.status()===200)live=await response.json();});
    await page.goto('https://news-release.test/');
    await page.locator('#guestBrowseButton').click();
+   const liveResponse=page.waitForResponse(response=>response.url().includes('/functions/v1/benza-market-news')&&response.status()===200,{timeout:25000});
    await page.evaluate(()=>openNews());
+   live=await (await liveResponse).json();
    await page.waitForFunction(()=>document.querySelector('#newsStatus').textContent.includes('Live headlines'),null,{timeout:25000});
    assert.equal(live.status,'ok');assert.equal(live.stale,false);assert.ok(live.items.length>0);
    assert.ok(Date.now()-Date.parse(live.fetched_at)<15*60000,'production data must be fresh');
