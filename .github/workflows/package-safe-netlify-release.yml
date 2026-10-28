@@ -1,0 +1,69 @@
+name: Package safe Netlify web release
+
+on:
+  push:
+    branches:
+      - chatgpt/web-release-package
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@v4
+
+      - name: Build isolated static web package
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf release benza-bullion-netlify-release.zip
+          mkdir -p release
+          rsync -a App/public/ release/ \
+            --exclude 'README.md' \
+            --exclude 'supabase/' \
+            --exclude 'supabase*.sql'
+
+          # The committed service worker still lists a legacy vendored Supabase file
+          # that is not present in the repository. Remove only that cache-shell entry
+          # in the deployment copy so a fresh service worker can install cleanly.
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('release/service-worker.js')
+          s = p.read_text()
+          s2 = s.replace(",'./vendor/supabase.js'", "")
+          if s2 == s:
+              raise SystemExit('Expected legacy vendor/supabase.js cache entry was not found')
+          p.write_text(s2)
+          PY
+
+          # Safety gates: static frontend only; no backend source or migrations.
+          test -f release/index.html
+          test -f release/service-worker.js
+          test -f release/manifest.webmanifest
+          test ! -e release/supabase
+          if find release -type f -name '*.sql' | grep -q .; then
+            echo 'Unexpected SQL file in release package' >&2
+            exit 1
+          fi
+          if grep -RIl 'SUPABASE_SERVICE_ROLE_KEY' release | grep -q .; then
+            echo 'Unexpected service-role backend source in release package' >&2
+            exit 1
+          fi
+
+          (cd release && zip -qr ../benza-bullion-netlify-release.zip .)
+          sha256sum benza-bullion-netlify-release.zip > benza-bullion-netlify-release.zip.sha256
+          unzip -l benza-bullion-netlify-release.zip
+
+      - name: Upload Netlify release ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: benza-bullion-netlify-release
+          path: |
+            benza-bullion-netlify-release.zip
+            benza-bullion-netlify-release.zip.sha256
+          if-no-files-found: error
+          retention-days: 7
