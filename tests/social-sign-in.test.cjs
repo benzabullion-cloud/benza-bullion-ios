@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const html=fs.readFileSync('App/public/index.html','utf8');
 const start=html.indexOf('const BENZA_SOCIAL_CALLBACK=');
-const end=html.indexOf('async function handleAuth(){',start);
+const end=html.indexOf('async function handleAuth(',start);
 function harness({callback='com.benzabullion.app.auth://oauth/callback?code=abc',cancelled=false}={}){
  const buttons=[{},{}],status={},calls=[],panel={},context={
   URL,currentUser:null,guestBrowsing:false,authRequestGeneration:0,authMode:'login',

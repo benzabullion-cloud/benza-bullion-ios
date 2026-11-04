@@ -1099,35 +1099,74 @@ final class BenzaSocialAuthPlugin: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticat
     }
 }
 
-@objc(BenzaFaceIDPlugin)
-final class BenzaFaceIDPlugin: CAPPlugin, CAPBridgedPlugin {
-    let identifier = "BenzaFaceIDPlugin"
-    let jsName = "BenzaFaceID"
+@objc(BenzaSavedLoginPlugin)
+final class BenzaSavedLoginPlugin: CAPPlugin, CAPBridgedPlugin, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+    let identifier = "BenzaSavedLoginPlugin"
+    let jsName = "BenzaSavedLogin"
     let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "setEnabled", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "requestPassword", returnType: CAPPluginReturnPromise)
     ]
+    private var controller: ASAuthorizationController?
+    private var pendingCall: CAPPluginCall?
+    private var anchor: UIWindow?
+
+    private var available: Bool {
+        guard Bundle.main.object(forInfoDictionaryKey: "BenzaSavedLoginEnabled") as? Bool == true else { return false }
+        let context = LAContext()
+        return context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
+            && context.biometryType == .faceID
+    }
 
     @objc func status(_ call: CAPPluginCall) {
+        DispatchQueue.main.async { call.resolve(["available": self.available]) }
+    }
+
+    @objc func requestPassword(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            let scene = self.bridge?.viewController?.viewIfLoaded?.window?.windowScene?.delegate as? SceneDelegate
-            call.resolve(["available": scene?.canEnableFaceID ?? false, "enabled": scene?.faceIDEnabled ?? false])
+            guard self.available, self.controller == nil,
+                  let window = self.bridge?.viewController?.viewIfLoaded?.window else {
+                call.reject("Saved sign-in is unavailable.")
+                return
+            }
+            let controller = ASAuthorizationController(authorizationRequests: [ASAuthorizationPasswordProvider().createRequest()])
+            self.controller = controller
+            self.anchor = window
+            self.pendingCall = call
+            controller.delegate = self
+            controller.presentationContextProvider = self
+            controller.performRequests()
         }
     }
 
-    @objc func setEnabled(_ call: CAPPluginCall) {
-        guard let enabled = call.getBool("enabled") else {
-            call.reject("Missing Face ID preference.")
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        anchor ?? ASPresentationAnchor()
+    }
+
+    private func finish(_ controller: ASAuthorizationController) -> CAPPluginCall? {
+        guard self.controller === controller else { return nil }
+        let call = pendingCall
+        pendingCall = nil
+        self.controller = nil
+        anchor = nil
+        return call
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        guard let call = finish(controller) else { return }
+        guard let credential = authorization.credential as? ASPasswordCredential else {
+            call.reject("No saved Benza Bullion password was returned.")
             return
         }
-        DispatchQueue.main.async {
-            guard let scene = self.bridge?.viewController?.viewIfLoaded?.window?.windowScene?.delegate as? SceneDelegate else {
-                call.reject("Face ID settings are unavailable.")
-                return
-            }
-            scene.setFaceIDEnabled(enabled) { success in
-                call.resolve(["enabled": scene.faceIDEnabled, "success": success])
-            }
+        call.resolve(["email": credential.user, "password": credential.password])
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        guard let call = finish(controller) else { return }
+        if (error as? ASAuthorizationError)?.code == .canceled {
+            call.resolve(["cancelled": true])
+        } else {
+            call.reject("No saved Benza Bullion password was available.")
         }
     }
 }
@@ -1136,7 +1175,7 @@ final class BenzaBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
         bridge?.registerPluginInstance(BenzaSocialAuthPlugin())
-        bridge?.registerPluginInstance(BenzaFaceIDPlugin())
+        bridge?.registerPluginInstance(BenzaSavedLoginPlugin())
         bridge?.registerPluginInstance(BenzaStoreKitPlugin())
         bridge?.registerPluginInstance(BenzaExportPlugin())
         bridge?.registerPluginInstance(BenzaNotificationsPlugin())
@@ -1147,163 +1186,11 @@ final class BenzaBridgeViewController: CAPBridgeViewController {
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
 
-    private let faceIDPreferenceKey = "benza.faceIDUnlock"
-    private var privacyCover: UIView?
-    private var unlockButton: UIButton?
-    private var privacyMessage: UILabel?
-    private var authentication: LAContext?
-    private var locked = false
-    private var pendingLaunchUnlock = false
-    private var inactive = true
-    private var faceIDFeatureEnabled: Bool {
-        Bundle.main.object(forInfoDictionaryKey: "BenzaFaceIDUnlockEnabled") as? Bool == true
-    }
-    var faceIDEnabled: Bool {
-        faceIDFeatureEnabled && UserDefaults.standard.bool(forKey: faceIDPreferenceKey)
-    }
-    var canEnableFaceID: Bool {
-        guard faceIDFeatureEnabled else { return false }
-        let context = LAContext()
-        return context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
-            && context.biometryType == .faceID
-    }
-
-    private func authenticate(reason: String, completion: @escaping (Bool) -> Void) {
-        guard authentication == nil else { completion(false); return }
-        let context = LAContext()
-        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) else {
-            completion(false)
-            return
-        }
-        authentication = context
-        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { [weak self] ok, _ in
-            DispatchQueue.main.async {
-                guard let self else { completion(false); return }
-                guard self.authentication === context else { completion(false); return }
-                self.authentication = nil
-                completion(ok)
-            }
-        }
-    }
-
-    func setFaceIDEnabled(_ enabled: Bool, completion: @escaping (Bool) -> Void) {
-        if !enabled {
-            authentication?.invalidate()
-            authentication = nil
-            UserDefaults.standard.removeObject(forKey: faceIDPreferenceKey)
-            locked = false
-            pendingLaunchUnlock = false
-            updatePrivacyCover()
-            completion(true)
-            return
-        }
-        guard canEnableFaceID, !locked, !inactive else { completion(false); return }
-        authenticate(reason: "Confirm Face ID unlock for Benza Bullion.") { [weak self] success in
-            guard let self, success else { completion(false); return }
-            UserDefaults.standard.set(true, forKey: self.faceIDPreferenceKey)
-            self.updatePrivacyCover()
-            completion(true)
-        }
-    }
-
-    private func updatePrivacyCover() {
-        guard let window else { return }
-        if faceIDEnabled && (locked || inactive) {
-            if privacyCover == nil {
-                let cover = UIView(frame: window.bounds)
-                cover.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-                cover.backgroundColor = .systemBackground
-                cover.accessibilityViewIsModal = true
-                let title = UILabel()
-                title.text = "Benza Bullion Locked"
-                title.font = .preferredFont(forTextStyle: .title2)
-                title.adjustsFontForContentSizeCategory = true
-                title.textAlignment = .center
-                title.numberOfLines = 0
-                let message = UILabel()
-                message.text = "Unlock with Face ID or your device passcode."
-                message.font = .preferredFont(forTextStyle: .body)
-                message.adjustsFontForContentSizeCategory = true
-                message.textColor = .secondaryLabel
-                message.textAlignment = .center
-                message.numberOfLines = 0
-                let button = UIButton(type: .system)
-                button.configuration = .filled()
-                button.setTitle("Unlock Benza Bullion", for: .normal)
-                button.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
-                button.addTarget(self, action: #selector(unlockPortfolio), for: .touchUpInside)
-                let stack = UIStackView(arrangedSubviews: [title, message, button])
-                stack.axis = .vertical
-                stack.spacing = 16
-                stack.translatesAutoresizingMaskIntoConstraints = false
-                cover.addSubview(stack)
-                NSLayoutConstraint.activate([
-                    stack.leadingAnchor.constraint(equalTo: cover.safeAreaLayoutGuide.leadingAnchor, constant: 24),
-                    stack.trailingAnchor.constraint(equalTo: cover.safeAreaLayoutGuide.trailingAnchor, constant: -24),
-                    stack.centerYAnchor.constraint(equalTo: cover.safeAreaLayoutGuide.centerYAnchor)
-                ])
-                window.endEditing(true)
-                window.rootViewController?.view.accessibilityElementsHidden = true
-                window.addSubview(cover)
-                privacyCover = cover
-                privacyMessage = message
-                unlockButton = button
-            }
-            unlockButton?.isEnabled = locked && !inactive && authentication == nil
-        } else {
-            privacyCover?.removeFromSuperview()
-            privacyCover = nil
-            privacyMessage = nil
-            unlockButton = nil
-            window.rootViewController?.view.accessibilityElementsHidden = false
-        }
-    }
-
-    @objc private func unlockPortfolio() {
-        guard locked, !inactive, authentication == nil else { return }
-        unlockButton?.isEnabled = false
-        authenticate(reason: "Unlock your Benza Bullion portfolio.") { [weak self] success in
-            guard let self else { return }
-            if success {
-                self.locked = false
-            } else {
-                self.privacyMessage?.text = "Still locked. Try Face ID or your device passcode again."
-            }
-            self.updatePrivacyCover()
-        }
-    }
-
-    func sceneWillResignActive(_ scene: UIScene) {
-        inactive = true
-        updatePrivacyCover()
-    }
-
-    func sceneDidEnterBackground(_ scene: UIScene) {
-        inactive = true
-        // iOS owns the authentication prompt lifecycle, including system cancellation.
-        updatePrivacyCover()
-    }
-
-    func sceneDidBecomeActive(_ scene: UIScene) {
-        inactive = false
-        updatePrivacyCover()
-        guard pendingLaunchUnlock, locked else { return }
-        DispatchQueue.main.async { [weak self] in
-            guard let self, self.pendingLaunchUnlock, !self.inactive, self.locked else { return }
-            // Consume before invoking iOS authentication, which can itself change scene activity.
-            self.pendingLaunchUnlock = false
-            self.unlockPortfolio()
-        }
-    }
-
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
 
         window = UIWindow(windowScene: windowScene)
         window?.rootViewController = BenzaBridgeViewController()
-        locked = faceIDEnabled
-        pendingLaunchUnlock = locked
-        updatePrivacyCover()
         window?.makeKeyAndVisible()
 
         if let appDelegate = UIApplication.shared.delegate as? AppDelegate {

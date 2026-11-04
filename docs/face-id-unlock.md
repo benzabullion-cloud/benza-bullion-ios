@@ -1,25 +1,12 @@
-# Face ID portfolio unlock
+# Optional Face ID sign-in
 
-The Face ID follow-up includes the Apple and Google sign-in and recent-email
-changes. The email picker offers up to four successful email logins stored on
-the current device/browser. Remember me is off by default for new installs.
-Clearing the picker or turning off Remember me removes the saved addresses.
-This picker fills only the email; it is separate from iOS Password AutoFill.
+On a supported iPhone, the signed-out login screen offers Sign in with Face ID.
+Tapping it opens Apple's saved-password picker; the credential returned by
+Apple is used for one normal account sign-in and is not saved by Benza Bullion.
+There is no automatic launch prompt and no in-app Face ID setup setting.
 
-For a signed test build, set BenzaFaceIDUnlockEnabled in App/Info.plist to true.
-Leave it off for production until a physical-device check passes. Under
-Settings → Account, select Enable Face ID unlock and confirm using the system
-prompt. The setting is local to the device. The lock covers the app during
-a fresh launch and hides it from the app switcher on inactivity. Face ID
-starts automatically once on a fresh launch; returning to the running app
-does not trigger it. If the prompt is dismissed, tap Unlock Benza Bullion to retry. iOS device passcode is the recovery
-option if Face ID is unavailable or locked out. This is a local viewing lock
-on an existing Supabase session; it does not authenticate to Supabase or
-protect against access to the underlying data on a compromised device.
-
-On a signed iPhone build, verify cold launch, warm resume, app-switcher
-snapshots, cancellation, failed Face ID, device passcode, backgrounding
-during a prompt, VoiceOver, disabling the lock, session expiry, sign-out and
-account deletion. Verify holdings are never visible before successful unlock
-and that a guest never sees a Face ID setup option. Separately follow
-social-sign-in.md for the provider and Password AutoFill release gates.
+Before distributing a signed test build, follow the Password AutoFill setup
+in social-sign-in.md. Verify that the signed app includes its webcredentials
+entitlement and that the website serves the matching association file.
+Test manual sign-in, a saved account, cancellation, no saved account,
+multiple saved accounts, stale credentials, and reopening while signed in.

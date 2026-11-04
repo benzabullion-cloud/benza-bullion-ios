@@ -5752,6 +5752,9 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
       </label>
       <button class="authButton" id="authButton" type="submit">Log in</button>
     </form>
+    <div class="socialAuth" id="savedLoginOption" hidden>
+      <button type="button" onclick="handleAuth({savedLogin:true})">Sign in with Face ID</button>
+    </div>
     <button class="authToggle" id="authToggle" type="button" onclick="toggleAuthMode()">Need an account? Create one</button>
     <button class="authRecoveryButton" id="authRecoveryButton" type="button" onclick="requestPasswordReset()">Forgot password?</button>
     <div class="socialAuth" id="socialAuth" hidden>
@@ -6434,10 +6437,6 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
         <button id="exportDataButton" class="settingsExportButton" type="button" onclick="exportBenzaData()">Export My Data</button>
         <div class="settingsAccountNote">Creates a personal copy of your Benza Bullion portfolio, activity, history, alerts, and account preferences.</div>
 
-        <div id="faceIDSettings" hidden>
-          <button id="faceIDButton" class="settingsAccountButton" type="button" onclick="toggleFaceIDUnlock()">Enable Face ID unlock</button>
-          <div class="settingsAccountNote">Lock Benza Bullion when you leave the app. Your device passcode can also unlock it.</div>
-        </div>
         <button class="settingsSignOutButton" type="button" onclick="signOut()">Sign Out</button>
         <div class="settingsAccountNote">
           Changing your email may require confirmation through your new email address before it becomes active.
@@ -8726,6 +8725,7 @@ function setAuthMode(mode){
   const guestButton=document.getElementById('guestBrowseButton');
   if(guestButton)guestButton.hidden=authMode==='recovery';
   updateSocialAuthButtons();
+  updateSavedLoginButton();
   hideRecentEmails();
   if(authMode==='recovery'){
     if(title)title.textContent='Set new password';
@@ -8919,14 +8919,28 @@ async function handleSocialAuth(provider){
   }
 }
 
-async function handleAuth(){
+async function handleAuth({savedLogin=false}={}){
   if(handleAuth.pending||(typeof handleSocialAuth==='function'&&handleSocialAuth.pending))return;
   handleAuth.pending=true;
   try{
   setAuthError('');
-  const email=(document.getElementById('authEmail')?.value||'').trim();
-  const password=document.getElementById('authPassword')?.value||'';
+  let email=(document.getElementById('authEmail')?.value||'').trim();
+  let password=document.getElementById('authPassword')?.value||'';
   const status=document.getElementById('authStatus');
+
+  if(savedLogin){
+    if(!handleAuth.savedLoginAvailable||authMode!=='login'||currentUser)return;
+    const generation=authRequestGeneration;
+    let credential;
+    try{credential=await savedLoginPlugin()?.requestPassword();}catch(_){}
+    if(generation!==authRequestGeneration||authMode!=='login'||currentUser||credential?.cancelled)return;
+    if(!credential?.email||!credential?.password){
+      setAuthError('No saved sign-in was available. Use your email and password to log in.');
+      return;
+    }
+    email=credential.email.trim();
+    password=credential.password;
+  }
 
   if(authMode==='recovery'){
     if(password.length<8){
@@ -8980,7 +8994,7 @@ async function handleAuth(){
 
     if(result.data.session)saveRememberedLogin(email);
     currentUser=result.data.user;
-    await onSignedIn({offerFaceID:!!result.data.session});
+    await onSignedIn();
   }catch(err){
     status.textContent='';
     setAuthError(err.message||'Authentication failed.');
@@ -8988,7 +9002,7 @@ async function handleAuth(){
   }finally{handleAuth.pending=false;}
 }
 
-async function onSignedIn({offerFaceID=false}={}){
+async function onSignedIn(){
   const userId=currentUser?.id;
   if(!userId)return;
   guestBrowsing=false;
@@ -9001,7 +9015,6 @@ async function onSignedIn({offerFaceID=false}={}){
 
   // Honor Settings/legal return routes before waiting on portfolio data.
   handleBenzaDeepLink();
-  if(offerFaceID&&route!=='pro')void offerFaceIDSetup(userId);
 
   await loadHoldingsFromSupabase();
   if(currentUser?.id!==userId)return;
@@ -9113,70 +9126,20 @@ function closeActivity(){
   setSettingsTab('settings');
 }
 
-function faceIDPlugin(){
-  return window.Capacitor?.isNativePlatform?.()?window.Capacitor?.Plugins?.BenzaFaceID:null;
+function savedLoginPlugin(){
+  return window.Capacitor?.isNativePlatform?.()?window.Capacitor?.Plugins?.BenzaSavedLogin:null;
 }
-// Only offer setup after an explicit sign-in, once per installation.
-let faceIDSetupOffered=false;
-async function offerFaceIDSetup(userId){
-  const plugin=faceIDPlugin();
-  const dialog=document.getElementById('faceIDSetupDialog');
-  const key='benza.faceIDSetupOffered';
-  if(!plugin||!dialog||faceIDSetupOffered)return;
-  try{
-    if(localStorage.getItem(key)==='1')return;
-    const state=await plugin.status();
-    if(currentUser?.id!==userId||!state?.available||state.enabled||faceIDSetupOffered)return;
-    dialog.returnValue='';
-    dialog.onclose=async()=>{
-      if(dialog.returnValue!=='enable'||currentUser?.id!==userId)return;
-      try{
-        const result=await plugin.setEnabled({enabled:true});
-        if(currentUser?.id!==userId&&result?.enabled)await clearFaceIDUnlock();
-      }catch(_){}
-      finally{await refreshFaceIDSettings();}
-    };
-    dialog.showModal();
-    faceIDSetupOffered=true;
-    try{localStorage.setItem(key,'1');}catch(_){}
-  }catch(_){}
+function updateSavedLoginButton(){
+  const option=document.getElementById('savedLoginOption');
+  if(option)option.hidden=!handleAuth.savedLoginAvailable||authMode!=='login';
 }
-async function refreshFaceIDSettings(){
-  const section=document.getElementById('faceIDSettings');
-  const button=document.getElementById('faceIDButton');
-  if(!section||!button)return;
-  const userId=currentUser?.id;
-  try{
-    const state=userId?await faceIDPlugin()?.status():null;
-    if(currentUser?.id!==userId)return;
-    section.hidden=!(state?.available||state?.enabled);
-    button.dataset.enabled=String(state?.enabled===true);
-    button.textContent=state?.enabled?'Turn off Face ID unlock':'Enable Face ID unlock';
-  }catch(_){section.hidden=true;}
-}
-async function toggleFaceIDUnlock(){
-  const button=document.getElementById('faceIDButton');
-  const userId=currentUser?.id;
-  const plugin=faceIDPlugin();
-  if(!userId||!button||button.disabled||!plugin)return;
-  button.disabled=true;
-  try{
-    const result=await plugin.setEnabled({enabled:button.dataset.enabled!=='true'});
-    if(currentUser?.id!==userId){
-      if(result?.enabled)await plugin.setEnabled({enabled:false});
-      return;
-    }
-    if(!result?.success)setAccountSettingsStatus('Face ID settings were not changed. Complete the iPhone confirmation to enable it.',true);
-    else setAccountSettingsStatus(result.enabled?'Face ID is on for fresh launches.':'Face ID is off.');
-  }catch(_){setAccountSettingsStatus('Could not update Face ID settings.',true);}
-  finally{button.disabled=false;await refreshFaceIDSettings();}
-}
-async function clearFaceIDUnlock(){
-  try{await faceIDPlugin()?.setEnabled({enabled:false});}catch(_){}
+async function configureSavedLogin(){
+  try{handleAuth.savedLoginAvailable=(await savedLoginPlugin()?.status())?.available===true;}
+  catch(_){handleAuth.savedLoginAvailable=false;}
+  updateSavedLoginButton();
 }
 
 function clearBenzaAccountState(){
-  document.getElementById('faceIDSetupDialog')?.close();
   guestBrowsing=false;
   currentUser=null;
   document.body.classList.remove('guest-mode');
@@ -9199,7 +9162,7 @@ async function signOut(){
   clearBenzaAccountState();clearAuthPassword();
   document.getElementById('authScreen').style.display='flex';
   document.getElementById('authStatus').textContent='';setAuthError('');
-  if(!client){if(typeof clearFaceIDUnlock==='function')await clearFaceIDUnlock();return;}
+  if(!client)return;
   try{
     if(isBenzaNativeRuntime()&&userId){
       const plugin=nativeBenzaNotifications();const token=(await Promise.race([Promise.resolve(plugin?.status()),new Promise(resolve=>setTimeout(()=>resolve(null),1500))]))?.token;
@@ -9215,7 +9178,6 @@ async function signOut(){
     try{localStorage.removeItem(key);localStorage.removeItem(key+'-code-verifier');}catch(_){}
     console.warn('Local sign-out completed with an auth cleanup error:',error);
   }
-  if(typeof clearFaceIDUnlock==='function')await clearFaceIDUnlock();
 }
 
 function handleBenzaDeepLink(){
@@ -12407,7 +12369,6 @@ async function deleteBenzaAccount(){
     document.getElementById('authScreen').style.display='flex';
     document.getElementById('authStatus').textContent='';
     setAuthError('');
-    if(typeof clearFaceIDUnlock==='function')await clearFaceIDUnlock();
     alert('Your Benza Bullion account has been permanently deleted.');
   }catch(error){
     if(currentUser?.id!==deleteUserId)return;
@@ -12459,7 +12420,6 @@ function openSettings(tab='settings'){
   const screen=document.getElementById('settingsScreen');
   if(screen)screen.classList.add('show');
   applyTheme(localStorage.getItem('benzaTheme')||'dark');
-  refreshFaceIDSettings().catch(()=>{});
   try{populateAccountSettings();}catch(e){console.warn('Settings profile render failed:',e);}
   try{updateProIntegratedUI();}catch(e){console.warn('Pro settings render failed:',e);}
   try{setSettingsTab(tab);}catch(e){console.warn('Settings tab render failed:',e);}
@@ -12484,7 +12444,7 @@ try{
 }catch(e){
   console.warn('Account service initialization failed:',e);
 }
-restoreSession().finally(configureSocialAuth);
+restoreSession().finally(()=>{configureSocialAuth();configureSavedLogin();});
 // Markets is declared in the following script. Start the feed only after all scripts initialize.
 window.addEventListener('DOMContentLoaded',()=>{
   if(!navigator.onLine)updateNetworkState();
@@ -13039,40 +12999,7 @@ loadBenzaWatchlist();
 })();
 </script>
 
-<style>
-#faceIDSetupDialog{
-  width:min(calc(100% - 40px),360px);max-height:calc(100% - 40px);
-  box-sizing:border-box;padding:26px 22px 14px;border:0;border-radius:28px;
-  background:var(--surface);color:var(--text);box-shadow:0 24px 72px #0005;text-align:center;
-}
-#faceIDSetupDialog::backdrop{background:#08080bb0;backdrop-filter:blur(6px)}
-.faceIDSetupIcon{
-  display:grid;place-items:center;width:56px;height:56px;margin:0 auto 16px;border-radius:18px;
-  color:var(--gold);background:color-mix(in srgb,var(--gold) 14%,var(--surface));
-}
-#faceIDSetupTitle{margin:0;font-size:clamp(22px,6vw,26px);letter-spacing:-.025em}
-#faceIDSetupDescription{margin:9px 0 21px;color:var(--muted);font-size:15px;line-height:1.5}
-#faceIDSetupDialog button{
-  display:block;width:100%;min-height:48px;border:0;border-radius:15px;
-  font:inherit;font-weight:700;cursor:pointer;
-}
-#faceIDSetupDialog .faceIDSetupPrimary{background:#ffb341;color:#211507}
-#faceIDSetupDialog .faceIDSetupLater{margin-top:5px;background:transparent;color:var(--muted)}
-#faceIDSetupDialog button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
-</style>
-<dialog id="faceIDSetupDialog" aria-labelledby="faceIDSetupTitle" aria-describedby="faceIDSetupDescription">
-  <form method="dialog">
-    <div class="faceIDSetupIcon" aria-hidden="true">
-      <svg width="29" height="29" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M8 3H6a3 3 0 0 0-3 3v2m13-5h2a3 3 0 0 1 3 3v2M3 16v2a3 3 0 0 0 3 3h2m13-5v2a3 3 0 0 1-3 3h-2M8 9v1m8-1v1m-4-1v3l-1 1m-2 2a4.5 4.5 0 0 0 6 0"/>
-      </svg>
-    </div>
-    <h2 id="faceIDSetupTitle">Unlock with Face ID</h2>
-    <p id="faceIDSetupDescription">Protect your portfolio when you open the app after fully closing it. You can change this anytime in Settings.</p>
-    <button class="faceIDSetupPrimary" value="enable">Enable Face ID</button>
-    <button class="faceIDSetupLater" value="later" autofocus>Not now</button>
-  </form>
-</dialog>
+
 </body>
 </html>
 
