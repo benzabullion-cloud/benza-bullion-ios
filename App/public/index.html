@@ -8980,7 +8980,7 @@ async function handleAuth(){
 
     if(result.data.session)saveRememberedLogin(email);
     currentUser=result.data.user;
-    await onSignedIn();
+    await onSignedIn({offerFaceID:!!result.data.session});
   }catch(err){
     status.textContent='';
     setAuthError(err.message||'Authentication failed.');
@@ -8988,7 +8988,7 @@ async function handleAuth(){
   }finally{handleAuth.pending=false;}
 }
 
-async function onSignedIn(){
+async function onSignedIn({offerFaceID=false}={}){
   const userId=currentUser?.id;
   if(!userId)return;
   guestBrowsing=false;
@@ -9001,6 +9001,7 @@ async function onSignedIn(){
 
   // Honor Settings/legal return routes before waiting on portfolio data.
   handleBenzaDeepLink();
+  if(offerFaceID&&route!=='pro')void offerFaceIDSetup(userId);
 
   await loadHoldingsFromSupabase();
   if(currentUser?.id!==userId)return;
@@ -9115,6 +9116,31 @@ function closeActivity(){
 function faceIDPlugin(){
   return window.Capacitor?.isNativePlatform?.()?window.Capacitor?.Plugins?.BenzaFaceID:null;
 }
+// Only offer setup after an explicit sign-in, once per installation.
+let faceIDSetupOffered=false;
+async function offerFaceIDSetup(userId){
+  const plugin=faceIDPlugin();
+  const dialog=document.getElementById('faceIDSetupDialog');
+  const key='benza.faceIDSetupOffered';
+  if(!plugin||!dialog||faceIDSetupOffered)return;
+  try{
+    if(localStorage.getItem(key)==='1')return;
+    const state=await plugin.status();
+    if(currentUser?.id!==userId||!state?.available||state.enabled||faceIDSetupOffered)return;
+    dialog.returnValue='';
+    dialog.onclose=async()=>{
+      if(dialog.returnValue!=='enable'||currentUser?.id!==userId)return;
+      try{
+        const result=await plugin.setEnabled({enabled:true});
+        if(currentUser?.id!==userId&&result?.enabled)await clearFaceIDUnlock();
+      }catch(_){}
+      finally{await refreshFaceIDSettings();}
+    };
+    dialog.showModal();
+    faceIDSetupOffered=true;
+    try{localStorage.setItem(key,'1');}catch(_){}
+  }catch(_){}
+}
 async function refreshFaceIDSettings(){
   const section=document.getElementById('faceIDSettings');
   const button=document.getElementById('faceIDButton');
@@ -9149,6 +9175,7 @@ async function clearFaceIDUnlock(){
 }
 
 function clearBenzaAccountState(){
+  document.getElementById('faceIDSetupDialog')?.close();
   guestBrowsing=false;
   currentUser=null;
   document.body.classList.remove('guest-mode');
@@ -13013,6 +13040,17 @@ loadBenzaWatchlist();
 })();
 </script>
 
+<dialog id="faceIDSetupDialog" aria-labelledby="faceIDSetupTitle" aria-describedby="faceIDSetupDescription"
+  style="width:min(88vw,380px);box-sizing:border-box;padding:24px;border-radius:20px;background:var(--bg,#171719);color:var(--text,#fff);border:1px solid currentColor">
+  <form method="dialog">
+    <h2 id="faceIDSetupTitle" style="margin:0 0 12px">Enable Face ID?</h2>
+    <p id="faceIDSetupDescription">Use Face ID to unlock Benza Bullion when you reopen the app while signed in. You can change this anytime in Settings.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end">
+      <button class="settingsAccountButton" value="later" autofocus>Not now</button>
+      <button class="settingsAccountButton" value="enable">Enable Face ID</button>
+    </div>
+  </form>
+</dialog>
 </body>
 </html>
 
