@@ -15,6 +15,9 @@ on:
       - 'storekit-verifier/**'
       - 'tests/final-launch*'
       - 'tests/market-news.test.cjs'
+      - 'tests/social-sign-in.test.cjs'
+      - 'tests/recent-login-emails.test.cjs'
+      - 'tests/guest-access.test.cjs'
       - '.github/workflows/statistics-accuracy.yml'
 permissions:
   contents: read
@@ -31,6 +34,8 @@ jobs:
           node-version: 24
       - name: Run statistics regression suite
         run: node --test tests/statistics-accuracy.test.cjs tests/launch-account-purchases.test.cjs tests/final-launch-hardening.test.cjs tests/launch-sweep.test.cjs
+      - name: Verify account entry and recent-email privacy
+        run: node --test tests/social-sign-in.test.cjs tests/recent-login-emails.test.cjs tests/guest-access.test.cjs
       - name: Verify public market news and failure recovery
         run: |
           node --test tests/market-news.test.cjs

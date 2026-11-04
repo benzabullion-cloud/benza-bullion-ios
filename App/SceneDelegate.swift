@@ -1,4 +1,6 @@
 import UIKit
+import AuthenticationServices
+import LocalAuthentication
 import Capacitor
 import StoreKit
 import UserNotifications
@@ -1033,9 +1035,108 @@ final class BenzaStoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 }
 
+@objc(BenzaSocialAuthPlugin)
+final class BenzaSocialAuthPlugin: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticationPresentationContextProviding {
+    let identifier = "BenzaSocialAuthPlugin"
+    let jsName = "BenzaSocialAuth"
+    let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "authorize", returnType: CAPPluginReturnPromise)
+    ]
+    private var session: ASWebAuthenticationSession?
+    private weak var anchor: UIWindow?
+    private var enabled: Bool {
+        Bundle.main.object(forInfoDictionaryKey: "BenzaSocialSignInEnabled") as? Bool == true
+    }
+
+    @objc func status(_ call: CAPPluginCall) {
+        call.resolve(["enabled": enabled])
+    }
+
+    @objc func authorize(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let callback = "com.benzabullion.app.auth://oauth/callback"
+            guard self.enabled, self.session == nil,
+                  let raw = call.getString("url"), let url = URL(string: raw),
+                  let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                  parts.scheme == "https", parts.host == "wblibufurkquqgcavzim.supabase.co",
+                  parts.port == nil, parts.user == nil, parts.password == nil,
+                  parts.path == "/auth/v1/authorize", parts.fragment == nil,
+                  let query = parts.queryItems,
+                  query.filter({ $0.name == "redirect_to" }).map(\.value) == [callback],
+                  query.filter({ $0.name == "provider" }).count == 1,
+                  ["apple", "google"].contains(query.first(where: { $0.name == "provider" })?.value ?? ""),
+                  let window = self.bridge?.viewController?.viewIfLoaded?.window else {
+                call.reject("Could not start provider sign-in.")
+                return
+            }
+            self.anchor = window
+            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: "com.benzabullion.app.auth") { [weak self] url, error in
+                DispatchQueue.main.async {
+                    self?.session = nil
+                    self?.anchor = nil
+                    if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
+                        call.resolve(["cancelled": true])
+                    } else if let url, error == nil {
+                        call.resolve(["url": url.absoluteString])
+                    } else {
+                        call.reject("Could not complete provider sign-in.")
+                    }
+                }
+            }
+            session.presentationContextProvider = self
+            self.session = session
+            if !session.start() {
+                self.session = nil
+                self.anchor = nil
+                call.reject("Could not open provider sign-in.")
+            }
+        }
+    }
+
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        anchor ?? ASPresentationAnchor()
+    }
+}
+
+@objc(BenzaFaceIDPlugin)
+final class BenzaFaceIDPlugin: CAPPlugin, CAPBridgedPlugin {
+    let identifier = "BenzaFaceIDPlugin"
+    let jsName = "BenzaFaceID"
+    let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setEnabled", returnType: CAPPluginReturnPromise)
+    ]
+
+    @objc func status(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let scene = self.bridge?.viewController?.viewIfLoaded?.window?.windowScene?.delegate as? SceneDelegate
+            call.resolve(["available": scene?.canEnableFaceID ?? false, "enabled": scene?.faceIDEnabled ?? false])
+        }
+    }
+
+    @objc func setEnabled(_ call: CAPPluginCall) {
+        guard let enabled = call.getBool("enabled") else {
+            call.reject("Missing Face ID preference.")
+            return
+        }
+        DispatchQueue.main.async {
+            guard let scene = self.bridge?.viewController?.viewIfLoaded?.window?.windowScene?.delegate as? SceneDelegate else {
+                call.reject("Face ID settings are unavailable.")
+                return
+            }
+            scene.setFaceIDEnabled(enabled) { success in
+                call.resolve(["enabled": scene.faceIDEnabled, "success": success])
+            }
+        }
+    }
+}
+
 final class BenzaBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
+        bridge?.registerPluginInstance(BenzaSocialAuthPlugin())
+        bridge?.registerPluginInstance(BenzaFaceIDPlugin())
         bridge?.registerPluginInstance(BenzaStoreKitPlugin())
         bridge?.registerPluginInstance(BenzaExportPlugin())
         bridge?.registerPluginInstance(BenzaNotificationsPlugin())
@@ -1046,11 +1147,155 @@ final class BenzaBridgeViewController: CAPBridgeViewController {
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
 
+    private let faceIDPreferenceKey = "benza.faceIDUnlock"
+    private var privacyCover: UIView?
+    private var unlockButton: UIButton?
+    private var privacyMessage: UILabel?
+    private var authentication: LAContext?
+    private var locked = false
+    private var inactive = true
+    private var faceIDFeatureEnabled: Bool {
+        Bundle.main.object(forInfoDictionaryKey: "BenzaFaceIDUnlockEnabled") as? Bool == true
+    }
+    var faceIDEnabled: Bool {
+        faceIDFeatureEnabled && UserDefaults.standard.bool(forKey: faceIDPreferenceKey)
+    }
+    var canEnableFaceID: Bool {
+        guard faceIDFeatureEnabled else { return false }
+        let context = LAContext()
+        return context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
+            && context.biometryType == .faceID
+    }
+
+    private func authenticate(reason: String, completion: @escaping (Bool) -> Void) {
+        guard authentication == nil else { completion(false); return }
+        let context = LAContext()
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) else {
+            completion(false)
+            return
+        }
+        authentication = context
+        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { [weak self] ok, _ in
+            DispatchQueue.main.async {
+                guard let self else { completion(false); return }
+                guard self.authentication === context else { completion(false); return }
+                self.authentication = nil
+                completion(ok)
+            }
+        }
+    }
+
+    func setFaceIDEnabled(_ enabled: Bool, completion: @escaping (Bool) -> Void) {
+        if !enabled {
+            authentication?.invalidate()
+            authentication = nil
+            UserDefaults.standard.removeObject(forKey: faceIDPreferenceKey)
+            locked = false
+            updatePrivacyCover()
+            completion(true)
+            return
+        }
+        guard canEnableFaceID, !locked, !inactive else { completion(false); return }
+        authenticate(reason: "Confirm Face ID unlock for Benza Bullion.") { [weak self] success in
+            guard let self, success else { completion(false); return }
+            UserDefaults.standard.set(true, forKey: self.faceIDPreferenceKey)
+            self.updatePrivacyCover()
+            completion(true)
+        }
+    }
+
+    private func updatePrivacyCover() {
+        guard let window else { return }
+        if faceIDEnabled && (locked || inactive) {
+            if privacyCover == nil {
+                let cover = UIView(frame: window.bounds)
+                cover.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+                cover.backgroundColor = .systemBackground
+                cover.accessibilityViewIsModal = true
+                let title = UILabel()
+                title.text = "Benza Bullion Locked"
+                title.font = .preferredFont(forTextStyle: .title2)
+                title.adjustsFontForContentSizeCategory = true
+                title.textAlignment = .center
+                title.numberOfLines = 0
+                let message = UILabel()
+                message.text = "Unlock with Face ID or your device passcode."
+                message.font = .preferredFont(forTextStyle: .body)
+                message.adjustsFontForContentSizeCategory = true
+                message.textColor = .secondaryLabel
+                message.textAlignment = .center
+                message.numberOfLines = 0
+                let button = UIButton(type: .system)
+                button.configuration = .filled()
+                button.setTitle("Unlock Benza Bullion", for: .normal)
+                button.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+                button.addTarget(self, action: #selector(unlockPortfolio), for: .touchUpInside)
+                let stack = UIStackView(arrangedSubviews: [title, message, button])
+                stack.axis = .vertical
+                stack.spacing = 16
+                stack.translatesAutoresizingMaskIntoConstraints = false
+                cover.addSubview(stack)
+                NSLayoutConstraint.activate([
+                    stack.leadingAnchor.constraint(equalTo: cover.safeAreaLayoutGuide.leadingAnchor, constant: 24),
+                    stack.trailingAnchor.constraint(equalTo: cover.safeAreaLayoutGuide.trailingAnchor, constant: -24),
+                    stack.centerYAnchor.constraint(equalTo: cover.safeAreaLayoutGuide.centerYAnchor)
+                ])
+                window.endEditing(true)
+                window.rootViewController?.view.accessibilityElementsHidden = true
+                window.addSubview(cover)
+                privacyCover = cover
+                privacyMessage = message
+                unlockButton = button
+            }
+            unlockButton?.isEnabled = locked && !inactive && authentication == nil
+        } else {
+            privacyCover?.removeFromSuperview()
+            privacyCover = nil
+            privacyMessage = nil
+            unlockButton = nil
+            window.rootViewController?.view.accessibilityElementsHidden = false
+        }
+    }
+
+    @objc private func unlockPortfolio() {
+        guard locked, !inactive, authentication == nil else { return }
+        unlockButton?.isEnabled = false
+        authenticate(reason: "Unlock your Benza Bullion portfolio.") { [weak self] success in
+            guard let self else { return }
+            if success {
+                self.locked = false
+            } else {
+                self.privacyMessage?.text = "Still locked. Try Face ID or your device passcode again."
+            }
+            self.updatePrivacyCover()
+        }
+    }
+
+    func sceneWillResignActive(_ scene: UIScene) {
+        inactive = true
+        updatePrivacyCover()
+    }
+
+    func sceneDidEnterBackground(_ scene: UIScene) {
+        inactive = true
+        locked = faceIDEnabled
+        authentication?.invalidate()
+        authentication = nil
+        updatePrivacyCover()
+    }
+
+    func sceneDidBecomeActive(_ scene: UIScene) {
+        inactive = false
+        updatePrivacyCover()
+    }
+
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
 
         window = UIWindow(windowScene: windowScene)
         window?.rootViewController = BenzaBridgeViewController()
+        locked = faceIDEnabled
+        updatePrivacyCover()
         window?.makeKeyAndVisible()
 
         if let appDelegate = UIApplication.shared.delegate as? AppDelegate {
