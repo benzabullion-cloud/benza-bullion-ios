@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>BenzaFaceIDUnlockEnabled</key>
-    <false/>
+    <true/>
     <key>NSFaceIDUsageDescription</key>
     <string>Use Face ID to unlock your Benza Bullion portfolio on this iPhone.</string>
     <key>BenzaSocialSignInEnabled</key>
