@@ -1153,6 +1153,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     private var privacyMessage: UILabel?
     private var authentication: LAContext?
     private var locked = false
+    private var pendingLaunchUnlock = false
     private var inactive = true
     private var faceIDFeatureEnabled: Bool {
         Bundle.main.object(forInfoDictionaryKey: "BenzaFaceIDUnlockEnabled") as? Bool == true
@@ -1191,6 +1192,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             authentication = nil
             UserDefaults.standard.removeObject(forKey: faceIDPreferenceKey)
             locked = false
+            pendingLaunchUnlock = false
             updatePrivacyCover()
             completion(true)
             return
@@ -1278,15 +1280,20 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func sceneDidEnterBackground(_ scene: UIScene) {
         inactive = true
-        locked = faceIDEnabled
-        authentication?.invalidate()
-        authentication = nil
+        // iOS owns the authentication prompt lifecycle, including system cancellation.
         updatePrivacyCover()
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
         inactive = false
         updatePrivacyCover()
+        guard pendingLaunchUnlock, locked else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.pendingLaunchUnlock, !self.inactive, self.locked else { return }
+            // Consume before invoking iOS authentication, which can itself change scene activity.
+            self.pendingLaunchUnlock = false
+            self.unlockPortfolio()
+        }
     }
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
@@ -1295,6 +1302,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window = UIWindow(windowScene: windowScene)
         window?.rootViewController = BenzaBridgeViewController()
         locked = faceIDEnabled
+        pendingLaunchUnlock = locked
         updatePrivacyCover()
         window?.makeKeyAndVisible()
 

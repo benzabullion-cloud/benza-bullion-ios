@@ -10,8 +10,9 @@ For a signed test build, set BenzaFaceIDUnlockEnabled in App/Info.plist to true.
 Leave it off for production until a physical-device check passes. Under
 Settings → Account, select Enable Face ID unlock and confirm using the system
 prompt. The setting is local to the device. The lock covers the app during
-launch and hides it from the app switcher on inactivity. After backgrounding,
-tap Unlock Benza Bullion to authenticate. iOS device passcode is the recovery
+a fresh launch and hides it from the app switcher on inactivity. Face ID
+starts automatically once on a fresh launch; returning to the running app
+does not trigger it. If the prompt is dismissed, tap Unlock Benza Bullion to retry. iOS device passcode is the recovery
 option if Face ID is unavailable or locked out. This is a local viewing lock
 on an existing Supabase session; it does not authenticate to Supabase or
 protect against access to the underlying data on a compromised device.
