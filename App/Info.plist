@@ -7,7 +7,7 @@
     <key>NSFaceIDUsageDescription</key>
     <string>Use Face ID to unlock your saved Benza Bullion login on this iPhone.</string>
     <key>BenzaSocialSignInEnabled</key>
-    <false/>
+    <true/>
     <key>CFBundleURLTypes</key>
     <array>
         <dict>

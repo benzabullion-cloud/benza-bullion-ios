@@ -53,7 +53,8 @@ PKCE flow, then hands the Supabase session to the existing account flow.
    login until same-account access is confirmed.
 5. Recheck App Review guideline 4.8 and Apple's account-deletion guidance
    before exposing these options. Providers are configured in Supabase; the
-   native app feature flag stays off until server configuration is complete.
+   native app feature flag is enabled on this internal test branch after server
+   configuration. It must not be promoted to the public release before device tests.
    Google Cloud is in Testing with the owner's email added as a test user.
    Switch Google to the intended production audience before public release.
 
