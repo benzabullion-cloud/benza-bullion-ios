@@ -1206,9 +1206,57 @@ final class BenzaSavedLoginPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 }
 
+// StoreKit decides whether a request is displayed; no rating or review outcome is collected.
+@objc(BenzaReviewsPlugin)
+final class BenzaReviewsPlugin: CAPPlugin, CAPBridgedPlugin {
+    let identifier = "BenzaReviewsPlugin"
+    let jsName = "BenzaReviews"
+    let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "requestReview", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openReviewPage", returnType: CAPPluginReturnPromise)
+    ]
+    private let lastRequestKey = "benzaReviewLastRequest"
+    private let cooldown: TimeInterval = 180 * 24 * 60 * 60
+
+    @objc func requestReview(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard let controller = self.bridge?.viewController,
+                  let scene = controller.viewIfLoaded?.window?.windowScene,
+                  scene.activationState == .foregroundActive,
+                  controller.presentedViewController == nil else {
+                call.resolve(["requested": false]); return
+            }
+            let now = Date().timeIntervalSince1970
+            let last = UserDefaults.standard.double(forKey: self.lastRequestKey)
+            guard last == 0 || now - last >= self.cooldown else {
+                call.resolve(["requested": false]); return
+            }
+            // Count the attempt, even if Apple's policy suppresses the sheet.
+            UserDefaults.standard.set(now, forKey: self.lastRequestKey)
+            AppStore.requestReview(in: scene)
+            call.resolve(["requested": true])
+        }
+    }
+
+    @objc func openReviewPage(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard let url = URL(string: "https://apps.apple.com/app/id6811639929?action=write-review") else {
+                call.reject("Review page unavailable."); return
+            }
+            UIApplication.shared.open(url, options: [:]) { opened in
+                if opened {
+                    UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: self.lastRequestKey)
+                    call.resolve(["opened": true])
+                } else { call.reject("Could not open the App Store. Please try again.") }
+            }
+        }
+    }
+}
+
 final class BenzaBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
+        bridge?.registerPluginInstance(BenzaReviewsPlugin())
         bridge?.registerPluginInstance(BenzaSocialAuthPlugin())
         bridge?.registerPluginInstance(BenzaSavedLoginPlugin())
         bridge?.registerPluginInstance(BenzaStoreKitPlugin())

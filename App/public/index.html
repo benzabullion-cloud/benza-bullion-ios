@@ -6467,6 +6467,7 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
 
         <div class="settingsAccountDivider"></div>
         <div class="settingsLegalTitle">Support &amp; About</div>
+        <button class="settingsLegalLink" type="button" onclick="openBenzaReviewPage()"><span>☆ &nbsp; Rate Benza Bullion</span><span aria-hidden="true">›</span></button>
         <a class="settingsLegalLink" href="support.html"><span>Help &amp; Support</span><span>›</span></a>
         <a class="settingsLegalLink" href="mailto:benzabullion@gmail.com"><span>Contact Support</span><span>›</span></a>
         <div class="settingsAboutMeta">
@@ -9052,6 +9053,7 @@ async function onSignedIn(){
   const userId=currentUser?.id;
   if(!userId)return;
   guestBrowsing=false;
+  recordBenzaReviewVisit();
   document.body.classList.remove('guest-mode');
   closeProUpgrade();
   const route=pendingAccountRoute;pendingAccountRoute=null;
@@ -9172,6 +9174,83 @@ function closeActivity(){
   setSettingsTab('settings');
 }
 
+// Local engagement only: no ratings, sentiment, portfolio value, or personal data are collected.
+const BENZA_REVIEW_KEY='benzaReviewEngagement:v1';
+const BENZA_REVIEW_DAY=24*60*60*1000;
+let benzaReviewTimer=null;
+let benzaReviewSessionStarted=0;
+let benzaReviewInFlight=false;
+function benzaReviewsPlugin(){
+  return window.Capacitor?.isNativePlatform?.()?window.Capacitor?.Plugins?.BenzaReviews:null;
+}
+function readBenzaReviewState(){
+  try{
+    const state=JSON.parse(localStorage.getItem(BENZA_REVIEW_KEY)||'null');
+    if(!state||!Number.isFinite(state.firstUse)||!Array.isArray(state.days))return null;
+    return {...state,days:[...new Set(state.days.filter(day=>typeof day==='string'))].slice(-30),adds:Math.max(0,Math.min(3,Number(state.adds)||0)),lastRequest:Number(state.lastRequest)||0};
+  }catch(_){return null;}
+}
+function writeBenzaReviewState(state){
+  try{localStorage.setItem(BENZA_REVIEW_KEY,JSON.stringify(state));return true;}catch(_){return false;}
+}
+function recordBenzaReviewVisit(now=Date.now()){
+  if(!currentUser||guestBrowsing||!benzaReviewsPlugin())return;
+  if(!benzaReviewSessionStarted)benzaReviewSessionStarted=now;
+  const state=readBenzaReviewState()||{firstUse:now,days:[],adds:0,lastRequest:0};
+  const date=new Date(now);
+  const day=[date.getFullYear(),date.getMonth()+1,date.getDate()].join('-');
+  state.days=[...new Set([...state.days,day])].slice(-30);
+  writeBenzaReviewState(state);
+}
+function benzaReviewEligible(state,now=Date.now()){
+  return !!state&&now-state.firstUse>=7*BENZA_REVIEW_DAY&&state.days.length>=5&&state.adds>=3&&
+    (!state.lastRequest||now-state.lastRequest>=180*BENZA_REVIEW_DAY);
+}
+function cancelBenzaReviewRequest(){
+  clearTimeout(benzaReviewTimer);benzaReviewTimer=null;
+}
+function recordBenzaReviewHoldingAdded(){
+  if(!currentUser||guestBrowsing||!benzaReviewsPlugin())return;
+  recordBenzaReviewVisit();
+  const state=readBenzaReviewState();if(!state)return;
+  state.adds=Math.min(3,state.adds+1);
+  if(!writeBenzaReviewState(state)||!benzaReviewEligible(state))return;
+  cancelBenzaReviewRequest();
+  const userId=currentUser.id;
+  benzaReviewTimer=setTimeout(()=>requestBenzaReviewWhenQuiet(userId),Math.max(5000,45000-(Date.now()-benzaReviewSessionStarted)));
+}
+async function requestBenzaReviewWhenQuiet(userId){
+  benzaReviewTimer=null;
+  if(benzaReviewInFlight||currentUser?.id!==userId||guestBrowsing||document.visibilityState!=='visible'||
+    !document.querySelector('.nav [data-tab="portfolio"].active')||document.querySelector('.modal.show,.overlay.show,[id$="Screen"].show,[role="dialog"].show,.addChoiceSheet.show')||
+    document.getElementById('authScreen')?.style.display!=='none'||!benzaReviewEligible(readBenzaReviewState()))return;
+  benzaReviewInFlight=true;
+  try{
+    const result=await benzaReviewsPlugin()?.requestReview();
+    if(result?.requested){
+      const state=readBenzaReviewState();
+      if(state){state.lastRequest=Date.now();writeBenzaReviewState(state);}
+    }
+  }catch(_){} // A review request must never interrupt or fail a portfolio action.
+  finally{benzaReviewInFlight=false;}
+}
+async function openBenzaReviewPage(){
+  if(benzaReviewInFlight)return;
+  cancelBenzaReviewRequest();benzaReviewInFlight=true;
+  try{
+    const plugin=benzaReviewsPlugin();
+    if(plugin)await plugin.openReviewPage();
+    else window.location.href='https://apps.apple.com/app/id6811639929?action=write-review';
+    const state=readBenzaReviewState();
+    if(state){state.lastRequest=Date.now();writeBenzaReviewState(state);}
+  }catch(_){alert('Could not open the App Store. Please try again.');}
+  finally{benzaReviewInFlight=false;}
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden')cancelBenzaReviewRequest();
+  else recordBenzaReviewVisit();
+});
+
 function savedLoginPlugin(){
   return window.Capacitor?.isNativePlatform?.()?window.Capacitor?.Plugins?.BenzaSavedLogin:null;
 }
@@ -9230,6 +9309,7 @@ async function forgetSavedLogin(){
 }
 
 function clearBenzaAccountState(){
+  cancelBenzaReviewRequest();benzaReviewSessionStarted=0;
   guestBrowsing=false;
   currentUser=null;
   document.body.classList.remove('guest-mode');
@@ -11430,6 +11510,7 @@ async function saveHolding(){
     closeAdd({preserveScannerPhotos:true});
     setButtonBusy(button,false);
     if(photoFile||receiptFile)finishHoldingAttachmentUploads({holdingId:row.id,photoFile,receiptFile});
+    recordBenzaReviewHoldingAdded();
     Promise.resolve()
       .then(()=>loadActivityFromSupabase())
       .then(()=>recordPortfolioSnapshot(true))
