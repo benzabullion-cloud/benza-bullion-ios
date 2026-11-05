@@ -1,4 +1,8 @@
 import UIKit
+import MessageUI
+import AuthenticationServices
+import LocalAuthentication
+import Security
 import Capacitor
 import StoreKit
 import UserNotifications
@@ -1033,9 +1037,301 @@ final class BenzaStoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 }
 
+@objc(BenzaSocialAuthPlugin)
+final class BenzaSocialAuthPlugin: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticationPresentationContextProviding {
+    let identifier = "BenzaSocialAuthPlugin"
+    let jsName = "BenzaSocialAuth"
+    let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "authorize", returnType: CAPPluginReturnPromise)
+    ]
+    private var session: ASWebAuthenticationSession?
+    private weak var anchor: UIWindow?
+    private var enabled: Bool {
+        Bundle.main.object(forInfoDictionaryKey: "BenzaSocialSignInEnabled") as? Bool == true
+    }
+
+    @objc func status(_ call: CAPPluginCall) {
+        call.resolve(["enabled": enabled])
+    }
+
+    @objc func authorize(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let callback = "com.benzabullion.app.auth://oauth/callback"
+            guard self.enabled, self.session == nil,
+                  let raw = call.getString("url"), let url = URL(string: raw),
+                  let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                  parts.scheme == "https", parts.host == "wblibufurkquqgcavzim.supabase.co",
+                  parts.port == nil, parts.user == nil, parts.password == nil,
+                  parts.path == "/auth/v1/authorize", parts.fragment == nil,
+                  let query = parts.queryItems,
+                  query.filter({ $0.name == "redirect_to" }).map(\.value) == [callback],
+                  query.filter({ $0.name == "provider" }).count == 1,
+                  ["apple", "google"].contains(query.first(where: { $0.name == "provider" })?.value ?? ""),
+                  let window = self.bridge?.viewController?.viewIfLoaded?.window else {
+                call.reject("Could not start provider sign-in.")
+                return
+            }
+            self.anchor = window
+            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: "com.benzabullion.app.auth") { [weak self] url, error in
+                DispatchQueue.main.async {
+                    self?.session = nil
+                    self?.anchor = nil
+                    if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
+                        call.resolve(["cancelled": true])
+                    } else if let url, error == nil {
+                        call.resolve(["url": url.absoluteString])
+                    } else {
+                        call.reject("Could not complete provider sign-in.")
+                    }
+                }
+            }
+            session.presentationContextProvider = self
+            self.session = session
+            if !session.start() {
+                self.session = nil
+                self.anchor = nil
+                call.reject("Could not open provider sign-in.")
+            }
+        }
+    }
+
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        anchor ?? ASPresentationAnchor()
+    }
+}
+
+@objc(BenzaSavedLoginPlugin)
+final class BenzaSavedLoginPlugin: CAPPlugin, CAPBridgedPlugin {
+    let identifier = "BenzaSavedLoginPlugin"
+    let jsName = "BenzaSavedLogin"
+    let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "requestPassword", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "savePassword", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "forgetPassword", returnType: CAPPluginReturnPromise)
+    ]
+    private let queue = DispatchQueue(label: "com.benzabullion.saved-login")
+    private let item: [String: Any] = [
+        kSecClass as String: kSecClassGenericPassword,
+        kSecAttrService as String: "com.benzabullion.app.face-id-login",
+        kSecAttrAccount as String: "saved-login",
+        kSecAttrSynchronizable as String: false
+    ]
+
+    private struct Credential: Codable {
+        let email: String
+        let password: String
+    }
+
+    private var enabled: Bool {
+        Bundle.main.object(forInfoDictionaryKey: "BenzaSavedLoginEnabled") as? Bool == true
+    }
+
+    private func deviceAuthenticationAvailable(_ context: LAContext) -> Bool {
+        enabled && context.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil)
+    }
+
+    @objc func status(_ call: CAPPluginCall) {
+        queue.async {
+            let context = LAContext()
+            context.interactionNotAllowed = true
+            var query = self.item
+            query[kSecUseAuthenticationContext as String] = context
+            query[kSecReturnAttributes as String] = true
+            let result = self.enabled ? SecItemCopyMatching(query as CFDictionary, nil) : errSecItemNotFound
+            call.resolve(["available": self.deviceAuthenticationAvailable(LAContext()),
+                          "hasSavedLogin": result == errSecSuccess || result == errSecInteractionNotAllowed])
+        }
+    }
+
+    @objc func savePassword(_ call: CAPPluginCall) {
+        queue.async {
+            guard self.deviceAuthenticationAvailable(LAContext()),
+                  let email = call.getString("email"), !email.isEmpty,
+                  let password = call.getString("password"), !password.isEmpty,
+                  let data = try? JSONEncoder().encode(Credential(email: email, password: password)),
+                  let protection = SecAccessControlCreateWithFlags(
+                    nil, kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly, .userPresence, nil
+                  ) else {
+                call.reject("Saved login is unavailable.")
+                return
+            }
+            var item = self.item
+            item[kSecAttrAccessControl as String] = protection
+            item[kSecValueData as String] = data
+            var result = SecItemAdd(item as CFDictionary, nil)
+            if result == errSecDuplicateItem {
+                let deleted = SecItemDelete(self.item as CFDictionary)
+                result = (deleted == errSecSuccess || deleted == errSecItemNotFound)
+                    ? SecItemAdd(item as CFDictionary, nil) : deleted
+            }
+            if result == errSecSuccess { call.resolve() }
+            else { call.reject("Could not save the login on this iPhone.") }
+        }
+    }
+
+    @objc func requestPassword(_ call: CAPPluginCall) {
+        queue.async {
+            let context = LAContext()
+            guard self.deviceAuthenticationAvailable(context) else {
+                call.reject("Device authentication is unavailable.")
+                return
+            }
+            context.localizedReason = "Sign in to Benza Bullion."
+            var query = self.item
+            query[kSecUseAuthenticationContext as String] = context
+            query[kSecReturnData as String] = true
+            query[kSecMatchLimit as String] = kSecMatchLimitOne
+            var value: CFTypeRef?
+            let result = SecItemCopyMatching(query as CFDictionary, &value)
+            context.invalidate()
+            if result == errSecUserCanceled {
+                call.resolve(["cancelled": true])
+            } else if result == errSecSuccess, let data = value as? Data,
+                      let credential = try? JSONDecoder().decode(Credential.self, from: data) {
+                call.resolve(["email": credential.email, "password": credential.password])
+            } else {
+                call.reject("Could not unlock the saved Benza Bullion login.")
+            }
+        }
+    }
+
+    @objc func forgetPassword(_ call: CAPPluginCall) {
+        queue.async {
+            guard self.enabled else { call.reject("Saved login is unavailable."); return }
+            let result = SecItemDelete(self.item as CFDictionary)
+            if result == errSecSuccess || result == errSecItemNotFound { call.resolve() }
+            else { call.reject("Could not remove the saved login.") }
+        }
+    }
+}
+
+// StoreKit decides whether a request is displayed; no rating or review outcome is collected.
+@objc(BenzaReviewsPlugin)
+final class BenzaReviewsPlugin: CAPPlugin, CAPBridgedPlugin {
+    let identifier = "BenzaReviewsPlugin"
+    let jsName = "BenzaReviews"
+    let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "requestReview", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openReviewPage", returnType: CAPPluginReturnPromise)
+    ]
+    private let lastRequestKey = "benzaReviewLastRequest"
+    private let cooldown: TimeInterval = 180 * 24 * 60 * 60
+
+    @objc func requestReview(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard let controller = self.bridge?.viewController,
+                  let scene = controller.viewIfLoaded?.window?.windowScene,
+                  scene.activationState == .foregroundActive,
+                  controller.presentedViewController == nil else {
+                call.resolve(["requested": false]); return
+            }
+            let now = Date().timeIntervalSince1970
+            let last = UserDefaults.standard.double(forKey: self.lastRequestKey)
+            guard last == 0 || now - last >= self.cooldown else {
+                call.resolve(["requested": false]); return
+            }
+            // Count the attempt, even if Apple's policy suppresses the sheet.
+            UserDefaults.standard.set(now, forKey: self.lastRequestKey)
+            AppStore.requestReview(in: scene)
+            call.resolve(["requested": true])
+        }
+    }
+
+    @objc func openReviewPage(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard let url = URL(string: "https://apps.apple.com/app/id6811639929?action=write-review") else {
+                call.reject("Review page unavailable."); return
+            }
+            UIApplication.shared.open(url, options: [:]) { opened in
+                if opened {
+                    UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: self.lastRequestKey)
+                    call.resolve(["opened": true])
+                } else { call.reject("Could not open the App Store. Please try again.") }
+            }
+        }
+    }
+}
+
+// Small system actions use fixed public destinations and never attach account data.
+@objc(BenzaAppPlugin)
+final class BenzaAppPlugin: CAPPlugin, CAPBridgedPlugin, MFMailComposeViewControllerDelegate {
+    let identifier = "BenzaAppPlugin"
+    let jsName = "BenzaApp"
+    let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "getInfo", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "shareApp", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openFeedback", returnType: CAPPluginReturnPromise)
+    ]
+    private var actionBusy = false
+    private var feedbackCall: CAPPluginCall?
+    private var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "" }
+
+    @objc func getInfo(_ call: CAPPluginCall) { call.resolve(["version": version]) }
+
+    @objc func shareApp(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard !self.actionBusy, let presenter = self.bridge?.viewController,
+                  presenter.viewIfLoaded?.window != nil, presenter.presentedViewController == nil,
+                  let url = URL(string: "https://apps.apple.com/app/id6811639929") else {
+                call.reject("Close the open dialog and try again."); return
+            }
+            self.actionBusy = true
+            let sheet = UIActivityViewController(activityItems: ["Track your precious metals with Benza Bullion.", url], applicationActivities: nil)
+            sheet.completionWithItemsHandler = { _, completed, _, error in
+                DispatchQueue.main.async {
+                    self.actionBusy = false
+                    if let error { call.reject(error.localizedDescription) }
+                    else { call.resolve(["completed": completed]) }
+                }
+            }
+            if let popover = sheet.popoverPresentationController {
+                popover.sourceView = presenter.view
+                popover.sourceRect = CGRect(x: presenter.view.bounds.midX, y: presenter.view.bounds.midY, width: 1, height: 1)
+                popover.permittedArrowDirections = []
+            }
+            presenter.present(sheet, animated: true)
+        }
+    }
+
+    @objc func openFeedback(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard !self.actionBusy, let presenter = self.bridge?.viewController,
+                  presenter.viewIfLoaded?.window != nil, presenter.presentedViewController == nil else {
+                call.reject("Close the open dialog and try again."); return
+            }
+            guard MFMailComposeViewController.canSendMail() else {
+                call.resolve(["available": false]); return
+            }
+            self.actionBusy = true
+            self.feedbackCall = call
+            let composer = MFMailComposeViewController()
+            composer.mailComposeDelegate = self
+            composer.setToRecipients(["benzabullion@gmail.com"])
+            composer.setSubject("Benza Bullion feedback")
+            composer.setMessageBody("App version: \(self.version)\n\nWhat happened or what would you like improved?\n\n\nPlease do not include passwords or sensitive portfolio information.", isHTML: false)
+            presenter.present(composer, animated: true)
+        }
+    }
+
+    func mailComposeController(_ controller: MFMailComposeViewController, didFinishWith result: MFMailComposeResult, error: Error?) {
+        controller.dismiss(animated: true) {
+            self.actionBusy = false
+            if let error { self.feedbackCall?.reject(error.localizedDescription) }
+            else { self.feedbackCall?.resolve(["available": true, "sent": result == .sent]) }
+            self.feedbackCall = nil
+        }
+    }
+}
+
 final class BenzaBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
+        bridge?.registerPluginInstance(BenzaAppPlugin())
+        bridge?.registerPluginInstance(BenzaReviewsPlugin())
+        bridge?.registerPluginInstance(BenzaSocialAuthPlugin())
+        bridge?.registerPluginInstance(BenzaSavedLoginPlugin())
         bridge?.registerPluginInstance(BenzaStoreKitPlugin())
         bridge?.registerPluginInstance(BenzaExportPlugin())
         bridge?.registerPluginInstance(BenzaNotificationsPlugin())

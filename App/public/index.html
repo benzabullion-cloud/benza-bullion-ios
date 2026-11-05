@@ -67,6 +67,16 @@ select,input{width:100%;height:48px;border:1px solid var(--border);border-radius
 .authToggle{border:0;background:none;width:100%;margin-top:14px;color:#b26d00;font-weight:650;font-size:14px}
 .authNote{font-size:11px;color:var(--muted);line-height:1.45;margin-top:16px}
 .authError{display:none;background:var(--surface)0f0;color:#b42318;border-radius:10px;padding:10px;font-size:13px;margin-top:12px}
+.authScreen{align-items:safe center}
+.recentEmails{margin:6px 0 12px;padding:8px;border:1px solid var(--border);border-radius:12px;background:var(--surface2)}
+.recentEmails[hidden]{display:none}
+.recentEmails button{display:block;width:100%;min-height:44px;padding:7px 9px;text-align:left;overflow-wrap:anywhere;background:transparent;border:0;color:var(--text);font:inherit}
+.recentEmails button:focus-visible{outline:2px solid currentColor}
+.recentEmailsTitle{padding:4px 9px;font-size:12px;font-weight:700;color:var(--text)}
+.socialAuth{margin-top:16px;display:grid;gap:8px}
+.socialAuth[hidden]{display:none}
+.socialAuth button{width:100%;min-height:48px;border-radius:13px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:15px;font-weight:700}
+.socialAuth button:disabled{opacity:.55}
 .guestBrowseButton{width:100%;min-height:48px;margin-top:16px;border:1px solid var(--border);border-radius:13px;background:var(--surface2);color:var(--text);font-size:15px;font-weight:700;padding:10px}
 .authLegalLinks,.guestBrowseLinks{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:14px;font-size:12px}
 .authLegalLinks a,.guestBrowseLinks a{color:var(--muted);padding:6px 0}
@@ -4741,6 +4751,25 @@ nav > div{
   font-weight:650;font-size:13px;cursor:pointer;
 }
 .authRecoveryButton:hover{color:#b26d00}
+
+/* Keep sign-in choices distinct and the secondary actions compact. */
+.authCard .authSub{margin-bottom:16px}
+.authCard #socialAuth{margin:0 0 4px}
+.authCard #socialAuth button{display:flex;align-items:center;justify-content:center;gap:12px;position:relative;padding:10px 42px;font-family:Arial,sans-serif;font-weight:600}
+.authCard #socialAuth svg{position:absolute;left:16px;width:20px;height:20px}
+.authCard #socialAuth .appleSignIn{background:#fff;color:#000;border-color:#fff}
+.authCard #socialAuth .googleSignIn{background:#131314;color:#e3e3e3;border-color:#8e918f}
+.authDivider{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:12px;margin:8px 0 0}
+.authDivider:before,.authDivider:after{content:"";height:1px;background:var(--border);flex:1}
+.authCard .authButton{margin-top:4px}
+.authCard #savedLoginOption{margin-top:8px}
+.authCard #forgetSavedLogin{margin:0;min-height:36px;font-size:12px}
+.authAccountLinks{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:0 16px;margin-top:6px}
+.authCard .authAccountLinks button{width:auto;margin:0;min-height:44px;padding:6px 0}
+.authCard .guestBrowseButton{border:0;background:none;color:var(--muted);font-size:14px;margin-top:8px;min-height:44px}
+.authCard .authLegalLinks{margin-top:4px}
+.authCard button:focus-visible{outline:2px solid #c88719;outline-offset:3px}
+
 .settingsExportButton{
   width:100%;min-height:44px;margin-top:10px;border:1px solid var(--border);
   border-radius:12px;background:var(--surface2);color:var(--text);
@@ -5726,21 +5755,35 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
 <div id="authScreen" class="authScreen">
   <div class="authCard">
     <div class="authBrand">benza <span>bullion</span></div>
-    <div class="authSub">Your precious-metals portfolio, securely synced to your Benza Bullion account.</div>
+    <div class="authSub">Your metals. Your stack. All in one place.</div>
     <h1 class="authTitle" id="authTitle">Log in</h1>
+    <div class="socialAuth" id="socialAuth" hidden>
+      <button class="appleSignIn" type="button" onclick="handleSocialAuth('apple')"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M17.05 12.54c.03 3.25 2.85 4.33 2.88 4.35-.02.08-.45 1.54-1.48 3.05-.9 1.3-1.83 2.6-3.3 2.63-1.45.03-1.92-.85-3.58-.85-1.65 0-2.17.82-3.55.88-1.42.05-2.5-1.41-3.4-2.7-1.86-2.7-3.29-7.64-1.38-10.98a5.27 5.27 0 0 1 4.46-2.7c1.4-.03 2.71.95 3.57.95.85 0 2.46-1.17 4.14-1a5.05 5.05 0 0 1 3.96 2.15c-.1.06-2.36 1.38-2.32 4.22ZM14.33 4.42c.75-.9 1.26-2.16 1.12-3.42-1.08.04-2.38.72-3.15 1.62-.69.8-1.3 2.08-1.14 3.3 1.2.1 2.42-.61 3.17-1.5Z"/></svg><span>Sign in with Apple</span></button>
+      <button class="googleSignIn" type="button" onclick="handleSocialAuth('google')"><svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path fill="#4285F4" d="M43.61 24.46c0-1.36-.12-2.66-.35-3.92H24v7.42h11a9.4 9.4 0 0 1-4.08 6.17v5h6.6c3.87-3.56 6.09-8.8 6.09-14.67Z"/><path fill="#34A853" d="M24 44c5.4 0 9.93-1.79 13.24-4.87l-6.6-5c-1.83 1.23-4.17 1.98-6.64 1.98-5.2 0-9.61-3.51-11.19-8.24H6v5.16A20 20 0 0 0 24 44Z"/><path fill="#FBBC05" d="M12.81 27.87a12 12 0 0 1 0-7.74V14.97H6a20 20 0 0 0 0 18.06l6.81-5.16Z"/><path fill="#EA4335" d="M24 11.89c2.85 0 5.4.98 7.41 2.9l5.56-5.56A19.4 19.4 0 0 0 24 4 20 20 0 0 0 6 14.97l6.81 5.16C14.39 15.4 18.8 11.89 24 11.89Z"/></svg><span>Continue with Google</span></button>
+      <div class="authDivider"><span>or use email</span></div>
+    </div>
     <form id="authForm" onsubmit="event.preventDefault();handleAuth()">
+      <div id="authEmailGroup" onfocusout="if(!this.contains(event.relatedTarget))hideRecentEmails()">
       <label class="authLabel" for="authEmail">Email</label>
-      <input id="authEmail" name="email" class="authInput" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="you@example.com">
+      <input id="authEmail" name="email" class="authInput" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" autocorrect="off" placeholder="you@example.com" onfocus="showRecentEmails()" onclick="showRecentEmails()">
+        <div class="recentEmails" id="recentEmails" hidden aria-label="Recent emails"></div>
+      </div>
       <label class="authLabel" for="authPassword">Password</label>
       <div class="authPasswordWrap"><input id="authPassword" name="password" class="authInput" type="password" minlength="8" autocomplete="current-password" placeholder="At least 8 characters" oninput="updateAuthPasswordControls()" onfocus="updateAuthPasswordControls()"><div class="authPasswordControls"><button id="authPasswordClear" type="button" onclick="clearAuthPassword()" aria-label="Clear password" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button><button id="authPasswordVisibility" type="button" onclick="toggleAuthPasswordVisibility()" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path id="authPasswordEyeSlash" d="m3 3 18 18" style="display:none"/></svg></button></div></div>
       <label class="authRememberRow">
-        <input id="authRemember" type="checkbox" checked>
-        <span>Remember me</span>
+        <input id="authRemember" type="checkbox" onchange="changeRememberLogin(this.checked)">
+        <span id="authRememberLabel">Remember me</span>
       </label>
       <button class="authButton" id="authButton" type="submit">Log in</button>
     </form>
+    <div class="socialAuth" id="savedLoginOption" hidden>
+      <button type="button" onclick="handleAuth({savedLogin:true})">Use saved login</button>
+    </div>
+    <button class="authRecoveryButton" id="forgetSavedLogin" type="button" hidden style="display:none" onclick="forgetSavedLogin()">Forget saved login</button>
+    <div class="authAccountLinks">
     <button class="authToggle" id="authToggle" type="button" onclick="toggleAuthMode()">Need an account? Create one</button>
     <button class="authRecoveryButton" id="authRecoveryButton" type="button" onclick="requestPasswordReset()">Forgot password?</button>
+    </div>
     <button id="guestBrowseButton" class="guestBrowseButton" type="button" onclick="continueAsGuest()">Continue without an account</button>
     <div class="authLegalLinks"><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="support.html">Support</a></div>
     <div id="authError" role="alert" aria-live="assertive" class="authError"></div>
@@ -6424,11 +6467,14 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
 
         <div class="settingsAccountDivider"></div>
         <div class="settingsLegalTitle">Support &amp; About</div>
+        <button class="settingsLegalLink" type="button" onclick="openBenzaReviewPage()"><span>☆ &nbsp; Rate Benza Bullion</span><span aria-hidden="true">›</span></button>
         <a class="settingsLegalLink" href="support.html"><span>Help &amp; Support</span><span>›</span></a>
-        <a class="settingsLegalLink" href="mailto:benzabullion@gmail.com"><span>Contact Support</span><span>›</span></a>
+        <button class="settingsLegalLink" type="button" onclick="openBenzaFeedback()"><span>Send Feedback / Report a Problem</span><span aria-hidden="true">›</span></button>
+        <button class="settingsLegalLink" type="button" onclick="shareBenzaApp()"><span>Share Benza Bullion</span><span aria-hidden="true">›</span></button>
+        <div id="benzaSupportStatus" class="settingsHint" role="status" aria-live="polite"></div>
         <div class="settingsAboutMeta">
           <div class="settingsAboutName">Benza Bullion</div>
-          <div class="settingsAboutVersion">Version 1.0</div>
+          <div id="benzaReleaseVersion" class="settingsAboutVersion"></div>
           <div class="settingsAboutNote">Hold · Track · Grow. Portfolio tracking and market information are provided for informational purposes and are not investment advice.</div>
         </div>
 
@@ -6536,7 +6582,7 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
 
 <div id="addScreen" class="overlay">
   <div class="sheet">
-    <div class="sheetTop"><button class="close" onclick="closeAdd()">‹</button><h1 id="holdingSheetTitle">Add holding</h1><div style="width:34px"></div></div>
+    <div class="sheetTop"><button class="close" onclick="requestCloseAdd()" aria-label="Close holding form">‹</button><h1 id="holdingSheetTitle">Add holding</h1><div style="width:34px"></div></div>
 
     <div class="form">
       <div class="holdingSectionTitle">Your bullion</div>
@@ -8298,6 +8344,19 @@ function syncProInventoryVisibility(){
   if(fields)fields.hidden=!active;
   if(teaser)teaser.hidden=active;
 }
+let holdingFormBaseline='';
+function holdingFormSnapshot(){
+  const ids=['product','qty','weight','purchaseCostMode','cost','date','holdingYear','holdingPurity','holdingMint','holdingSerial','holdingNotes'];
+  return JSON.stringify([metal,...ids.map(id=>document.getElementById(id)?.value||''),
+    ...['holdingPhoto','holdingReceipt'].map(id=>Array.from(document.getElementById(id)?.files||[]).map(f=>[f.name,f.size,f.lastModified])),
+    pendingScannerPhotoFiles.map(f=>[f.name,f.size,f.lastModified]),pendingHoldingPhotoPath,pendingHoldingReceiptPath]);
+}
+function requestCloseAdd(){
+  if(document.getElementById('holdingSaveBtn')?.disabled)return;
+  if(holdingFormBaseline&&holdingFormSnapshot()!==holdingFormBaseline&&!confirm('Discard your unsaved holding changes?'))return;
+  closeAdd();
+}
+
 function openAdd(){
   if(!requestAccountAccess('save bullion holdings','portfolio'))return;
   ensureGlobalAddPortals();
@@ -8315,6 +8374,7 @@ function openAdd(){
   suggestBullionDetails();
   update();
   addScreen.classList.add('show');
+  holdingFormBaseline=holdingFormSnapshot();
 }
 function closeAdd({preserveScannerPhotos=false}={}){
   addScreen.classList.remove('show');
@@ -8364,6 +8424,7 @@ function editHolding(i){
   }
   update();
   addScreen.classList.add('show');
+  holdingFormBaseline=holdingFormSnapshot();
 }
 function syncDateFieldDisplay(inputId,displayId){
   const input=document.getElementById(inputId);
@@ -8704,6 +8765,9 @@ function setAuthMode(mode){
 
   const guestButton=document.getElementById('guestBrowseButton');
   if(guestButton)guestButton.hidden=authMode==='recovery';
+  updateSocialAuthButtons();
+  updateSavedLoginButton();
+  hideRecentEmails();
   if(authMode==='recovery'){
     if(title)title.textContent='Set new password';
     if(button)button.textContent='Update password';
@@ -8738,6 +8802,7 @@ function setAuthMode(mode){
   setAuthError('');
 }
 function toggleAuthMode(){
+  if(handleSocialAuth.pending)return;
   if(authMode==='recovery'){setAuthMode('login');return;}
   setAuthMode(authMode==='login'?'signup':'login');
 }
@@ -8759,14 +8824,61 @@ function loadRememberedLogin(){
     if(remember) remember.checked=!!saved || remember.checked;
   }catch(e){}
 }
+const BENZA_RECENT_EMAILS='benzaRecentEmails';
+const BENZA_REMEMBERED_EMAIL='benzaRememberedEmail';
+function recentLoginEmails(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(BENZA_RECENT_EMAILS)||'[]');
+    const emails=[localStorage.getItem(BENZA_REMEMBERED_EMAIL),...(Array.isArray(saved)?saved:[])];
+    const seen=new Set();
+    return emails.filter(email=>{
+      if(typeof email!=='string'||email.length>254||!/^\S+@\S+\.\S+$/.test(email))return false;
+      const key=email.toLowerCase();
+      if(seen.has(key))return false;
+      seen.add(key);return true;
+    }).slice(0,4);
+  }catch(_){return [];}
+}
+function hideRecentEmails(){
+  const list=document.getElementById('recentEmails');
+  if(list){list.hidden=true;list.replaceChildren();}
+}
+function clearRecentEmails(){
+  try{localStorage.removeItem(BENZA_RECENT_EMAILS);localStorage.removeItem(BENZA_REMEMBERED_EMAIL);}catch(_){}
+  hideRecentEmails();
+}
+function showRecentEmails(){
+  const list=document.getElementById('recentEmails');
+  const field=document.getElementById('authEmail');
+  if(!list||!field||authMode!=='login'||!document.getElementById('authRemember')?.checked)return;
+  const emails=recentLoginEmails();
+  if(!emails.length)return;
+  list.replaceChildren();
+  const title=document.createElement('div');
+  title.className='recentEmailsTitle';title.textContent='Recent emails on this device';
+  list.append(title);
+  for(const email of emails){
+    const button=document.createElement('button');
+    button.type='button';button.textContent=email;
+    button.onclick=()=>{field.value=email;hideRecentEmails();document.getElementById('authPassword')?.focus();};
+    list.append(button);
+  }
+  const clear=document.createElement('button');
+  clear.type='button';clear.textContent='Clear recent emails';
+  clear.onclick=()=>{clearRecentEmails();field.focus();};
+  list.append(clear);list.hidden=false;
+}
 function saveRememberedLogin(email){
   try{
-    const remember=document.getElementById('authRemember');
-    if(remember?.checked) localStorage.setItem('benzaRememberedEmail',email);
-    else localStorage.removeItem('benzaRememberedEmail');
-  }catch(e){}
+    if(!document.getElementById('authRemember')?.checked){clearRecentEmails();return;}
+    if(typeof email!=='string'||email.length>254||!/^\S+@\S+\.\S+$/.test(email))return;
+    const previous=recentLoginEmails().filter(x=>x.toLowerCase()!==email.toLowerCase());
+    localStorage.setItem(BENZA_RECENT_EMAILS,JSON.stringify([email,...previous].slice(0,4)));
+    localStorage.setItem(BENZA_REMEMBERED_EMAIL,email);
+  }catch(_){}
 }
 async function requestPasswordReset(){
+  if(handleSocialAuth.pending)return;
   setAuthError('');
   const email=(document.getElementById('authEmail')?.value||'').trim();
   const status=document.getElementById('authStatus');
@@ -8789,11 +8901,94 @@ async function requestPasswordReset(){
   }
 }
 
-async function handleAuth(){
-  setAuthError('');
-  const email=(document.getElementById('authEmail')?.value||'').trim();
-  const password=document.getElementById('authPassword')?.value||'';
+const BENZA_SOCIAL_CALLBACK='com.benzabullion.app.auth://oauth/callback';
+function updateSocialAuthButtons(){
+  const panel=document.getElementById('socialAuth');
+  if(panel)panel.hidden=!handleSocialAuth.enabled||authMode==='recovery';
+}
+async function configureSocialAuth(){
+  try{
+    const plugin=isBenzaNativeRuntime()?window.Capacitor?.Plugins?.BenzaSocialAuth:null;
+    handleSocialAuth.enabled=(await plugin?.status())?.enabled===true;
+  }catch(_){handleSocialAuth.enabled=false;}
+  updateSocialAuthButtons();
+}
+async function beginSocialOAuth(provider,generation){
+  const plugin=window.Capacitor?.Plugins?.BenzaSocialAuth;
+  if(!plugin)throw new Error('Please use the latest Benza Bullion iPhone app to verify your Apple Account.');
+  // The verifier and provider tokens remain in memory, separate from the active account.
+  const oauth=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
+    auth:{flowType:'pkce',storageKey:'benza-social-oauth',persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}
+  });
+  const {data,error}=await oauth.auth.signInWithOAuth({provider,options:{redirectTo:BENZA_SOCIAL_CALLBACK,skipBrowserRedirect:true,scopes:'email'}});
+  if(error||!data?.url)throw new Error('Provider unavailable');
+  if(generation!==authRequestGeneration)return null;
+  const reply=await plugin.authorize({url:data.url});
+  if(reply.cancelled||generation!==authRequestGeneration)return null;
+  const url=new URL(reply.url);
+  if(url.protocol!=='com.benzabullion.app.auth:'||url.host!=='oauth'||url.pathname!=='/callback'||url.username||url.password||url.hash||url.searchParams.has('error')||url.searchParams.getAll('code').length!==1||!url.searchParams.get('code'))throw new Error('Invalid sign-in response');
+  const exchange=await oauth.auth.exchangeCodeForSession(url.searchParams.get('code'));
+  const session=exchange.data?.session;
+  if(exchange.error||!session)throw new Error('Session unavailable');
+  return generation===authRequestGeneration?session:null;
+}
+
+async function handleSocialAuth(provider){
+  if(!handleSocialAuth.enabled||handleSocialAuth.pending||handleAuth.pending||currentUser||authMode==='recovery'||!['apple','google'].includes(provider))return;
+  const plugin=window.Capacitor?.Plugins?.BenzaSocialAuth;
+  if(!plugin)return;
+  handleSocialAuth.pending=true;
+  const generation=++authRequestGeneration;
   const status=document.getElementById('authStatus');
+  const buttons=document.querySelectorAll('#socialAuth button, #authButton');
+  for(const button of buttons)button.disabled=true;
+  setAuthError('');
+  status.textContent=provider==='google'?'Opening Google sign-in…':'Opening Apple sign-in…';
+  try{
+    initSupabase();
+    const session=await beginSocialOAuth(provider,generation);
+    if(!session)return;
+    status.textContent='Finishing sign-in…';
+    const result=await supabaseClient.auth.setSession({access_token:session.access_token,refresh_token:session.refresh_token});
+    if(generation!==authRequestGeneration){
+      if(guestBrowsing&&result.data?.session)await supabaseClient.auth.signOut({scope:'local'});
+      return;
+    }
+    if(result.error||!result.data?.user)throw new Error('Session unavailable');
+    currentUser=result.data.user;
+    clearAuthPassword();
+    await onSignedIn();
+  }catch(_){
+    if(generation===authRequestGeneration)setAuthError('Could not sign in with '+(provider==='google'?'Google':'Apple')+'. Try again or use email.');
+  }finally{
+    handleSocialAuth.pending=false;
+    for(const button of buttons)button.disabled=false;
+    if(generation===authRequestGeneration)status.textContent='';
+  }
+}
+
+async function handleAuth({savedLogin=false}={}){
+  if(handleAuth.pending||(typeof handleSocialAuth==='function'&&handleSocialAuth.pending))return;
+  handleAuth.pending=true;
+  try{
+  setAuthError('');
+  let email=(document.getElementById('authEmail')?.value||'').trim();
+  let password=document.getElementById('authPassword')?.value||'';
+  const status=document.getElementById('authStatus');
+
+  if(savedLogin){
+    if(!handleAuth.savedLoginAvailable||authMode!=='login'||currentUser)return;
+    const generation=authRequestGeneration;
+    let credential;
+    try{credential=await savedLoginPlugin()?.requestPassword();}catch(_){}
+    if(generation!==authRequestGeneration||authMode!=='login'||currentUser||credential?.cancelled)return;
+    if(!credential?.email||!credential?.password){
+      setAuthError('No saved sign-in was available. Use your email and password to log in.');
+      return;
+    }
+    email=credential.email.trim();
+    password=credential.password;
+  }
 
   if(authMode==='recovery'){
     if(password.length<8){
@@ -8829,8 +9024,11 @@ async function handleAuth(){
   try{
     initSupabase();
     const generation=++authRequestGeneration;
-    status.textContent=authMode==='login'?'Signing in…':'Creating account…';
-    const result=authMode==='login'
+    const mode=authMode;
+    const saveOption=document.getElementById('authRemember');
+    const shouldSave=mode==='login'&&!savedLogin&&handleAuth.canSavePassword&&saveOption?.checked;
+    status.textContent=mode==='login'?'Signing in…':'Creating account…';
+    const result=mode==='login'
       ? await supabaseClient.auth.signInWithPassword({email,password})
       : await supabaseClient.auth.signUp({email,password,options:{data:{name:'Bullion Builder'}}});
 
@@ -8840,25 +9038,39 @@ async function handleAuth(){
       return;
     }
 
-    saveRememberedLogin(email);
-
-    if(authMode==='signup'&&!result.data.session){
+    if(mode==='signup'&&!result.data.session){
       status.textContent='Account created. Check your email to confirm your account, then log in.';
       return;
     }
 
+    if(result.data.session){
+      if(savedLogin&&saveOption)saveOption.checked=true;
+      saveRememberedLogin(email);
+    }
     currentUser=result.data.user;
+    if(shouldSave&&result.data.session&&currentUser&&authMode==='login'){
+      const userId=currentUser.id;
+      const input=document.getElementById('authPassword');
+      if(input){input.value='';updateAuthPasswordControls();}
+      try{await savedLoginPlugin().savePassword({email,password});}
+      catch(_){status.textContent='Could not save your login on this iPhone. You can still sign in with your password.';}
+      await configureSavedLogin();
+      if(generation!==authRequestGeneration||currentUser?.id!==userId)return;
+    }
+    password='';
     await onSignedIn();
   }catch(err){
     status.textContent='';
     setAuthError(err.message||'Authentication failed.');
   }
+  }finally{handleAuth.pending=false;}
 }
 
 async function onSignedIn(){
   const userId=currentUser?.id;
   if(!userId)return;
   guestBrowsing=false;
+  recordBenzaReviewVisit();
   document.body.classList.remove('guest-mode');
   closeProUpgrade();
   const route=pendingAccountRoute;pendingAccountRoute=null;
@@ -8979,7 +9191,189 @@ function closeActivity(){
   setSettingsTab('settings');
 }
 
+// Release version comes from the signed app, never from its internal build number.
+let benzaReleaseVersion='';
+let benzaAppActionBusy=false;
+function benzaAppPlugin(){
+  return window.Capacitor?.isNativePlatform?.()?window.Capacitor?.Plugins?.BenzaApp:null;
+}
+async function refreshBenzaReleaseVersion(){
+  try{
+    const info=await benzaAppPlugin()?.getInfo();
+    if(typeof info?.version==='string'&&/^\d+\.\d+(?:\.\d+)?$/.test(info.version))benzaReleaseVersion=info.version;
+    const label=document.getElementById('benzaReleaseVersion');
+    if(label)label.textContent=benzaReleaseVersion?'Version '+benzaReleaseVersion:'';
+  }catch(_){} // Missing metadata must never block Settings.
+}
+function benzaFeedbackURL(){
+  const body=(benzaReleaseVersion?'App version: '+benzaReleaseVersion+'\n\n':'')+'What happened or what would you like improved?\n\n\nPlease do not include passwords or sensitive portfolio information.';
+  return 'mailto:benzabullion@gmail.com?subject='+encodeURIComponent('Benza Bullion feedback')+'&body='+encodeURIComponent(body);
+}
+async function openBenzaFeedback(){
+  if(benzaAppActionBusy)return;
+  benzaAppActionBusy=true;
+  const status=document.getElementById('benzaSupportStatus');
+  if(status)status.textContent='';
+  try{
+    const plugin=benzaAppPlugin();
+    if(plugin){
+      const result=await plugin.openFeedback();
+      if(!result?.available&&status)status.textContent='Email benzabullion@gmail.com from your preferred mail app. Include your app version and a description of the problem.';
+    }else window.location.href=benzaFeedbackURL();
+  }catch(_){if(status)status.textContent='Could not open email. Contact benzabullion@gmail.com from your preferred mail app.';}
+  finally{benzaAppActionBusy=false;}
+}
+async function shareBenzaApp(){
+  if(benzaAppActionBusy)return;
+  benzaAppActionBusy=true;
+  const status=document.getElementById('benzaSupportStatus');
+  if(status)status.textContent='';
+  const url='https://apps.apple.com/app/id6811639929';
+  try{
+    const plugin=benzaAppPlugin();
+    if(plugin)await plugin.shareApp();
+    else if(navigator.share)await navigator.share({title:'Benza Bullion',text:'Track your precious metals with Benza Bullion.',url});
+    else if(status)status.textContent='Share this App Store link: '+url;
+  }catch(error){if(error?.name!=='AbortError'&&status)status.textContent='Could not open sharing. Share this App Store link: '+url;}
+  finally{benzaAppActionBusy=false;}
+}
+
+// Local engagement only: no ratings, sentiment, portfolio value, or personal data are collected.
+const BENZA_REVIEW_KEY='benzaReviewEngagement:v1';
+const BENZA_REVIEW_DAY=24*60*60*1000;
+let benzaReviewTimer=null;
+let benzaReviewSessionStarted=0;
+let benzaReviewInFlight=false;
+function benzaReviewsPlugin(){
+  return window.Capacitor?.isNativePlatform?.()?window.Capacitor?.Plugins?.BenzaReviews:null;
+}
+function readBenzaReviewState(){
+  try{
+    const state=JSON.parse(localStorage.getItem(BENZA_REVIEW_KEY)||'null');
+    if(!state||!Number.isFinite(state.firstUse)||!Array.isArray(state.days))return null;
+    return {...state,days:[...new Set(state.days.filter(day=>typeof day==='string'))].slice(-30),adds:Math.max(0,Math.min(3,Number(state.adds)||0)),lastRequest:Number(state.lastRequest)||0};
+  }catch(_){return null;}
+}
+function writeBenzaReviewState(state){
+  try{localStorage.setItem(BENZA_REVIEW_KEY,JSON.stringify(state));return true;}catch(_){return false;}
+}
+function recordBenzaReviewVisit(now=Date.now()){
+  if(!currentUser||guestBrowsing||!benzaReviewsPlugin())return;
+  if(!benzaReviewSessionStarted)benzaReviewSessionStarted=now;
+  const state=readBenzaReviewState()||{firstUse:now,days:[],adds:0,lastRequest:0};
+  const date=new Date(now);
+  const day=[date.getFullYear(),date.getMonth()+1,date.getDate()].join('-');
+  state.days=[...new Set([...state.days,day])].slice(-30);
+  writeBenzaReviewState(state);
+}
+function benzaReviewEligible(state,now=Date.now()){
+  return !!state&&now-state.firstUse>=7*BENZA_REVIEW_DAY&&state.days.length>=5&&state.adds>=3&&
+    (!state.lastRequest||now-state.lastRequest>=180*BENZA_REVIEW_DAY);
+}
+function cancelBenzaReviewRequest(){
+  clearTimeout(benzaReviewTimer);benzaReviewTimer=null;
+}
+function recordBenzaReviewHoldingAdded(){
+  if(!currentUser||guestBrowsing||!benzaReviewsPlugin())return;
+  recordBenzaReviewVisit();
+  const state=readBenzaReviewState();if(!state)return;
+  state.adds=Math.min(3,state.adds+1);
+  if(!writeBenzaReviewState(state)||!benzaReviewEligible(state))return;
+  cancelBenzaReviewRequest();
+  const userId=currentUser.id;
+  benzaReviewTimer=setTimeout(()=>requestBenzaReviewWhenQuiet(userId),Math.max(5000,45000-(Date.now()-benzaReviewSessionStarted)));
+}
+async function requestBenzaReviewWhenQuiet(userId){
+  benzaReviewTimer=null;
+  if(benzaReviewInFlight||currentUser?.id!==userId||guestBrowsing||document.visibilityState!=='visible'||
+    !document.querySelector('.nav [data-tab="portfolio"].active')||document.querySelector('.modal.show,.overlay.show,[id$="Screen"].show,[role="dialog"].show,.addChoiceSheet.show')||
+    document.getElementById('authScreen')?.style.display!=='none'||!benzaReviewEligible(readBenzaReviewState()))return;
+  benzaReviewInFlight=true;
+  try{
+    const result=await benzaReviewsPlugin()?.requestReview();
+    if(result?.requested){
+      const state=readBenzaReviewState();
+      if(state){state.lastRequest=Date.now();writeBenzaReviewState(state);}
+    }
+  }catch(_){} // A review request must never interrupt or fail a portfolio action.
+  finally{benzaReviewInFlight=false;}
+}
+async function openBenzaReviewPage(){
+  if(benzaReviewInFlight)return;
+  cancelBenzaReviewRequest();benzaReviewInFlight=true;
+  try{
+    const plugin=benzaReviewsPlugin();
+    if(plugin)await plugin.openReviewPage();
+    else window.location.href='https://apps.apple.com/app/id6811639929?action=write-review';
+    const state=readBenzaReviewState();
+    if(state){state.lastRequest=Date.now();writeBenzaReviewState(state);}
+  }catch(_){alert('Could not open the App Store. Please try again.');}
+  finally{benzaReviewInFlight=false;}
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden')cancelBenzaReviewRequest();
+  else recordBenzaReviewVisit();
+});
+
+function savedLoginPlugin(){
+  return window.Capacitor?.isNativePlatform?.()?window.Capacitor?.Plugins?.BenzaSavedLogin:null;
+}
+function updateSavedLoginButton(){
+  const option=document.getElementById('savedLoginOption');
+  if(option)option.hidden=!handleAuth.savedLoginAvailable||authMode!=='login';
+  const label=document.getElementById('authRememberLabel');
+  if(label)label.textContent=handleAuth.canSavePassword&&authMode==='login'?'Remember me on this iPhone':'Remember me';
+  const forget=document.getElementById('forgetSavedLogin');
+  if(forget){
+    forget.hidden=!handleAuth.hasSavedLogin||authMode!=='login';
+    forget.style.display=forget.hidden?'none':'';
+  }
+}
+async function configureSavedLogin(){
+  let state;
+  try{state=await savedLoginPlugin()?.status();}catch(_){return;} // Keep known preferences if Keychain is temporarily unavailable.
+  const checkbox=document.getElementById('authRemember');
+  if(state){
+    if(checkbox&&state.hasSavedLogin===true)checkbox.checked=true;
+    else if(checkbox&&!handleAuth.canSavePassword)checkbox.checked=false; // Old email-only consent must not opt into password storage.
+    handleAuth.canSavePassword=state.available===true;
+    handleAuth.hasSavedLogin=state.hasSavedLogin===true;
+    handleAuth.savedLoginAvailable=handleAuth.canSavePassword&&handleAuth.hasSavedLogin;
+  }
+  updateSavedLoginButton();
+}
+async function changeRememberLogin(checked){
+  if(checked)return;
+  if(handleAuth.pending){
+    const checkbox=document.getElementById('authRemember');
+    if(checkbox)checkbox.checked=!!handleAuth.hasSavedLogin;
+    return;
+  }
+  if(handleAuth.hasSavedLogin)await forgetSavedLogin();
+  else clearRecentEmails();
+}
+async function forgetSavedLogin(){
+  if(handleAuth.pending||!handleAuth.hasSavedLogin)return;
+  handleAuth.pending=true;
+  try{
+    await savedLoginPlugin().forgetPassword();
+    clearRecentEmails();
+    const checkbox=document.getElementById('authRemember');
+    if(checkbox)checkbox.checked=false;
+    const email=document.getElementById('authEmail');
+    if(email)email.value='';
+    setAuthError('');
+    await configureSavedLogin();
+  }catch(_){
+    const checkbox=document.getElementById('authRemember');
+    if(checkbox)checkbox.checked=!!handleAuth.hasSavedLogin;
+    setAuthError('Could not remove the saved login. Try again.');
+  }
+  finally{handleAuth.pending=false;}
+}
+
 function clearBenzaAccountState(){
+  cancelBenzaReviewRequest();benzaReviewSessionStarted=0;
   guestBrowsing=false;
   currentUser=null;
   document.body.classList.remove('guest-mode');
@@ -9002,6 +9396,8 @@ async function signOut(){
   clearBenzaAccountState();clearAuthPassword();
   document.getElementById('authScreen').style.display='flex';
   document.getElementById('authStatus').textContent='';setAuthError('');
+  loadRememberedLogin();
+  await configureSavedLogin();
   if(!client)return;
   try{
     if(isBenzaNativeRuntime()&&userId){
@@ -9042,7 +9438,8 @@ async function restoreSession(){
   const generation=authRequestGeneration;
   try{
     if(!supabaseClient)initSupabase();
-    const {data}=await supabaseClient.auth.getSession();
+    const {data,error}=await supabaseClient.auth.getSession();
+    if(error)throw error;
     if(generation!==authRequestGeneration){
       // A guest chose public browsing before session restoration completed.
       if(guestBrowsing)await supabaseClient.auth.signOut({scope:'local'});
@@ -9085,8 +9482,8 @@ function monitorAuthSession(){
       updateWelcomeBack();
     }
 
-    if(event==='SIGNED_OUT'&&currentUser){
-      handleExpiredSession('You’ve been signed out. Please sign in again.');
+    if(event==='SIGNED_OUT'){
+      if(currentUser)handleExpiredSession('You’ve been signed out. Please sign in again.');
     }
   });
 }
@@ -11177,6 +11574,7 @@ async function saveHolding(){
     closeAdd({preserveScannerPhotos:true});
     setButtonBusy(button,false);
     if(photoFile||receiptFile)finishHoldingAttachmentUploads({holdingId:row.id,photoFile,receiptFile});
+    recordBenzaReviewHoldingAdded();
     Promise.resolve()
       .then(()=>loadActivityFromSupabase())
       .then(()=>recordPortfolioSnapshot(true))
@@ -12183,6 +12581,16 @@ async function deleteBenzaAccount(){
     const token=session?.access_token;
     if(sessionError||!token) throw new Error('Your session has expired. Please sign in again before deleting your account.');
 
+    let appleRefreshToken;
+    if((currentUser.identities||[]).some(identity=>identity.provider==='apple')){
+      setAccountSettingsStatus('Verify the linked Apple Account to finish deleting your account.');
+      const verified=await beginSocialOAuth('apple',authRequestGeneration);
+      if(!verified){setAccountSettingsStatus('Account deletion cancelled.');return;}
+      if(currentUser?.id!==deleteUserId)return;
+      if(verified.user?.id!==deleteUserId)throw new Error('Use the Apple Account linked to this Benza Bullion account. Your account has not been deleted.');
+      if(!verified.provider_refresh_token)throw new Error('Apple verification did not return the required permission. Your account has not been deleted. Please try again.');
+      appleRefreshToken=verified.provider_refresh_token;
+    }
     const key=SUPABASE_PUBLISHABLE_KEY;
     const response=await fetch(`${SUPABASE_URL}/functions/v1/benza-delete-account`,{
       method:'POST',
@@ -12191,7 +12599,7 @@ async function deleteBenzaAccount(){
         'apikey':key,
         'Content-Type':'application/json'
       },
-      body:JSON.stringify({confirm:true})
+      body:JSON.stringify({confirm:true,apple_refresh_token:appleRefreshToken})
     });
 
     let result={};
@@ -12201,6 +12609,7 @@ async function deleteBenzaAccount(){
     }
 
     if(currentUser?.id!==deleteUserId)return;
+    try{await savedLoginPlugin()?.forgetPassword();await configureSavedLogin();}catch(_){}
     try{await supabaseClient.auth.signOut({scope:'local'});}catch(_){}
     try{localStorage.removeItem(benzaWatchlistStorageKey());}catch(_){}
     clearBenzaAccountState();
@@ -12221,6 +12630,7 @@ async function deleteBenzaAccount(){
 let activeSettingsTab='settings';
 
 function setSettingsTab(tab){
+  refreshBenzaReleaseVersion();
   activeSettingsTab=['settings','notifications','activity','pro'].includes(tab)?tab:'settings';
 
   const main=document.getElementById('settingsMainPanel');
@@ -12283,7 +12693,7 @@ try{
 }catch(e){
   console.warn('Account service initialization failed:',e);
 }
-restoreSession();
+restoreSession().finally(()=>{configureSocialAuth();configureSavedLogin();});
 // Markets is declared in the following script. Start the feed only after all scripts initialize.
 window.addEventListener('DOMContentLoaded',()=>{
   if(!navigator.onLine)updateNetworkState();
@@ -12837,6 +13247,7 @@ loadBenzaWatchlist();
   console.info('Benza Bullion bundled UI source: benza-direct-ui-2026-10-15');
 })();
 </script>
+
 
 </body>
 </html>

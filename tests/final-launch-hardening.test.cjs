@@ -16,7 +16,7 @@ test('completed payment plus verification outage retains recovery; cancellation 
 });
 test('sign-out clears account UI and stored session even when auth throws',async()=>{
  let cleared=false;const removed=[];
- const c=run({URL,console:{warn(){}},SUPABASE_URL:'https://project.supabase.co',isBenzaNativeRuntime:()=>false,currentUser:{id:'x'},supabaseClient:{auth:{signOut:async()=>{throw Error('Offline')}}},clearBenzaAccountState(){cleared=true},clearAuthPassword(){},document:{getElementById:()=>({style:{}})},setAuthError(){},localStorage:{removeItem:k=>removed.push(k)}},html,['signOut']);
+ const c=run({URL,console:{warn(){}},SUPABASE_URL:'https://project.supabase.co',isBenzaNativeRuntime:()=>false,currentUser:{id:'x'},supabaseClient:{auth:{signOut:async()=>{throw Error('Offline')}}},clearBenzaAccountState(){cleared=true},clearAuthPassword(){},loadRememberedLogin(){},configureSavedLogin:async()=>{},document:{getElementById:()=>({style:{}})},setAuthError(){},localStorage:{removeItem:k=>removed.push(k)}},html,['signOut']);
  await c.signOut();assert.equal(cleared,true);assert.ok(removed.includes('sb-project-auth-token'));
 });
 const worker=fs.readFileSync('supabase/functions/benza-price-alerts/index.ts','utf8');
