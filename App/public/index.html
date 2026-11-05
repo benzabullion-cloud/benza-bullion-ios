@@ -6469,10 +6469,12 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
         <div class="settingsLegalTitle">Support &amp; About</div>
         <button class="settingsLegalLink" type="button" onclick="openBenzaReviewPage()"><span>☆ &nbsp; Rate Benza Bullion</span><span aria-hidden="true">›</span></button>
         <a class="settingsLegalLink" href="support.html"><span>Help &amp; Support</span><span>›</span></a>
-        <a class="settingsLegalLink" href="mailto:benzabullion@gmail.com"><span>Contact Support</span><span>›</span></a>
+        <button class="settingsLegalLink" type="button" onclick="openBenzaFeedback()"><span>Send Feedback / Report a Problem</span><span aria-hidden="true">›</span></button>
+        <button class="settingsLegalLink" type="button" onclick="shareBenzaApp()"><span>Share Benza Bullion</span><span aria-hidden="true">›</span></button>
+        <div id="benzaSupportStatus" class="settingsHint" role="status" aria-live="polite"></div>
         <div class="settingsAboutMeta">
           <div class="settingsAboutName">Benza Bullion</div>
-          <div class="settingsAboutVersion">Version 1.0</div>
+          <div id="benzaReleaseVersion" class="settingsAboutVersion"></div>
           <div class="settingsAboutNote">Hold · Track · Grow. Portfolio tracking and market information are provided for informational purposes and are not investment advice.</div>
         </div>
 
@@ -6580,7 +6582,7 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
 
 <div id="addScreen" class="overlay">
   <div class="sheet">
-    <div class="sheetTop"><button class="close" onclick="closeAdd()">‹</button><h1 id="holdingSheetTitle">Add holding</h1><div style="width:34px"></div></div>
+    <div class="sheetTop"><button class="close" onclick="requestCloseAdd()" aria-label="Close holding form">‹</button><h1 id="holdingSheetTitle">Add holding</h1><div style="width:34px"></div></div>
 
     <div class="form">
       <div class="holdingSectionTitle">Your bullion</div>
@@ -8342,6 +8344,19 @@ function syncProInventoryVisibility(){
   if(fields)fields.hidden=!active;
   if(teaser)teaser.hidden=active;
 }
+let holdingFormBaseline='';
+function holdingFormSnapshot(){
+  const ids=['product','qty','weight','purchaseCostMode','cost','date','holdingYear','holdingPurity','holdingMint','holdingSerial','holdingNotes'];
+  return JSON.stringify([metal,...ids.map(id=>document.getElementById(id)?.value||''),
+    ...['holdingPhoto','holdingReceipt'].map(id=>Array.from(document.getElementById(id)?.files||[]).map(f=>[f.name,f.size,f.lastModified])),
+    pendingScannerPhotoFiles.map(f=>[f.name,f.size,f.lastModified]),pendingHoldingPhotoPath,pendingHoldingReceiptPath]);
+}
+function requestCloseAdd(){
+  if(document.getElementById('holdingSaveBtn')?.disabled)return;
+  if(holdingFormBaseline&&holdingFormSnapshot()!==holdingFormBaseline&&!confirm('Discard your unsaved holding changes?'))return;
+  closeAdd();
+}
+
 function openAdd(){
   if(!requestAccountAccess('save bullion holdings','portfolio'))return;
   ensureGlobalAddPortals();
@@ -8359,6 +8374,7 @@ function openAdd(){
   suggestBullionDetails();
   update();
   addScreen.classList.add('show');
+  holdingFormBaseline=holdingFormSnapshot();
 }
 function closeAdd({preserveScannerPhotos=false}={}){
   addScreen.classList.remove('show');
@@ -8408,6 +8424,7 @@ function editHolding(i){
   }
   update();
   addScreen.classList.add('show');
+  holdingFormBaseline=holdingFormSnapshot();
 }
 function syncDateFieldDisplay(inputId,displayId){
   const input=document.getElementById(inputId);
@@ -9172,6 +9189,53 @@ async function openActivity(){
 }
 function closeActivity(){
   setSettingsTab('settings');
+}
+
+// Release version comes from the signed app, never from its internal build number.
+let benzaReleaseVersion='';
+let benzaAppActionBusy=false;
+function benzaAppPlugin(){
+  return window.Capacitor?.isNativePlatform?.()?window.Capacitor?.Plugins?.BenzaApp:null;
+}
+async function refreshBenzaReleaseVersion(){
+  try{
+    const info=await benzaAppPlugin()?.getInfo();
+    if(typeof info?.version==='string'&&/^\d+\.\d+(?:\.\d+)?$/.test(info.version))benzaReleaseVersion=info.version;
+    const label=document.getElementById('benzaReleaseVersion');
+    if(label)label.textContent=benzaReleaseVersion?'Version '+benzaReleaseVersion:'';
+  }catch(_){} // Missing metadata must never block Settings.
+}
+function benzaFeedbackURL(){
+  const body=(benzaReleaseVersion?'App version: '+benzaReleaseVersion+'\n\n':'')+'What happened or what would you like improved?\n\n\nPlease do not include passwords or sensitive portfolio information.';
+  return 'mailto:benzabullion@gmail.com?subject='+encodeURIComponent('Benza Bullion feedback')+'&body='+encodeURIComponent(body);
+}
+async function openBenzaFeedback(){
+  if(benzaAppActionBusy)return;
+  benzaAppActionBusy=true;
+  const status=document.getElementById('benzaSupportStatus');
+  if(status)status.textContent='';
+  try{
+    const plugin=benzaAppPlugin();
+    if(plugin){
+      const result=await plugin.openFeedback();
+      if(!result?.available&&status)status.textContent='Email benzabullion@gmail.com from your preferred mail app. Include your app version and a description of the problem.';
+    }else window.location.href=benzaFeedbackURL();
+  }catch(_){if(status)status.textContent='Could not open email. Contact benzabullion@gmail.com from your preferred mail app.';}
+  finally{benzaAppActionBusy=false;}
+}
+async function shareBenzaApp(){
+  if(benzaAppActionBusy)return;
+  benzaAppActionBusy=true;
+  const status=document.getElementById('benzaSupportStatus');
+  if(status)status.textContent='';
+  const url='https://apps.apple.com/app/id6811639929';
+  try{
+    const plugin=benzaAppPlugin();
+    if(plugin)await plugin.shareApp();
+    else if(navigator.share)await navigator.share({title:'Benza Bullion',text:'Track your precious metals with Benza Bullion.',url});
+    else if(status)status.textContent='Share this App Store link: '+url;
+  }catch(error){if(error?.name!=='AbortError'&&status)status.textContent='Could not open sharing. Share this App Store link: '+url;}
+  finally{benzaAppActionBusy=false;}
 }
 
 // Local engagement only: no ratings, sentiment, portfolio value, or personal data are collected.
@@ -12566,6 +12630,7 @@ async function deleteBenzaAccount(){
 let activeSettingsTab='settings';
 
 function setSettingsTab(tab){
+  refreshBenzaReleaseVersion();
   activeSettingsTab=['settings','notifications','activity','pro'].includes(tab)?tab:'settings';
 
   const main=document.getElementById('settingsMainPanel');

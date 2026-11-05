@@ -1,4 +1,5 @@
 import UIKit
+import MessageUI
 import AuthenticationServices
 import LocalAuthentication
 import Security
@@ -1253,9 +1254,81 @@ final class BenzaReviewsPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 }
 
+// Small system actions use fixed public destinations and never attach account data.
+@objc(BenzaAppPlugin)
+final class BenzaAppPlugin: CAPPlugin, CAPBridgedPlugin, MFMailComposeViewControllerDelegate {
+    let identifier = "BenzaAppPlugin"
+    let jsName = "BenzaApp"
+    let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "getInfo", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "shareApp", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openFeedback", returnType: CAPPluginReturnPromise)
+    ]
+    private var actionBusy = false
+    private var feedbackCall: CAPPluginCall?
+    private var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "" }
+
+    @objc func getInfo(_ call: CAPPluginCall) { call.resolve(["version": version]) }
+
+    @objc func shareApp(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard !self.actionBusy, let presenter = self.bridge?.viewController,
+                  presenter.viewIfLoaded?.window != nil, presenter.presentedViewController == nil,
+                  let url = URL(string: "https://apps.apple.com/app/id6811639929") else {
+                call.reject("Close the open dialog and try again."); return
+            }
+            self.actionBusy = true
+            let sheet = UIActivityViewController(activityItems: ["Track your precious metals with Benza Bullion.", url], applicationActivities: nil)
+            sheet.completionWithItemsHandler = { _, completed, _, error in
+                DispatchQueue.main.async {
+                    self.actionBusy = false
+                    if let error { call.reject(error.localizedDescription) }
+                    else { call.resolve(["completed": completed]) }
+                }
+            }
+            if let popover = sheet.popoverPresentationController {
+                popover.sourceView = presenter.view
+                popover.sourceRect = CGRect(x: presenter.view.bounds.midX, y: presenter.view.bounds.midY, width: 1, height: 1)
+                popover.permittedArrowDirections = []
+            }
+            presenter.present(sheet, animated: true)
+        }
+    }
+
+    @objc func openFeedback(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard !self.actionBusy, let presenter = self.bridge?.viewController,
+                  presenter.viewIfLoaded?.window != nil, presenter.presentedViewController == nil else {
+                call.reject("Close the open dialog and try again."); return
+            }
+            guard MFMailComposeViewController.canSendMail() else {
+                call.resolve(["available": false]); return
+            }
+            self.actionBusy = true
+            self.feedbackCall = call
+            let composer = MFMailComposeViewController()
+            composer.mailComposeDelegate = self
+            composer.setToRecipients(["benzabullion@gmail.com"])
+            composer.setSubject("Benza Bullion feedback")
+            composer.setMessageBody("App version: \(self.version)\n\nWhat happened or what would you like improved?\n\n\nPlease do not include passwords or sensitive portfolio information.", isHTML: false)
+            presenter.present(composer, animated: true)
+        }
+    }
+
+    func mailComposeController(_ controller: MFMailComposeViewController, didFinishWith result: MFMailComposeResult, error: Error?) {
+        controller.dismiss(animated: true) {
+            self.actionBusy = false
+            if let error { self.feedbackCall?.reject(error.localizedDescription) }
+            else { self.feedbackCall?.resolve(["available": true, "sent": result == .sent]) }
+            self.feedbackCall = nil
+        }
+    }
+}
+
 final class BenzaBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
+        bridge?.registerPluginInstance(BenzaAppPlugin())
         bridge?.registerPluginInstance(BenzaReviewsPlugin())
         bridge?.registerPluginInstance(BenzaSocialAuthPlugin())
         bridge?.registerPluginInstance(BenzaSavedLoginPlugin())
