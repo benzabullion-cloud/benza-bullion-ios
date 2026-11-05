@@ -35,7 +35,7 @@ jobs:
       - name: Run statistics regression suite
         run: node --test tests/statistics-accuracy.test.cjs tests/launch-account-purchases.test.cjs tests/final-launch-hardening.test.cjs tests/launch-sweep.test.cjs
       - name: Verify account entry and recent-email privacy
-        run: node --test tests/social-sign-in.test.cjs tests/recent-login-emails.test.cjs tests/guest-access.test.cjs
+        run: node --test tests/social-sign-in.test.cjs tests/recent-login-emails.test.cjs tests/guest-access.test.cjs tests/device-saved-login.test.cjs tests/saved-login-preference.test.cjs tests/apple-deletion-ui.test.cjs tests/review-engagement.test.cjs tests/settings-actions.test.cjs tests/apple-revocation.test.mjs
       - name: Verify public market news and failure recovery
         run: |
           node --test tests/market-news.test.cjs

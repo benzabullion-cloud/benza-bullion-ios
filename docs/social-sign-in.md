@@ -55,8 +55,10 @@ PKCE flow, then hands the Supabase session to the existing account flow.
    before exposing these options. Providers are configured in Supabase; the
    native app feature flag is enabled on this internal test branch after server
    configuration. It must not be promoted to the public release before device tests.
-   Google Cloud is in Testing with the owner's email added as a test user.
-   Switch Google to the intended production audience before public release.
+   November 5 public-access check: owner completed Branding and production publishing
+   flow, declared only openid, userinfo.email and userinfo.profile, and confirmed
+   successful TestFlight sign-in with a Google account outside the test-user list.
+   A separate post-publish Audience screenshot was not captured.
 
 References:
 - https://developer.apple.com/app-store/review/guidelines/#login-services
