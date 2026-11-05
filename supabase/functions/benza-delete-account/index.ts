@@ -1,4 +1,8 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { createRemoteJWKSet, importPKCS8, jwtVerify, SignJWT } from "npm:jose@6.1.0";
+import { revokeAppleAccess } from "./apple-revocation.mjs";
+
+const appleKeys = createRemoteJWKSet(new URL("https://appleid.apple.com/auth/keys"));
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -92,6 +96,31 @@ Deno.serve(async (req) => {
     );
 
     const userId = user.id;
+
+    if ((user.identities ?? []).some((identity) => identity.provider === "apple")) {
+      const body = await req.json().catch(() => ({}));
+      const clientId = Deno.env.get("BENZA_APPLE_CLIENT_ID");
+      const teamId = Deno.env.get("BENZA_APPLE_TEAM_ID");
+      const keyId = Deno.env.get("BENZA_APPLE_KEY_ID");
+      const privateKey = Deno.env.get("BENZA_APPLE_PRIVATE_KEY");
+      let clientSecret;
+      if (clientId && teamId && keyId && privateKey) {
+        clientSecret = await new SignJWT({})
+          .setProtectedHeader({ alg: "ES256", kid: keyId })
+          .setIssuer(teamId).setAudience("https://appleid.apple.com")
+          .setSubject(clientId).setIssuedAt().setExpirationTime("5m")
+          .sign(await importPKCS8(privateKey, "ES256"));
+      }
+      await revokeAppleAccess({
+        user, refreshToken: body.apple_refresh_token, clientId, clientSecret,
+        verifyIdentity: async (token: string, audience: string) => {
+          const { payload } = await jwtVerify(token, appleKeys, {
+            issuer: "https://appleid.apple.com", audience, algorithms: ["RS256"],
+          });
+          return payload;
+        },
+      });
+    }
 
     // Remove private holding documents before deleting database/auth records.
     // Storage objects do not cascade automatically when an Auth user is deleted.

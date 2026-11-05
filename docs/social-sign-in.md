@@ -33,11 +33,16 @@ PKCE flow, then hands the Supabase session to the existing account flow.
 2. Configure Apple's App ID, Services ID, return URL and signing key for the
    hosted Apple flow. Store secrets in provider or server configuration only.
    Track rotation of the Apple client secret before its six-month expiry.
-3. Implement and verify server-side Apple token revocation as part of
-   account deletion before enabling Apple sign-in publicly. Verify the
-   mechanism for obtaining, protecting and revoking an Apple token; the
-   app currently transfers only the Supabase session and does not store
-   Apple provider tokens. Confirm button branding before submission.
+3. Account deletion now asks Apple-linked users to verify their Apple Account
+   in a separate in-memory OAuth session. The returned Supabase user ID must
+   match the active account. The server refreshes the Apple token, verifies the
+   signed Apple ID token against Apple's JWKS and the linked immutable subject,
+   then revokes the refresh token before removing any data. Cancellation or
+   failed verification/revocation stops deletion. No provider tokens are stored.
+   Configure server-only `BENZA_APPLE_CLIENT_ID`, `BENZA_APPLE_TEAM_ID`,
+   `BENZA_APPLE_KEY_ID`, and `BENZA_APPLE_PRIVATE_KEY` before deploying.
+   Test the actual hosted Apple refresh-token response and deletion with a
+   disposable account in TestFlight before enabling the public release.
 4. Enable the app flag in a test build only. Test first sign-in, cancellation,
    network errors, sign-out, relaunch, guest browsing, and password recovery.
    Test existing verified-email accounts with holdings and Pro purchases:
@@ -47,8 +52,10 @@ PKCE flow, then hands the Supabase session to the existing account flow.
    purchases by email. Existing users should continue with their original
    login until same-account access is confirmed.
 5. Recheck App Review guideline 4.8 and Apple's account-deletion guidance
-   before exposing these options. This branch does not enable providers,
-   change database policies, or publish a build.
+   before exposing these options. Providers are configured in Supabase; the
+   native app feature flag stays off until server configuration is complete.
+   Google Cloud is in Testing with the owner's email added as a test user.
+   Switch Google to the intended production audience before public release.
 
 References:
 - https://developer.apple.com/app-store/review/guidelines/#login-services

@@ -8873,6 +8873,26 @@ async function configureSocialAuth(){
   }catch(_){handleSocialAuth.enabled=false;}
   updateSocialAuthButtons();
 }
+async function beginSocialOAuth(provider,generation){
+  const plugin=window.Capacitor?.Plugins?.BenzaSocialAuth;
+  if(!plugin)throw new Error('Please use the latest Benza Bullion iPhone app to verify your Apple Account.');
+  // The verifier and provider tokens remain in memory, separate from the active account.
+  const oauth=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
+    auth:{flowType:'pkce',storageKey:'benza-social-oauth',persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}
+  });
+  const {data,error}=await oauth.auth.signInWithOAuth({provider,options:{redirectTo:BENZA_SOCIAL_CALLBACK,skipBrowserRedirect:true,scopes:'email'}});
+  if(error||!data?.url)throw new Error('Provider unavailable');
+  if(generation!==authRequestGeneration)return null;
+  const reply=await plugin.authorize({url:data.url});
+  if(reply.cancelled||generation!==authRequestGeneration)return null;
+  const url=new URL(reply.url);
+  if(url.protocol!=='com.benzabullion.app.auth:'||url.host!=='oauth'||url.pathname!=='/callback'||url.username||url.password||url.hash||url.searchParams.has('error')||url.searchParams.getAll('code').length!==1||!url.searchParams.get('code'))throw new Error('Invalid sign-in response');
+  const exchange=await oauth.auth.exchangeCodeForSession(url.searchParams.get('code'));
+  const session=exchange.data?.session;
+  if(exchange.error||!session)throw new Error('Session unavailable');
+  return generation===authRequestGeneration?session:null;
+}
+
 async function handleSocialAuth(provider){
   if(!handleSocialAuth.enabled||handleSocialAuth.pending||handleAuth.pending||currentUser||authMode==='recovery'||!['apple','google'].includes(provider))return;
   const plugin=window.Capacitor?.Plugins?.BenzaSocialAuth;
@@ -8886,22 +8906,9 @@ async function handleSocialAuth(provider){
   status.textContent=provider==='google'?'Opening Google sign-in…':'Opening Apple sign-in…';
   try{
     initSupabase();
-    // Keep the PKCE verifier and transient session separate from email and recovery.
-    const oauth=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
-      auth:{flowType:'pkce',storageKey:'benza-social-oauth',persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}
-    });
-    const {data,error}=await oauth.auth.signInWithOAuth({provider,options:{redirectTo:BENZA_SOCIAL_CALLBACK,skipBrowserRedirect:true,scopes:'email'}});
-    if(error||!data?.url)throw new Error('Provider unavailable');
-    if(generation!==authRequestGeneration)return;
-    const reply=await plugin.authorize({url:data.url});
-    if(reply.cancelled||generation!==authRequestGeneration)return;
-    const url=new URL(reply.url);
-    if(url.protocol!=='com.benzabullion.app.auth:'||url.host!=='oauth'||url.pathname!=='/callback'||url.username||url.password||url.hash||url.searchParams.has('error')||url.searchParams.getAll('code').length!==1||!url.searchParams.get('code'))throw new Error('Invalid sign-in response');
+    const session=await beginSocialOAuth(provider,generation);
+    if(!session)return;
     status.textContent='Finishing sign-in…';
-    const exchange=await oauth.auth.exchangeCodeForSession(url.searchParams.get('code'));
-    const session=exchange.data?.session;
-    if(exchange.error||!session)throw new Error('Session unavailable');
-    if(generation!==authRequestGeneration)return;
     const result=await supabaseClient.auth.setSession({access_token:session.access_token,refresh_token:session.refresh_token});
     if(generation!==authRequestGeneration){
       if(guestBrowsing&&result.data?.session)await supabaseClient.auth.signOut({scope:'local'});
@@ -12388,6 +12395,16 @@ async function deleteBenzaAccount(){
     const token=session?.access_token;
     if(sessionError||!token) throw new Error('Your session has expired. Please sign in again before deleting your account.');
 
+    let appleRefreshToken;
+    if((currentUser.identities||[]).some(identity=>identity.provider==='apple')){
+      setAccountSettingsStatus('Verify the linked Apple Account to finish deleting your account.');
+      const verified=await beginSocialOAuth('apple',authRequestGeneration);
+      if(!verified){setAccountSettingsStatus('Account deletion cancelled.');return;}
+      if(currentUser?.id!==deleteUserId)return;
+      if(verified.user?.id!==deleteUserId)throw new Error('Use the Apple Account linked to this Benza Bullion account. Your account has not been deleted.');
+      if(!verified.provider_refresh_token)throw new Error('Apple verification did not return the required permission. Your account has not been deleted. Please try again.');
+      appleRefreshToken=verified.provider_refresh_token;
+    }
     const key=SUPABASE_PUBLISHABLE_KEY;
     const response=await fetch(`${SUPABASE_URL}/functions/v1/benza-delete-account`,{
       method:'POST',
@@ -12396,7 +12413,7 @@ async function deleteBenzaAccount(){
         'apikey':key,
         'Content-Type':'application/json'
       },
-      body:JSON.stringify({confirm:true})
+      body:JSON.stringify({confirm:true,apple_refresh_token:appleRefreshToken})
     });
 
     let result={};
