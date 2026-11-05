@@ -5750,6 +5750,10 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
         <input id="authRemember" type="checkbox" onchange="if(!this.checked)clearRecentEmails()">
         <span>Remember me</span>
       </label>
+      <label class="authRememberRow" id="savePasswordOption" hidden style="display:none">
+        <input id="authSavePassword" type="checkbox">
+        <span>Save password for Face ID</span>
+      </label>
       <button class="authButton" id="authButton" type="submit">Log in</button>
     </form>
     <div class="socialAuth" id="savedLoginOption" hidden>
@@ -8976,8 +8980,11 @@ async function handleAuth({savedLogin=false}={}){
   try{
     initSupabase();
     const generation=++authRequestGeneration;
-    status.textContent=authMode==='login'?'Signing in…':'Creating account…';
-    const result=authMode==='login'
+    const mode=authMode;
+    const saveOption=document.getElementById('authSavePassword');
+    const shouldSave=mode==='login'&&!savedLogin&&handleAuth.canSavePassword&&saveOption?.checked;
+    status.textContent=mode==='login'?'Signing in…':'Creating account…';
+    const result=mode==='login'
       ? await supabaseClient.auth.signInWithPassword({email,password})
       : await supabaseClient.auth.signUp({email,password,options:{data:{name:'Bullion Builder'}}});
 
@@ -8987,13 +8994,20 @@ async function handleAuth({savedLogin=false}={}){
       return;
     }
 
-    if(authMode==='signup'&&!result.data.session){
+    if(mode==='signup'&&!result.data.session){
       status.textContent='Account created. Check your email to confirm your account, then log in.';
       return;
     }
 
     if(result.data.session)saveRememberedLogin(email);
     currentUser=result.data.user;
+    if(shouldSave&&result.data.session&&currentUser&&authMode==='login'){
+      const userId=currentUser.id;
+      saveOption.checked=false;
+      clearAuthPassword();
+      try{await savedLoginPlugin()?.savePassword({email,password});}catch(_){}
+      if(generation!==authRequestGeneration||currentUser?.id!==userId)return;
+    }
     await onSignedIn();
   }catch(err){
     status.textContent='';
@@ -9132,10 +9146,18 @@ function savedLoginPlugin(){
 function updateSavedLoginButton(){
   const option=document.getElementById('savedLoginOption');
   if(option)option.hidden=!handleAuth.savedLoginAvailable||authMode!=='login';
+  const save=document.getElementById('savePasswordOption');
+  if(save){
+    save.hidden=!handleAuth.canSavePassword||authMode!=='login';
+    save.style.display=save.hidden?'none':'';
+    if(save.hidden){const box=document.getElementById('authSavePassword');if(box)box.checked=false;}
+  }
 }
 async function configureSavedLogin(){
-  try{handleAuth.savedLoginAvailable=(await savedLoginPlugin()?.status())?.available===true;}
-  catch(_){handleAuth.savedLoginAvailable=false;}
+  let state;
+  try{state=await savedLoginPlugin()?.status();}catch(_){}
+  handleAuth.savedLoginAvailable=state?.available===true;
+  handleAuth.canSavePassword=state?.canSave===true;
   updateSavedLoginButton();
 }
 

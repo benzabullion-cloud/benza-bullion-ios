@@ -1105,7 +1105,8 @@ final class BenzaSavedLoginPlugin: CAPPlugin, CAPBridgedPlugin, ASAuthorizationC
     let jsName = "BenzaSavedLogin"
     let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "requestPassword", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "requestPassword", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "savePassword", returnType: CAPPluginReturnPromise)
     ]
     private var controller: ASAuthorizationController?
     private var pendingCall: CAPPluginCall?
@@ -1119,7 +1120,35 @@ final class BenzaSavedLoginPlugin: CAPPlugin, CAPBridgedPlugin, ASAuthorizationC
     }
 
     @objc func status(_ call: CAPPluginCall) {
-        DispatchQueue.main.async { call.resolve(["available": self.available]) }
+        DispatchQueue.main.async {
+            var canSave = false
+            if #available(iOS 26.2, *) { canSave = self.available }
+            call.resolve(["available": self.available, "canSave": canSave])
+        }
+    }
+
+    @objc func savePassword(_ call: CAPPluginCall) {
+        Task { @MainActor in
+            guard #available(iOS 26.2, *), self.available, self.controller == nil,
+                  let email = call.getString("email"), !email.isEmpty,
+                  let password = call.getString("password"), !password.isEmpty,
+                  let window = self.bridge?.viewController?.viewIfLoaded?.window,
+                  let url = URL(string: "https://benzabullion.com"),
+                  let scope = ASAutoFillURLScope(url: url) else {
+                call.reject("Password saving is unavailable.")
+                return
+            }
+            do {
+                try await ASCredentialDataManager().save(
+                    password: ASPasswordCredential(user: email, password: password),
+                    for: scope, title: "Benza Bullion", anchor: window
+                )
+                // The system does not disclose whether the password was saved.
+                call.resolve()
+            } catch {
+                call.reject("Could not request a password save.")
+            }
+        }
     }
 
     @objc func requestPassword(_ call: CAPPluginCall) {
