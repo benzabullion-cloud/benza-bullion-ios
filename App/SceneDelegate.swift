@@ -1,6 +1,7 @@
 import UIKit
 import AuthenticationServices
 import LocalAuthentication
+import Security
 import Capacitor
 import StoreKit
 import UserNotifications
@@ -1100,102 +1101,107 @@ final class BenzaSocialAuthPlugin: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticat
 }
 
 @objc(BenzaSavedLoginPlugin)
-final class BenzaSavedLoginPlugin: CAPPlugin, CAPBridgedPlugin, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+final class BenzaSavedLoginPlugin: CAPPlugin, CAPBridgedPlugin {
     let identifier = "BenzaSavedLoginPlugin"
     let jsName = "BenzaSavedLogin"
     let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "requestPassword", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "savePassword", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "savePassword", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "forgetPassword", returnType: CAPPluginReturnPromise)
     ]
-    private var controller: ASAuthorizationController?
-    private var pendingCall: CAPPluginCall?
-    private var anchor: UIWindow?
+    private let queue = DispatchQueue(label: "com.benzabullion.saved-login")
+    private let item: [String: Any] = [
+        kSecClass as String: kSecClassGenericPassword,
+        kSecAttrService as String: "com.benzabullion.app.face-id-login",
+        kSecAttrAccount as String: "saved-login",
+        kSecAttrSynchronizable as String: false
+    ]
 
-    private var available: Bool {
-        guard Bundle.main.object(forInfoDictionaryKey: "BenzaSavedLoginEnabled") as? Bool == true else { return false }
-        let context = LAContext()
-        return context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
-            && context.biometryType == .faceID
+    private struct Credential: Codable {
+        let email: String
+        let password: String
+    }
+
+    private var enabled: Bool {
+        Bundle.main.object(forInfoDictionaryKey: "BenzaSavedLoginEnabled") as? Bool == true
+    }
+
+    private func deviceAuthenticationAvailable(_ context: LAContext) -> Bool {
+        enabled && context.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil)
     }
 
     @objc func status(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            var canSave = false
-            if #available(iOS 26.2, *) { canSave = self.available }
-            call.resolve(["available": self.available, "canSave": canSave])
+        queue.async {
+            let context = LAContext()
+            context.interactionNotAllowed = true
+            var query = self.item
+            query[kSecUseAuthenticationContext as String] = context
+            query[kSecReturnAttributes as String] = true
+            let result = self.enabled ? SecItemCopyMatching(query as CFDictionary, nil) : errSecItemNotFound
+            call.resolve(["available": self.deviceAuthenticationAvailable(LAContext()),
+                          "hasSavedLogin": result == errSecSuccess || result == errSecInteractionNotAllowed])
         }
     }
 
     @objc func savePassword(_ call: CAPPluginCall) {
-        Task { @MainActor in
-            guard #available(iOS 26.2, *), self.available, self.controller == nil,
+        queue.async {
+            guard self.deviceAuthenticationAvailable(LAContext()),
                   let email = call.getString("email"), !email.isEmpty,
                   let password = call.getString("password"), !password.isEmpty,
-                  let window = self.bridge?.viewController?.viewIfLoaded?.window,
-                  let url = URL(string: "https://benzabullion.com"),
-                  let scope = ASAutoFillURLScope(url: url) else {
-                call.reject("Password saving is unavailable.")
+                  let data = try? JSONEncoder().encode(Credential(email: email, password: password)),
+                  let protection = SecAccessControlCreateWithFlags(
+                    nil, kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly, .userPresence, nil
+                  ) else {
+                call.reject("Saved login is unavailable.")
                 return
             }
-            do {
-                try await ASCredentialDataManager().save(
-                    password: ASPasswordCredential(user: email, password: password),
-                    for: scope, title: "Benza Bullion", anchor: window
-                )
-                // The system does not disclose whether the password was saved.
-                call.resolve()
-            } catch {
-                call.reject("Could not request a password save.")
+            var item = self.item
+            item[kSecAttrAccessControl as String] = protection
+            item[kSecValueData as String] = data
+            var result = SecItemAdd(item as CFDictionary, nil)
+            if result == errSecDuplicateItem {
+                let deleted = SecItemDelete(self.item as CFDictionary)
+                result = (deleted == errSecSuccess || deleted == errSecItemNotFound)
+                    ? SecItemAdd(item as CFDictionary, nil) : deleted
             }
+            if result == errSecSuccess { call.resolve() }
+            else { call.reject("Could not save the login on this iPhone.") }
         }
     }
 
     @objc func requestPassword(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            guard self.available, self.controller == nil,
-                  let window = self.bridge?.viewController?.viewIfLoaded?.window else {
-                call.reject("Saved sign-in is unavailable.")
+        queue.async {
+            let context = LAContext()
+            guard self.deviceAuthenticationAvailable(context) else {
+                call.reject("Device authentication is unavailable.")
                 return
             }
-            let controller = ASAuthorizationController(authorizationRequests: [ASAuthorizationPasswordProvider().createRequest()])
-            self.controller = controller
-            self.anchor = window
-            self.pendingCall = call
-            controller.delegate = self
-            controller.presentationContextProvider = self
-            controller.performRequests()
+            context.localizedReason = "Sign in to Benza Bullion."
+            var query = self.item
+            query[kSecUseAuthenticationContext as String] = context
+            query[kSecReturnData as String] = true
+            query[kSecMatchLimit as String] = kSecMatchLimitOne
+            var value: CFTypeRef?
+            let result = SecItemCopyMatching(query as CFDictionary, &value)
+            context.invalidate()
+            if result == errSecUserCanceled {
+                call.resolve(["cancelled": true])
+            } else if result == errSecSuccess, let data = value as? Data,
+                      let credential = try? JSONDecoder().decode(Credential.self, from: data) {
+                call.resolve(["email": credential.email, "password": credential.password])
+            } else {
+                call.reject("Could not unlock the saved Benza Bullion login.")
+            }
         }
     }
 
-    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-        anchor ?? ASPresentationAnchor()
-    }
-
-    private func finish(_ controller: ASAuthorizationController) -> CAPPluginCall? {
-        guard self.controller === controller else { return nil }
-        let call = pendingCall
-        pendingCall = nil
-        self.controller = nil
-        anchor = nil
-        return call
-    }
-
-    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
-        guard let call = finish(controller) else { return }
-        guard let credential = authorization.credential as? ASPasswordCredential else {
-            call.reject("No saved Benza Bullion password was returned.")
-            return
-        }
-        call.resolve(["email": credential.user, "password": credential.password])
-    }
-
-    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
-        guard let call = finish(controller) else { return }
-        if (error as? ASAuthorizationError)?.code == .canceled {
-            call.resolve(["cancelled": true])
-        } else {
-            call.reject("No saved Benza Bullion password was available.")
+    @objc func forgetPassword(_ call: CAPPluginCall) {
+        queue.async {
+            guard self.enabled else { call.reject("Saved login is unavailable."); return }
+            let result = SecItemDelete(self.item as CFDictionary)
+            if result == errSecSuccess || result == errSecItemNotFound { call.resolve() }
+            else { call.reject("Could not remove the saved login.") }
         }
     }
 }

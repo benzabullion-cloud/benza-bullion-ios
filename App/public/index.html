@@ -5748,17 +5748,14 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
       <div class="authPasswordWrap"><input id="authPassword" name="password" class="authInput" type="password" minlength="8" autocomplete="current-password" placeholder="At least 8 characters" oninput="updateAuthPasswordControls()" onfocus="updateAuthPasswordControls()"><div class="authPasswordControls"><button id="authPasswordClear" type="button" onclick="clearAuthPassword()" aria-label="Clear password" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button><button id="authPasswordVisibility" type="button" onclick="toggleAuthPasswordVisibility()" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path id="authPasswordEyeSlash" d="m3 3 18 18" style="display:none"/></svg></button></div></div>
       <label class="authRememberRow">
         <input id="authRemember" type="checkbox" onchange="if(!this.checked)clearRecentEmails()">
-        <span>Remember me</span>
-      </label>
-      <label class="authRememberRow" id="savePasswordOption" hidden style="display:none">
-        <input id="authSavePassword" type="checkbox">
-        <span>Save password for Face ID</span>
+        <span id="authRememberLabel">Remember me</span>
       </label>
       <button class="authButton" id="authButton" type="submit">Log in</button>
     </form>
     <div class="socialAuth" id="savedLoginOption" hidden>
-      <button type="button" onclick="handleAuth({savedLogin:true})">Sign in with Face ID</button>
+      <button type="button" onclick="handleAuth({savedLogin:true})">Use saved login</button>
     </div>
+    <button class="authRecoveryButton" id="forgetSavedLogin" type="button" hidden style="display:none" onclick="forgetSavedLogin()">Forget saved login</button>
     <button class="authToggle" id="authToggle" type="button" onclick="toggleAuthMode()">Need an account? Create one</button>
     <button class="authRecoveryButton" id="authRecoveryButton" type="button" onclick="requestPasswordReset()">Forgot password?</button>
     <div class="socialAuth" id="socialAuth" hidden>
@@ -8981,7 +8978,7 @@ async function handleAuth({savedLogin=false}={}){
     initSupabase();
     const generation=++authRequestGeneration;
     const mode=authMode;
-    const saveOption=document.getElementById('authSavePassword');
+    const saveOption=document.getElementById('authRemember');
     const shouldSave=mode==='login'&&!savedLogin&&handleAuth.canSavePassword&&saveOption?.checked;
     status.textContent=mode==='login'?'Signing in…':'Creating account…';
     const result=mode==='login'
@@ -9004,10 +9001,14 @@ async function handleAuth({savedLogin=false}={}){
     if(shouldSave&&result.data.session&&currentUser&&authMode==='login'){
       const userId=currentUser.id;
       saveOption.checked=false;
-      clearAuthPassword();
-      try{await savedLoginPlugin()?.savePassword({email,password});}catch(_){}
+      const input=document.getElementById('authPassword');
+      if(input){input.value='';updateAuthPasswordControls();}
+      try{await savedLoginPlugin().savePassword({email,password});}
+      catch(_){status.textContent='Could not save your login on this iPhone. You can still sign in with your password.';}
+      await configureSavedLogin();
       if(generation!==authRequestGeneration||currentUser?.id!==userId)return;
     }
+    password='';
     await onSignedIn();
   }catch(err){
     status.textContent='';
@@ -9146,19 +9147,40 @@ function savedLoginPlugin(){
 function updateSavedLoginButton(){
   const option=document.getElementById('savedLoginOption');
   if(option)option.hidden=!handleAuth.savedLoginAvailable||authMode!=='login';
-  const save=document.getElementById('savePasswordOption');
-  if(save){
-    save.hidden=!handleAuth.canSavePassword||authMode!=='login';
-    save.style.display=save.hidden?'none':'';
-    if(save.hidden){const box=document.getElementById('authSavePassword');if(box)box.checked=false;}
+  const label=document.getElementById('authRememberLabel');
+  if(label)label.textContent=handleAuth.canSavePassword&&authMode==='login'?'Remember me on this iPhone':'Remember me';
+  const forget=document.getElementById('forgetSavedLogin');
+  if(forget){
+    forget.hidden=!handleAuth.hasSavedLogin||authMode!=='login';
+    forget.style.display=forget.hidden?'none':'';
   }
 }
 async function configureSavedLogin(){
   let state;
   try{state=await savedLoginPlugin()?.status();}catch(_){}
-  handleAuth.savedLoginAvailable=state?.available===true;
-  handleAuth.canSavePassword=state?.canSave===true;
+  if(state?.available===true&&!handleAuth.canSavePassword){
+    const checkbox=document.getElementById('authRemember');
+    if(checkbox)checkbox.checked=false; // An old email preference is not password-saving consent.
+  }
+  handleAuth.canSavePassword=state?.available===true;
+  handleAuth.hasSavedLogin=state?.hasSavedLogin===true;
+  handleAuth.savedLoginAvailable=handleAuth.canSavePassword&&handleAuth.hasSavedLogin;
   updateSavedLoginButton();
+}
+async function forgetSavedLogin(){
+  if(handleAuth.pending||!handleAuth.hasSavedLogin)return;
+  handleAuth.pending=true;
+  try{
+    await savedLoginPlugin().forgetPassword();
+    clearRecentEmails();
+    const checkbox=document.getElementById('authRemember');
+    if(checkbox)checkbox.checked=false;
+    const email=document.getElementById('authEmail');
+    if(email)email.value='';
+    setAuthError('');
+    await configureSavedLogin();
+  }catch(_){setAuthError('Could not remove the saved login. Try again.');}
+  finally{handleAuth.pending=false;}
 }
 
 function clearBenzaAccountState(){
@@ -12384,6 +12406,7 @@ async function deleteBenzaAccount(){
     }
 
     if(currentUser?.id!==deleteUserId)return;
+    try{await savedLoginPlugin()?.forgetPassword();await configureSavedLogin();}catch(_){}
     try{await supabaseClient.auth.signOut({scope:'local'});}catch(_){}
     try{localStorage.removeItem(benzaWatchlistStorageKey());}catch(_){}
     clearBenzaAccountState();
