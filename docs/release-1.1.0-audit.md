@@ -4,7 +4,7 @@ Date: November 5, 2026. Base: testflight/face-id-round-one at 0516fd6c0382685b5b
 
 ## Status
 
-Not yet cleared for App Store submission. Local implementation and available source/database checks are complete. Uploading the modified source to GitHub was blocked by automatic approval review pending explicit authorization; therefore the candidate has not run native compilation or remote browser CI and has not been built or submitted. Build 126 predates these additions.
+Not yet cleared for App Store submission: final physical-device checks remain. User authorized source upload; PR #57 merged into testflight/face-id-round-one at ca5fc48f77e655d73899514389bd94aea0dd87fd. All GitHub release jobs passed on candidate 002519228a28be421e9517f7ff8dbdeb7a59a897. Xcode Cloud Build 127 was started and observed Queued at 11:57 AM Central. This is the 1.1.0 replacement candidate, not an App Store submission.
 
 ## Changes
 
@@ -34,8 +34,8 @@ Not yet cleared for App Store submission. Local implementation and available sou
 
 ## Required before submission
 
-1. Authorize uploading these source changes to the existing GitHub repository, then run full native and Chromium/WebKit CI. Browser downloads were truncated locally and the installed Chromium cannot create the required socket in this environment; no visual/browser pass is claimed.
-2. Build the exact audited candidate in Xcode Cloud. Verify signed version 1.1.0, entitlements, and privacy manifest, and inspect native warnings/errors.
+1. COMPLETED: full native iOS compile, bundled privacy manifest verification, native boundary tests, scanner regression and real-photo OCR gates passed. Chromium/WebKit passed 192 responsive form states, 168 full-app screen states, guest routes/races and production news refresh/article/offline recovery. Captured WebKit light Settings and Portfolio screens were visually reviewed. Browser QA initially failed because ubuntu-latest moved to unsupported Ubuntu 26.04; pinning the browser job to Ubuntu 24.04 resolved it without weakening checks.
+2. IN PROGRESS: Xcode Cloud Build 127 queued for the merged tested candidate. Verify successful archive/processing, signed version 1.1.0, entitlements and warnings before device distribution; no signed-build success is yet claimed.
 3. Google public sign-in check PASSED (user-reported, November 5): owner completed Branding and production publishing flow, screenshots show only userinfo.email, userinfo.profile and openid declared as non-sensitive scopes; user confirmed TestFlight sign-in worked with an account outside the test-user list. Production Audience status was not separately captured after confirmation. This verifies the tested external account, not every account or managed Workspace policy.
 4. On a physical iPhone: verify all three login options, cancellation, remembered login after logout, relaunch, recovery, existing holdings and Pro ownership; Apple Hide My Email may represent a different account. Verify Apple-linked account deletion/token revocation with a disposable account.
 5. Test Settings review link, feedback composer/send/cancel/no-mail fallback, native share/cancel, release footer, and discard/failed-save behavior. Automatic StoreKit review sheets cannot be validated in TestFlight; development builds and the policy tests cover request behavior, and Apple decides whether to display a sheet.
