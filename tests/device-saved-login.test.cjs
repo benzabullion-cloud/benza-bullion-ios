@@ -42,13 +42,16 @@ test('remembered credentials are saved only after a valid manual sign-in and opt
   const {events,elements}=await run();
   assert.deepEqual(events,['validate','save','open']);
   assert.equal(elements.authPassword.value,'');
+  assert.equal(elements.authRemember.checked,true);
   assert.deepEqual((await run({checked:false})).events,['validate','open']);
   assert.deepEqual((await run({valid:false})).events,['validate']);
   assert.deepEqual((await run({unavailable:true})).events,['validate','open']);
 });
 
 test('saved login authenticates without rewriting the Keychain; cancellation stays signed out',async()=>{
-  assert.deepEqual((await run({saved:true})).events,['validate','open']);
+  const saved=await run({saved:true,checked:false});
+  assert.deepEqual(saved.events,['validate','open']);
+  assert.equal(saved.elements.authRemember.checked,true);
   assert.deepEqual((await run({saved:true,cancelled:true})).events,[]);
 });
 
