@@ -1056,7 +1056,7 @@ final class BenzaSocialAuthPlugin: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticat
     }
 
     @objc func authorize(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [self] in
             let callback = "com.benzabullion.app.auth://oauth/callback"
             guard self.enabled, self.session == nil,
                   let raw = call.getString("url"), let url = URL(string: raw),
@@ -1097,7 +1097,11 @@ final class BenzaSocialAuthPlugin: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticat
     }
 
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        anchor ?? ASPresentationAnchor()
+        // authorize(_:) requires an existing window and sets anchor before session.start().
+        guard let anchor else {
+            preconditionFailure("Authentication session started without a presentation anchor.")
+        }
+        return anchor
     }
 }
 
