@@ -14,8 +14,7 @@ permissions:
   contents: read
 jobs:
   compile:
-    # Only standard public-repository runners; no billed larger/private runner.
-    if: github.event.repository.private == false
+    # Standard runners only. Keep the account Actions budget at $0 with stop-usage enabled.
     runs-on: xcode-27
     timeout-minutes: 15
     steps:
@@ -67,7 +66,6 @@ jobs:
         run: plutil -lint /tmp/benza-camera-app/Build/Products/Debug-iphoneos/App.app/PrivacyInfo.xcprivacy
 
   real_photos:
-    if: github.event.repository.private == false
     runs-on: macos-15-intel
     timeout-minutes: 10
     steps:
