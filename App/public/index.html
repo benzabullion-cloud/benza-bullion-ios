@@ -5773,6 +5773,7 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
 .benzaGuestLockSignIn{border:1px solid var(--border);background:var(--surface2);color:var(--text)}
 .benzaGuestLockLater{border:0;background:transparent;color:var(--muted);min-height:38px!important}
 </style>
+<link rel="stylesheet" href="./community.css">
 </head>
 <body>
 <div id="connectionBanner" class="connectionBanner" role="status" aria-live="polite"><span class="connectionBannerDot"></span><span id="connectionBannerText">You’re offline. Showing saved data.</span></div>
@@ -6432,10 +6433,31 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
 
 <div id="newsScreen" class="newsOverlay">
   <div class="newsHeader">
-    <div class="newsHeaderLeft"><button onclick="closeNews()">‹</button><h1>Market Insights</h1></div>
+    <div class="newsHeaderLeft"><button onclick="closeNews()">‹</button><h1>Explore</h1></div>
     <button id="newsRefreshButton" class="newsRefresh" type="button" aria-busy="false" onclick="loadMarketNews(true)">Refresh</button>
   </div>
   <div class="newsBody">
+    <nav class="communityTabs" aria-label="Explore sections">
+      <button id="communityNewsTab" type="button" onclick="openBullionNewsSection('news')" aria-pressed="true">News</button>
+      <button id="communityGalleryTab" type="button" onclick="openBullionNewsSection('community')" aria-pressed="false">Community</button>
+    </nav>
+    <section id="communityPanel" hidden aria-label="Bullion community">
+      <div class="communityHeading">
+        <div><h2>Bullion Community</h2><p>Coins, bars, and the stories behind them.</p></div>
+        <button class="communityPrimary" type="button" onclick="composeBullionPost()">Share a photo</button>
+      </div>
+      <div id="communityFilters" class="communityFilters">
+        <button type="button" data-community-view="discover" onclick="showBullionGallery('discover')">Discover</button>
+        <button type="button" data-community-view="following" onclick="showBullionGallery('following')">Following</button>
+        <button type="button" data-community-view="mine" onclick="showBullionGallery('mine')">My posts</button>
+        <button id="communityReviewTab" type="button" data-community-view="review" onclick="showBullionGallery('review')" hidden>Review queue</button>
+      </div>
+      <div id="communityStatus" class="communityStatus" role="status"></div>
+      <div id="communityFeed" class="communityFeed"></div>
+      <button id="communityMore" class="communitySecondary" type="button" onclick="loadMoreBullionPosts()" hidden>Load more</button>
+      <p class="communitySupport"><a href="support.html">Community support</a></p>
+    </section>
+    <section id="communityMarketNews" aria-label="Market news">
     <div class="newsEyebrow">Bullion news</div>
     <div class="newsIntro">Current stories that may matter to physical precious-metal owners. Swipe or use the arrows to browse, then open the original article for full context.</div>
     <div id="newsStatus" class="newsStatus">Loading current bullion news…</div>
@@ -6452,6 +6474,7 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
       <button id="tipNextButton" class="newsRailArrow" type="button" onclick="scrollMarketRail('tipSlider',1)" aria-label="Next Benza Bullion tip">›</button>
     </div>
     <div class="newsDisclosure">Market Insights is informational and educational only, not investment advice. Live headlines come from third-party news sources and may change or become unavailable.</div>
+    </section>
     <footer class="guestLegalFooter" aria-label="Legal and support"><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="support.html">Support</a></footer>
   </div>
 </div>
@@ -8545,7 +8568,7 @@ document.getElementById('date').value=new Date().toISOString().slice(0,10);
     <div class="active" data-tab="portfolio" role="button" tabindex="0" aria-current="page" onclick="goPortfolio()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goPortfolio()}"><div class="icon navTabIcon portfolioNavIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5"/><path d="M6.5 9.7V20h11V9.7"/><path d="M9.5 20v-5.5h5V20"/></svg></div>Portfolio</div>
     <div data-tab="analytics" role="button" tabindex="0" onclick="openAnalytics()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openAnalytics()}"><div class="icon navTabIcon analyticsNavIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4.5" width="16" height="15" rx="1.5"/><path d="M9.3 4.5v15"/><path d="M14.7 4.5v15"/></svg></div>Analytics</div>
     <div class="navAdd" role="button" tabindex="0" onclick="openAddChoice()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openAddChoice()}" aria-label="Add bullion"><div class="icon navCenterPlus">+</div></div>
-    <div data-tab="news" role="button" tabindex="0" onclick="openNews()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openNews()}"><div class="icon navTabIcon newsNavIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.8 20.2 12 12 20.2 3.8 12 12 3.8Z"/><path d="M12 7.2 16.8 12 12 16.8 7.2 12 12 7.2Z"/></svg></div>News</div>
+    <div data-tab="news" role="button" tabindex="0" onclick="openNews()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openNews()}"><div class="icon navTabIcon newsNavIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.2"/><path d="m15.4 8.6-2 4.8-4.8 2 2-4.8 4.8-2Z"/></svg></div>Explore</div>
     <div data-tab="markets" role="button" tabindex="0" onclick="openMarkets()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openMarkets()}"><div class="icon navTabIcon marketNavIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 10.5v7.5h13v-7.5"/><path d="M4.8 10.5h14.4l-1.7-4H6.5l-1.7 4Z"/><path d="M5 10.5c0 1 .8 1.7 1.8 1.7s1.8-.7 1.8-1.7c0 1 .8 1.7 1.8 1.7s1.8-.7 1.8-1.7c0 1 .8 1.7 1.8 1.7s1.8-.7 1.8-1.7c0 1 .8 1.7 1.8 1.7s1.8-.7 1.8-1.7"/><path d="M9.5 18v-3.5h5V18"/></svg></div>Markets</div>
   </nav>
 
@@ -8578,6 +8601,7 @@ let holdingReceiptObjectUrl=null;
 let holdingPhotoViewUrl=null;
 let holdingReceiptViewUrl=null;
 let authMode='login';
+const BENZA_COMMUNITY_PREVIEW=false;
 const SUPABASE_URL='https://wblibufurkquqgcavzim.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_hffs8V89TNA34-kGlIR4gg_pfjEySHv';
 
@@ -9136,7 +9160,17 @@ async function onSignedIn(){
   document.body.classList.remove('guest-mode');
   closeProUpgrade();
   const route=pendingAccountRoute;pendingAccountRoute=null;
-  if(route==='pro')openProUpgrade();else goPortfolio();
+  if(typeof BENZA_COMMUNITY_PREVIEW!=='undefined'&&BENZA_COMMUNITY_PREVIEW){
+    document.getElementById('authScreen').style.display='none';
+    openNews();
+    openBullionNewsSection('community');
+    return;
+  }
+  if(route==='pro')openProUpgrade();
+  else if(route==='community'&&typeof openBullionNewsSection==='function'){
+    openNews();
+    openBullionNewsSection('community');
+  }else goPortfolio();
   document.getElementById('authScreen').style.display='none';
   updateWelcomeBack();
 
@@ -9436,6 +9470,10 @@ async function forgetSavedLogin(){
 
 function clearBenzaAccountState(){
   cancelBenzaReviewRequest();benzaReviewSessionStarted=0;
+  if(typeof openBullionNewsSection==='function'){
+    document.getElementById('communityDialog')?.close();
+    openBullionNewsSection('news');
+  }
   guestBrowsing=false;
   currentUser=null;
   document.body.classList.remove('guest-mode');
@@ -12472,7 +12510,9 @@ function goPortfolio(){
 
 function openNews(){
   hideMainOverlays();
-  setActiveNav('news');document.getElementById('newsScreen').classList.add('show');loadMarketNews(false)}
+  setActiveNav('news');document.getElementById('newsScreen').classList.add('show');
+  if(typeof openBullionNewsSection==='function')openBullionNewsSection('news');
+  loadMarketNews(false)}
 function closeNews(){if(guestBrowsing){activeMarketsTab='market';openMarkets();return;}document.getElementById('newsScreen').classList.remove('show');setActiveNav('portfolio')}
 
 function applyTheme(theme){
@@ -13397,6 +13437,18 @@ loadBenzaWatchlist();
 </script>
 
 
+<dialog id="communityDialog" class="communityDialog" aria-labelledby="communityDialogTitle">
+  <form id="communityForm">
+    <h2 id="communityDialogTitle"></h2>
+    <div id="communityFormFields"></div>
+    <p id="communityFormStatus" class="communityStatus" role="status"></p>
+    <div class="communityDialogActions">
+      <button id="communityDialogCancel" class="communitySecondary" type="button">Cancel</button>
+      <button id="communityDialogSubmit" class="communityPrimary" type="submit">Submit</button>
+    </div>
+  </form>
+</dialog>
+<script src="./community.js"></script>
 </body>
 </html>
 

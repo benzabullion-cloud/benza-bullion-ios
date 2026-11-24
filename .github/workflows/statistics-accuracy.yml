@@ -18,6 +18,7 @@ on:
       - 'tests/social-sign-in.test.cjs'
       - 'tests/recent-login-emails.test.cjs'
       - 'tests/guest-access.test.cjs'
+      - 'tests/community-database.cjs'
       - '.github/workflows/statistics-accuracy.yml'
 permissions:
   contents: read
@@ -46,6 +47,7 @@ jobs:
           npm install --no-save --ignore-scripts @electric-sql/pglite@0.5.8
           node tests/holding-base-edits.cjs
           node tests/final-launch-database.cjs
+          node tests/community-database.cjs
       - name: Verify Apple lifecycle logic
         run: |
           npm ci --prefix storekit-verifier --ignore-scripts

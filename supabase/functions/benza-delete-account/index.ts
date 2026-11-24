@@ -122,49 +122,48 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Remove private holding documents before deleting database/auth records.
-    // Storage objects do not cascade automatically when an Auth user is deleted.
-    const inventoryBucket = admin.storage.from("holding-documents");
-    const storagePaths: string[] = [];
-
-    const walkStorage = async (prefix: string) => {
+    // Storage objects do not cascade when an Auth user is deleted.
+    const removeStorageFolder = async (bucketName: string, root: string) => {
+      const bucket = admin.storage.from(bucketName);
+      const paths: string[] = [];
       const limit = 100;
-      let offset = 0;
-      while (true) {
-        const { data: entries, error: listError } = await inventoryBucket.list(prefix, {
-          limit,
-          offset,
-          sortBy: { column: "name", order: "asc" },
-        });
-        if (listError) {
-          console.error("Storage list error:", listError);
-          throw new Error("Unable to delete account documents");
+      const walk = async (prefix: string) => {
+        for (let offset = 0;; offset += limit) {
+          const { data, error } = await bucket.list(prefix, {
+            limit,
+            offset,
+            sortBy: { column: "name", order: "asc" },
+          });
+          if (error) throw error;
+          const rows = data ?? [];
+          for (const entry of rows) {
+            const path = `${prefix}/${entry.name}`;
+            if (entry.id) paths.push(path);
+            else await walk(path);
+          }
+          if (rows.length < limit) break;
         }
-        const rows = entries ?? [];
-        for (const entry of rows) {
-          const path = prefix ? `${prefix}/${entry.name}` : entry.name;
-          if (entry.id) storagePaths.push(path);
-          else await walkStorage(path);
-        }
-        if (rows.length < limit) break;
-        offset += limit;
+      };
+
+      await walk(root);
+      for (let index = 0; index < paths.length; index += limit) {
+        const { error } = await bucket.remove(paths.slice(index, index + limit));
+        if (error) throw error;
       }
     };
 
-    const { data: rootEntries, error: rootListError } = await inventoryBucket.list(`${userId}/inventory`, { limit: 1 });
-    if (rootListError) {
-      console.error("Storage root list error:", rootListError);
-      throw new Error("Unable to delete account documents");
-    }
-    if ((rootEntries ?? []).length > 0) {
-      await walkStorage(`${userId}/inventory`);
-      for (let i = 0; i < storagePaths.length; i += 100) {
-        const { error: removeError } = await inventoryBucket.remove(storagePaths.slice(i, i + 100));
-        if (removeError) {
-          console.error("Storage remove error:", removeError);
-          throw new Error("Unable to delete account documents");
-        }
+    try {
+      await removeStorageFolder("holding-documents", `${userId}/inventory`);
+      // Keep account deletion compatible with deployments that precede Community.
+      const { data: buckets, error } = await admin.storage.listBuckets();
+      if (error) throw error;
+      if (buckets?.some(bucket => bucket.id === "bullion-community")) {
+        await removeStorageFolder("bullion-community", userId);
+        await removeStorageFolder("bullion-community", `published/${userId}`);
       }
+    } catch (error) {
+      console.error("Storage cleanup failed:", error);
+      throw new Error("Unable to delete account documents");
     }
 
     // Remove user-owned Benza data before deleting Auth user.

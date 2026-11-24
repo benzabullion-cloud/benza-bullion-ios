@@ -4,6 +4,10 @@ benza_stage=locate-repository
 trap 'benza_exit=$?; if [ "$benza_exit" -ne 0 ]; then printf "Benza asset setup failed at stage: %s (exit %s)\n" "$benza_stage" "$benza_exit" >&2; fi' EXIT
 benza_root="${CI_PRIMARY_REPOSITORY_PATH:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}"
 cd "$benza_root"
+if [ "${CI_BRANCH:-}" = "testflight/bullion-community" ]; then
+    benza_stage=configure-community-staging
+    python3 ci_scripts/configure_community_staging.py
+fi
 benza_stage=prepare-fixed-apple-sdk
 printf 'Benza setup: %s\n' "$benza_stage"
 if [ -n "${BENZA_APPLE_SDK_ARCHIVE:-}" ]; then
