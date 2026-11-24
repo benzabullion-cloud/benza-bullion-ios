@@ -1083,6 +1083,14 @@ button:disabled{opacity:.58;cursor:not-allowed}
 .settingsNotificationTitle{font-size:15px;font-weight:800;color:var(--text)}
 .settingsNotificationStatus{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.4}
 .settingsNotificationButton{border:0;border-radius:11px;padding:10px 13px;background:#c88719;color:#111;font-size:12px;font-weight:800;white-space:nowrap}
+.notificationInvite{margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface3);color:var(--text)}
+.notificationInvite[hidden]{display:none}
+.notificationInvite p{margin:0 0 8px;font-size:13px}
+#priceNotificationInvite{width:min(86vw,360px);padding:20px;background:var(--surface3);color:var(--text);border:1px solid var(--line);border-radius:16px}
+#priceNotificationInvite::backdrop{background:#0008}
+#priceNotificationInvite h2{margin:0 0 8px;font-size:19px}
+#priceNotificationInvite p{margin:0 0 14px;font-size:14px;line-height:1.45}
+#priceNotificationInvite button+button{margin-left:8px}
 .settingsNotificationButton.off{background:var(--surface3);color:var(--text);border:1px solid var(--line)}
 .settingsNotificationTest{width:100%;margin-top:12px;border:1px solid var(--line);border-radius:11px;padding:10px 12px;background:transparent;color:var(--text);font-size:12px;font-weight:750}
 .settingsNotificationNote{font-size:11px;color:var(--muted);line-height:1.45;margin-top:10px}
@@ -3315,6 +3323,17 @@ button:disabled{opacity:.58;cursor:not-allowed}
 .marketsMetricGrid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:9px 0}.marketsMetric{display:flex;flex-direction:column;gap:5px}.marketsMetric span{font-size:10px;color:var(--muted)}.marketsMetric strong{font-size:18px}
 .marketsSectionHead{display:flex;align-items:center;justify-content:space-between;gap:10px}.marketsSectionHead h2,.marketsCard h2{font-size:17px;margin:3px 0 0}.marketsLivePill{font-size:8px;font-weight:900;color:#168447;border:1px solid rgba(22,132,71,.28);background:rgba(22,132,71,.08);padding:4px 7px;border-radius:999px}
 .marketsPriceRow{display:grid;grid-template-columns:36px 1fr auto;gap:10px;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)}.marketsPriceRow:last-child{border-bottom:0}.marketsPriceName{font-weight:780;font-size:13px}.marketsPriceSymbol{font-size:9px;color:var(--muted);margin-top:2px}.marketsPriceValue{font-weight:820;font-size:14px;text-align:right}.marketsUnitNote{font-size:9px;line-height:1.4;color:var(--muted);padding-top:8px}
+.watchQuoteTicker{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin-top:12px;container-type:inline-size}
+.watchQuoteCard{min-width:0;padding:8px 1px;border:1px solid var(--border);border-radius:10px;text-align:center;background:linear-gradient(180deg,var(--metal-tint),var(--surface2))}
+.watchQuoteCard:nth-child(1){--metal-tint:rgba(245,184,46,.14)}
+.watchQuoteCard:nth-child(2){--metal-tint:rgba(205,210,218,.13)}
+.watchQuoteCard:nth-child(3){--metal-tint:rgba(98,185,255,.14)}
+.watchQuoteCard:nth-child(4){--metal-tint:rgba(120,201,168,.14)}
+.watchQuoteCard:nth-child(5){--metal-tint:rgba(230,129,82,.15)}
+.watchQuoteCard span,.watchQuoteCard strong{display:block;white-space:nowrap}
+.watchQuoteCard span{color:var(--muted);font-size:8px;font-size:clamp(7px,2.75cqw,10px);font-weight:700;text-transform:uppercase}
+.watchQuoteCard strong{margin-top:4px;color:var(--text);font-size:10px;font-size:clamp(8px,3.4cqw,14px);font-variant-numeric:tabular-nums;letter-spacing:-.15px}
+.watchQuoteUnits{margin-top:4px;color:var(--muted);font-size:10px}
 .marketsWatchIntro{margin-top:5px;line-height:1.45}.marketsWatchForm{display:grid;gap:8px;margin-top:12px}.marketsWatchForm select,.marketsWatchForm input{width:100%;box-sizing:border-box;border:1px solid var(--border);background:var(--surface3);color:var(--text);border-radius:11px;padding:12px;font-size:13px}.marketsWatchForm button{border:0;border-radius:11px;background:var(--button);color:var(--buttonText);padding:12px;font-weight:800}.marketsWatchList{display:flex;flex-direction:column;gap:9px;margin-top:9px}.marketsWatchItem{display:grid;grid-template-columns:36px 1fr 30px;gap:10px;align-items:center}.marketsWatchMeta{font-size:10px;color:var(--muted);margin-top:3px;line-height:1.4}.marketsWatchProgress{height:5px;background:var(--surface3);border-radius:999px;overflow:hidden;margin-top:7px}.marketsWatchProgress span{display:block;height:100%;background:#c88719;border-radius:999px}.marketsWatchRemove{border:0;background:transparent;color:var(--muted);font-size:21px;padding:4px}
 .marketsComingHero{position:relative;overflow:hidden;background:linear-gradient(145deg,var(--surface) 0%,var(--surface) 62%,rgba(200,135,25,.10) 100%);border:1px solid var(--border);border-radius:18px;padding:20px 16px;box-shadow:0 3px 14px var(--shadow)}
 .marketsComingBadge{display:inline-flex;align-items:center;border:1px solid rgba(200,135,25,.38);background:rgba(200,135,25,.10);color:#b26d00;border-radius:999px;padding:5px 9px;font-size:9px;font-weight:900;letter-spacing:.8px}
@@ -5806,25 +5825,25 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
   <div class="marketCards">
     <div class="marketCard gold" role="button" tabindex="0" onclick="openMarkets();setMarketsFocus('gold')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openMarkets();setMarketsFocus('gold')}">
       <div class="marketAccent"></div><div class="metalGlyph"><span class="metalBadge"><i></i><i></i><i></i></span></div>
-      <div class="marketIdentity"><b>GOLD</b><span>XAU</span></div>
+      <div class="marketIdentity"><b>GOLD</b><span>XAU · USD / oz</span></div>
       <div class="marketLive">LIVE</div>
       <strong id="goldSpot">—</strong><em id="goldMove">— today</em>
     </div>
     <div class="marketCard silver" role="button" tabindex="0" onclick="openMarkets();setMarketsFocus('silver')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openMarkets();setMarketsFocus('silver')}">
       <div class="marketAccent"></div><div class="metalGlyph"><span class="metalBadge"><i></i><i></i><i></i></span></div>
-      <div class="marketIdentity"><b>SILVER</b><span>XAG</span></div>
+      <div class="marketIdentity"><b>SILVER</b><span>XAG · USD / oz</span></div>
       <div class="marketLive">LIVE</div>
       <strong id="silverSpot">—</strong><em id="silverMove">— today</em>
     </div>
     <div class="marketCard platinum" role="button" tabindex="0" onclick="openMarkets();setMarketsFocus('platinum')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openMarkets();setMarketsFocus('platinum')}">
       <div class="marketAccent"></div><div class="metalGlyph"><span class="metalBadge"><i></i><i></i><i></i></span></div>
-      <div class="marketIdentity"><b>PLATINUM</b><span>XPT</span></div>
+      <div class="marketIdentity"><b>PLATINUM</b><span>XPT · USD / oz</span></div>
       <div class="marketLive">LIVE</div>
       <strong id="platinumSpot">—</strong><em id="platinumMove">— today</em>
     </div>
     <div class="marketCard palladium" role="button" tabindex="0" onclick="openMarkets();setMarketsFocus('palladium')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openMarkets();setMarketsFocus('palladium')}">
       <div class="marketAccent"></div><div class="metalGlyph"><span class="metalBadge"><i></i><i></i><i></i></span></div>
-      <div class="marketIdentity"><b>PALLADIUM</b><span>XPD</span></div>
+      <div class="marketIdentity"><b>PALLADIUM</b><span>XPD · USD / oz</span></div>
       <div class="marketLive">LIVE</div>
       <strong id="palladiumSpot">—</strong><em id="palladiumMove">— today</em>
     </div>
@@ -6070,6 +6089,10 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
           <div><strong id="milestoneProgressText">0 / 8</strong><span> achievements unlocked</span></div>
           <div class="milestoneProgressTrack"><div id="milestoneProgressFill"></div></div>
         </div>
+        <div id="milestoneNotificationInvite" class="notificationInvite" hidden>
+          <p>Get notified when you reach a portfolio milestone.</p>
+          <button type="button" class="settingsNotificationButton" onclick="enableFromNotificationInvite()">Enable notifications</button>
+        </div>
         <div class="milestoneGrid" id="milestoneGrid"></div>
       </div>
     </div></div>
@@ -6304,6 +6327,14 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
         <div class="marketsEyebrow">WATCHLIST</div>
         <h2>Price Targets</h2>
         <div class="marketsMuted marketsWatchIntro">Choose a metal and set the price you want Benza Bullion to track.</div>
+        <div id="watchQuoteTicker" class="watchQuoteTicker" role="group" aria-label="Current spot prices">
+          <div class="watchQuoteCard"><span>Gold</span><strong id="watchQuoteGold">—</strong></div>
+          <div class="watchQuoteCard"><span>Silver</span><strong id="watchQuoteSilver">—</strong></div>
+          <div class="watchQuoteCard"><span>Platinum</span><strong id="watchQuotePlatinum">—</strong></div>
+          <div class="watchQuoteCard"><span>Palladium</span><strong id="watchQuotePalladium">—</strong></div>
+          <div class="watchQuoteCard"><span>Copper</span><strong id="watchQuoteCopper">—</strong></div>
+        </div>
+        <div class="watchQuoteUnits">USD per troy oz · Copper per standard oz</div>
         <div class="marketsWatchForm">
           <select id="marketsWatchMetal">
             <option value="gold">Gold</option><option value="silver">Silver</option><option value="platinum">Platinum</option><option value="palladium">Palladium</option><option value="copper">Copper</option>
@@ -6321,6 +6352,10 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
         <div class="proFeaturePreviewHead"><strong>Unlimited Price Alerts</strong><span class="proMiniBadge">PRO</span></div>
         <p>Free accounts include up to 3 active targets. Pro removes the limit and is ready for advanced alert types as they are added.</p>
         <button type="button" onclick="openProUpgrade('alerts')">See Pro</button>
+      </div>
+      <div id="watchNotificationInvite" class="notificationInvite" hidden>
+        <p>Get notified when your price target is hit.</p>
+        <button type="button" class="settingsNotificationButton" onclick="enableFromNotificationInvite()">Enable notifications</button>
       </div>
       <div id="marketsWatchList" class="marketsWatchList"></div>
     </div>
@@ -9702,6 +9737,7 @@ function setAnalyticsTab(tab){
   const body=document.querySelector('#analyticsScreen .analyticsBody');
   if(body) body.scrollTop=0;
   if(tab==='pro') renderProAnalytics();
+  if(tab==='milestones'&&isBenzaNativeRuntime())void updateNotificationUI();
 }
 
 function clamp(n,min,max){return Math.max(min,Math.min(max,n))}
@@ -12795,7 +12831,7 @@ async function removeWatchItemFromSupabase(metal,direction){
 }
 function openMarkets(){hideMainOverlays();setActiveNav('markets');document.getElementById('marketsScreen')?.classList.add('show');setMarketsTab(activeMarketsTab);renderMarkets()}
 function closeMarkets(){if(guestBrowsing){openNews();return;}document.getElementById('marketsScreen')?.classList.remove('show');setActiveNav('portfolio')}
-function setMarketsTab(tab){if(tab==='watchlist'&&!requestAccountAccess('save watchlists and price alerts','watchlist'))return;activeMarketsTab=['market','watchlist','calculator','coming'].includes(tab)?tab:'market';const a=document.getElementById('marketsMarketPanel'),b=document.getElementById('marketsWatchPanel'),c=document.getElementById('marketsComingPanel'),d=document.getElementById('marketsCalculatorPanel');if(a)a.style.display=activeMarketsTab==='market'?'block':'none';if(b)b.style.display=activeMarketsTab==='watchlist'?'block':'none';if(c)c.style.display=activeMarketsTab==='coming'?'block':'none';if(d)d.style.display=activeMarketsTab==='calculator'?'block':'none';document.getElementById('marketsMarketTab')?.classList.toggle('active',activeMarketsTab==='market');document.getElementById('marketsWatchTab')?.classList.toggle('active',activeMarketsTab==='watchlist');document.getElementById('marketsCalculatorTab')?.classList.toggle('active',activeMarketsTab==='calculator');document.getElementById('marketsComingTab')?.classList.toggle('active',activeMarketsTab==='coming');if(activeMarketsTab==='calculator')updateBullionCalculator();renderMarkets()}
+function setMarketsTab(tab){if(tab==='watchlist'&&!requestAccountAccess('save watchlists and price alerts','watchlist'))return;activeMarketsTab=['market','watchlist','calculator','coming'].includes(tab)?tab:'market';const a=document.getElementById('marketsMarketPanel'),b=document.getElementById('marketsWatchPanel'),c=document.getElementById('marketsComingPanel'),d=document.getElementById('marketsCalculatorPanel');if(a)a.style.display=activeMarketsTab==='market'?'block':'none';if(b)b.style.display=activeMarketsTab==='watchlist'?'block':'none';if(c)c.style.display=activeMarketsTab==='coming'?'block':'none';if(d)d.style.display=activeMarketsTab==='calculator'?'block':'none';document.getElementById('marketsMarketTab')?.classList.toggle('active',activeMarketsTab==='market');document.getElementById('marketsWatchTab')?.classList.toggle('active',activeMarketsTab==='watchlist');document.getElementById('marketsCalculatorTab')?.classList.toggle('active',activeMarketsTab==='calculator');document.getElementById('marketsComingTab')?.classList.toggle('active',activeMarketsTab==='coming');if(activeMarketsTab==='calculator')updateBullionCalculator();renderMarkets();if(activeMarketsTab==='watchlist'&&isBenzaNativeRuntime())void updateNotificationUI()}
 function setMarketsFocus(metal){if(MARKETS_META[metal]){marketsFocusMetal=metal;renderMarkets()}}
 function marketsPrice(metal){const p=Number(livePrices?.[metal]||0);return Number.isFinite(p)&&p>0?p:0}
 function renderMarkets(){const selector=document.getElementById('marketsMetalSelector');if(!selector)return;selector.innerHTML=Object.keys(MARKETS_META).map(m=>`<button class="${m===marketsFocusMetal?'active':''}" onclick="setMarketsFocus('${m}')">${MARKETS_META[m].symbol.replace('X','')}</button>`).join('');const meta=MARKETS_META[marketsFocusMetal],price=marketsPrice(marketsFocusMetal);const n=document.getElementById('marketsFocusName'),t=document.getElementById('marketsFocusTicker'),p=document.getElementById('marketsFocusPrice');if(n)n.textContent=meta.name;if(t)t.textContent=meta.symbol+' • USD / '+meta.unit;if(p)p.textContent=price?money(price):'—';const g=marketsPrice('gold'),s=marketsPrice('silver');const ratio=document.getElementById('marketsGoldSilverRatio');if(ratio)ratio.textContent=g&&s?(g/s).toFixed(2):'—';const sorted=Object.keys(MARKETS_META).map(m=>({m,p:marketsPrice(m)})).filter(x=>x.p>0).sort((a,b)=>b.p-a.p);const hi=document.getElementById('marketsHighestSpot');if(hi)hi.textContent=sorted.length?MARKETS_META[sorted[0].m].name:'—';const list=document.getElementById('marketsPriceList');if(list)list.innerHTML=Object.keys(MARKETS_META).map(m=>{const a=MARKETS_META[m],v=marketsPrice(m);return `<div class="marketsPriceRow" onclick="setMarketsFocus('${m}')"><div class="holdingMetalEmblem ${m}" data-metal="${m}"><span class="metalBadge"><i></i><i></i><i></i></span></div><div><div class="marketsPriceName">${a.name}</div><div class="marketsPriceSymbol">${a.symbol}</div></div><div class="marketsPriceValue">${v?money(v):'—'}</div></div>`}).join('');renderMarketsWatchlist()}
@@ -12823,9 +12859,11 @@ async function saveMarketsWatchItem(){
     await syncWatchItemToSupabase({metal,target,direction});
     if(currentUser?.id!==userId)return;
     const old=benzaWatchlist.find(x=>x.metal===metal&&(x.direction||'higher')===direction);
+    const firstAlert=benzaWatchlist.length===0;
     if(old)old.target=target;else benzaWatchlist.push({metal,target,direction});
     persistBenzaWatchlist();
     const input=document.getElementById('marketsWatchTarget');if(input)input.value='';renderMarketsWatchlist();
+    if(isBenzaNativeRuntime())void refreshPriceNotificationInvite(userId,firstAlert);
   }catch(error){
     if(currentUser?.id===userId)alert(friendlyErrorMessage(error,'We could not save this price alert. Please try again.'));
   }finally{watchlistMutationBusy=false;setButtonBusy(button,false);}
@@ -12845,7 +12883,17 @@ async function removeMarketsWatchItem(metal,direction){
   }finally{watchlistMutationBusy=false;}
 }
 let watchlistMutationBusy=false;
+function renderWatchQuoteTicker(){
+  for(const [metal,{name}] of Object.entries(MARKETS_META)){
+    const quote=document.getElementById('watchQuote'+name);
+    if(!quote)continue;
+    const price=marketsPrice(metal);
+    quote.textContent=price?money(price):'—';
+  }
+}
 function renderMarketsWatchlist(){
+  renderWatchQuoteTicker();
+  renderNotificationInvites();
   const wrap=document.getElementById('marketsWatchList');
   const meter=document.getElementById('proAlertMeter');
   if(meter)meter.innerHTML=isProActive()?'<b>Pro:</b> unlimited active price alerts':`<b>Free:</b> ${Math.min(benzaWatchlist.length,3)} of 3 active price alerts used`;
@@ -12887,31 +12935,39 @@ function renderNotificationPreferences(){
     el.classList.toggle('on',on);el.setAttribute('aria-pressed',on?'true':'false');
   });
 }
+let notificationPreferenceLoad=0;
+let notificationPreferenceRevision=0;
+const notificationPreferenceRequests=new Set();
 async function loadNotificationPreferences(){
   renderNotificationPreferences();
   if(!supabaseClient||!currentUser)return;
   const userId=currentUser.id;
   const tz=detectedBenzaTimezone();
+  const load=++notificationPreferenceLoad;
+  const revision=notificationPreferenceRevision;
   const {data,error}=await supabaseClient.from('notification_preferences').select('*').eq('user_id',userId).maybeSingle();
-  if(currentUser?.id!==userId)return;
+  if(currentUser?.id!==userId||load!==notificationPreferenceLoad||revision!==notificationPreferenceRevision)return;
   if(error){
     if(String(error.code||'')!=='PGRST116')console.warn('Could not load notification preferences:',error.message||error);
     renderNotificationPreferences();return;
   }
   if(data){
-    benzaNotificationPrefs={...DEFAULT_NOTIFICATION_PREFS,...data,timezone:data.timezone||tz};
+    const prefs={...DEFAULT_NOTIFICATION_PREFS,...data,timezone:data.timezone||tz};
+    for(const key of Object.keys(NOTIFICATION_PREF_UI)){
+      if(notificationPreferenceRequests.has(userId+':'+key))prefs[key]=benzaNotificationPrefs[key];
+    }
+    benzaNotificationPrefs=prefs;
     if(!data.timezone||data.timezone!==tz){
       supabaseClient.from('notification_preferences').update({timezone:tz,updated_at:new Date().toISOString()}).eq('user_id',userId).then(()=>{});
     }
   }else{
-    benzaNotificationPrefs={...DEFAULT_NOTIFICATION_PREFS,timezone:tz};
-    const {error:insertError}=await supabaseClient.from('notification_preferences').insert({user_id:userId,...benzaNotificationPrefs});
-    if(currentUser?.id!==userId)return;
+    const defaults={...DEFAULT_NOTIFICATION_PREFS,timezone:tz};
+    const {error:insertError}=await supabaseClient.from('notification_preferences').upsert({user_id:userId,...defaults},{onConflict:'user_id',ignoreDuplicates:true});
+    if(currentUser?.id!==userId||load!==notificationPreferenceLoad||revision!==notificationPreferenceRevision)return;
     if(insertError)console.warn('Could not create notification preferences:',insertError.message||insertError);
   }
   renderNotificationPreferences();
 }
-const notificationPreferenceRequests=new Set();
 async function toggleNotificationPreference(key){
   if(!(key in NOTIFICATION_PREF_UI))return;
   const status=document.getElementById('notificationPrefsStatus');
@@ -12921,13 +12977,14 @@ async function toggleNotificationPreference(key){
   if(notificationPreferenceRequests.has(requestKey))return;
   const previous=!!benzaNotificationPrefs[key];
   notificationPreferenceRequests.add(requestKey);
+  notificationPreferenceRevision++;
   benzaNotificationPrefs[key]=!previous;renderNotificationPreferences();
   if(status)status.textContent='Saving…';
   try{
     // Save only this preference so concurrent toggles cannot overwrite one another.
-    const {error}=await supabaseClient.from('notification_preferences').update({
-      [key]:!previous,timezone:detectedBenzaTimezone(),updated_at:new Date().toISOString()
-    }).eq('user_id',userId).select('user_id').single();
+    const {error}=await supabaseClient.from('notification_preferences').upsert({
+      user_id:userId,[key]:!previous,timezone:detectedBenzaTimezone(),updated_at:new Date().toISOString()
+    },{onConflict:'user_id'}).select('user_id').single();
     if(error)throw error;
     if(currentUser?.id!==userId)return;
     if(status){status.textContent='Saved';setTimeout(()=>{if(currentUser?.id===userId&&status.textContent==='Saved')status.textContent=''},1400)}
@@ -12936,7 +12993,7 @@ async function toggleNotificationPreference(key){
     benzaNotificationPrefs[key]=previous;renderNotificationPreferences();
     if(status)status.textContent='Could not save this setting. Please try again.';
     console.warn('Notification preference save failed:',error);
-  }finally{notificationPreferenceRequests.delete(requestKey);}
+  }finally{notificationPreferenceRevision++;notificationPreferenceRequests.delete(requestKey);}
 }
 let benzaVapidPublicKey='';
 function urlBase64ToUint8Array(base64String){
@@ -13038,30 +13095,108 @@ async function removeNativeBenzaSubscriptions(){
     .delete().eq('user_id',userId).eq('endpoint',nativeBenzaEndpoint(state.token));
   if(error)throw error;
 }
+let notificationInviteStatus=null;
+let notificationInviteBusy=false;
+const presentedPriceNotificationInvites=new Set();
+function setNotificationInviteStatus(userId,state){
+  notificationInviteStatus={userId,state};
+  renderNotificationInvites();
+}
+function renderNotificationInvites(){
+  const state=notificationInviteStatus?.userId===currentUser?.id?notificationInviteStatus?.state:'';
+  const available=!!currentUser&&(state==='off'||state==='blocked');
+  for(const [id,visible] of [
+    ['watchNotificationInvite',available&&benzaWatchlist.length>0],
+    ['milestoneNotificationInvite',available]
+  ]){
+    const invite=document.getElementById(id);
+    if(invite)invite.hidden=!visible;
+  }
+  for(const id of ['watchNotificationInvite','milestoneNotificationInvite','priceNotificationInvite']){
+    const button=document.getElementById(id)?.querySelector('button');
+    if(button)button.textContent=state==='blocked'?'Open iPhone Settings':'Enable notifications';
+  }
+  const dialog=document.getElementById('priceNotificationInvite');
+  if(!available&&dialog?.open)dialog.close();
+}
+async function refreshPriceNotificationInvite(userId,firstAlert){
+  await updateNotificationUI();
+  if(!firstAlert||currentUser?.id!==userId||notificationInviteStatus?.userId!==userId||
+     !['off','blocked'].includes(notificationInviteStatus.state)||
+     activeMarketsTab!=='watchlist'||!document.getElementById('marketsScreen')?.classList.contains('show'))return;
+  const key='benzaPriceNotificationInvite:'+userId;
+  if(presentedPriceNotificationInvites.has(key))return;
+  try{if(localStorage.getItem(key))return;}catch(e){}
+  const dialog=document.getElementById('priceNotificationInvite');
+  if(!dialog||dialog.open||typeof dialog.showModal!=='function')return;
+  dialog.showModal();
+  presentedPriceNotificationInvites.add(key);
+  try{localStorage.setItem(key,'1');}catch(e){}
+}
+async function enableNativeNotifications(plugin){
+  const userId=currentUser?.id;
+  if(!userId)return;
+  const result=await plugin.enable();
+  if(currentUser?.id!==userId)return;
+  if(result?.permission!=='granted'||!result?.token){
+    await updateNotificationUI(result?.permission==='denied'?'Notifications were blocked. You can enable them in iPhone Settings.':'Notification permission was not granted.');
+    return;
+  }
+  await saveNativeBenzaSubscription(result.token);
+  if(currentUser?.id===userId)await updateNotificationUI('Notifications are enabled. Benza Bullion can alert you even when the app is closed.');
+}
+async function enableFromNotificationInvite(){
+  const plugin=nativeBenzaNotifications();
+  if(notificationInviteBusy||!currentUser||!plugin)return;
+  const userId=currentUser.id;
+  notificationInviteBusy=true;
+  document.getElementById('priceNotificationInvite')?.close();
+  try{
+    const state=await plugin.status();
+    if(currentUser?.id!==userId)return;
+    if(state?.permission==='denied'&&plugin.openSettings)await plugin.openSettings();
+    else await enableNativeNotifications(plugin);
+  }catch(error){
+    if(currentUser?.id===userId)alert('Could not set up notifications. Please try again.');
+    console.warn('Notification invitation failed:',error);
+  }finally{notificationInviteBusy=false;}
+}
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden&&currentUser&&isBenzaNativeRuntime())void updateNotificationUI();
+});
+let nativeNotificationStatusLoad=0;
 async function updateNotificationUI(message=''){
   const status=document.getElementById('notificationStatus'),btn=document.getElementById('notificationToggle'),test=document.getElementById('notificationTestButton'),note=document.getElementById('settingsNotificationNote');
   if(!status||!btn)return;
 
   if(isBenzaNativeRuntime()){
+    const load=++nativeNotificationStatusLoad;
+    const userId=currentUser?.id;
     if(note)note.textContent='Native iPhone alerts can notify you even when Benza Bullion is closed. Notification preferences are saved to your Benza Bullion account.';
-    if(!currentUser){status.textContent=message||'Log in to enable notifications.';btn.textContent='Enable';btn.style.display='';if(test)test.style.display='none';return}
+    if(!currentUser){setNotificationInviteStatus(userId,'');status.textContent=message||'Log in to enable notifications.';btn.textContent='Enable';btn.style.display='';if(test)test.style.display='none';return}
     const plugin=nativeBenzaNotifications();
-    if(!plugin){status.textContent='Native notification support is loading. Reopen this screen in a moment.';btn.style.display='none';if(test)test.style.display='none';return}
+    if(!plugin){setNotificationInviteStatus(userId,'');status.textContent='Native notification support is loading. Reopen this screen in a moment.';btn.style.display='none';if(test)test.style.display='none';return}
     try{
       const state=await plugin.status();
       const token=state?.token||'';
       const saved=token?await getSavedNativeBenzaSubscription(token):null;
+      if(load!==nativeNotificationStatusLoad||currentUser?.id!==userId)return;
       const enabled=state?.permission==='granted'&&!!token&&!!saved&&saved.enabled!==false;
       status.textContent=message||(state?.permission==='denied'
         ?'Notifications are blocked in iPhone Settings.'
-        :enabled?'Notifications are enabled on this iPhone.':'Notifications are off on this iPhone.');
-      btn.textContent=enabled?'Disable':'Enable';
+        :enabled?'Notifications are enabled on this iPhone.'
+        :state?.permission==='granted'&&token?'Tap Enable to reconnect notifications on this iPhone.'
+        :'Notifications are off on this iPhone.');
+      setNotificationInviteStatus(userId,enabled?'enabled':state?.permission==='denied'?'blocked':'off');
+      btn.textContent=enabled?'Disable':state?.permission==='denied'?'Open iPhone Settings':'Enable';
       btn.classList.toggle('off',enabled);
       btn.style.display='';
       if(test)test.style.display=enabled?'block':'none';
     }catch(e){
-      status.textContent=message||'Could not read iPhone notification status.';
-      btn.textContent='Enable';btn.style.display='';if(test)test.style.display='none';
+      if(load!==nativeNotificationStatusLoad||currentUser?.id!==userId)return;
+      setNotificationInviteStatus(userId,'');
+      status.textContent=message||'Could not check iPhone notification status. Reopen Settings to retry.';
+      btn.style.display='none';if(test)test.style.display='none';
     }
     return;
   }
@@ -13091,6 +13226,7 @@ async function toggleBenzaNotifications(){
       const plugin=nativeBenzaNotifications();
       if(!plugin)throw new Error('Native notification support is unavailable.');
       const state=await plugin.status();
+      if(state?.permission==='denied'&&plugin.openSettings){await plugin.openSettings();return;}
       const token=state?.token||'';
       const saved=token?await getSavedNativeBenzaSubscription(token):null;
       const enabled=state?.permission==='granted'&&!!token&&!!saved&&saved.enabled!==false;
@@ -13100,13 +13236,7 @@ async function toggleBenzaNotifications(){
         await updateNotificationUI('Notifications are off on this iPhone.');
         return;
       }
-      const result=await plugin.enable();
-      if(result?.permission!=='granted'||!result?.token){
-        await updateNotificationUI(result?.permission==='denied'?'Notifications were blocked. You can enable them in iPhone Settings.':'Notification permission was not granted.');
-        return;
-      }
-      await saveNativeBenzaSubscription(result.token);
-      await updateNotificationUI('Notifications are enabled. Benza Bullion can alert you even when the app is closed.');
+      await enableNativeNotifications(plugin);
     }catch(e){console.warn(e);await updateNotificationUI('Could not enable notifications: '+(e?.message||'Unknown error'))}
     return;
   }
@@ -13171,6 +13301,13 @@ loadBenzaWatchlist();
 </script>
 
 
+
+<dialog id="priceNotificationInvite" aria-labelledby="priceNotificationInviteTitle" aria-describedby="priceNotificationInviteCopy">
+  <h2 id="priceNotificationInviteTitle">Get notified when your target is hit</h2>
+  <p id="priceNotificationInviteCopy">Your price alert is saved. Enable notifications to get it on your iPhone, even when Benza Bullion is closed.</p>
+  <button type="button" class="settingsNotificationButton" onclick="enableFromNotificationInvite()">Enable notifications</button>
+  <button type="button" class="settingsNotificationButton off" onclick="this.closest('dialog').close()">Not now</button>
+</dialog>
 
 <div id="saleModal" class="saleModal" role="dialog" aria-modal="true" aria-labelledby="saleTitle" onclick="if(event.target===this)closeSaleModal()">
   <div class="saleSheet">

@@ -23,10 +23,10 @@ test('a profile response cannot replace the next signed-in account',async()=>{
 });
 test('notification failures roll back and concurrent changes save only their own column',async()=>{
  const c=context();const updates=[];
- c.supabaseClient={from:()=>({update:payload=>{updates.push(payload);return {eq:()=>({select:()=>({single:async()=>({error:Error('Offline')})})})}}})};
- load(c,['toggleNotificationPreference'],'const notificationPreferenceRequests=new Set();');
+ c.supabaseClient={from:()=>({upsert:payload=>{updates.push(payload);return {select:()=>({single:async()=>({error:Error('Offline')})})}}})};
+ load(c,['toggleNotificationPreference'],'let notificationPreferenceRevision=0;const notificationPreferenceRequests=new Set();');
  await c.toggleNotificationPreference('price_targets');assert.equal(c.benzaNotificationPrefs.price_targets,false);assert.match(c.els.notificationPrefsStatus.textContent,/try again/);
- let reject;c.supabaseClient={from:()=>({update:payload=>{updates.push(payload);return {eq:()=>({select:()=>({single:()=>new Promise((_,r)=>reject=r)})})}}})};
+ let reject;c.supabaseClient={from:()=>({upsert:payload=>{updates.push(payload);return {select:()=>({single:()=>new Promise((_,r)=>reject=r)})}}})};
  const request=c.toggleNotificationPreference('daily_summary');await c.toggleNotificationPreference('daily_summary');assert.equal(updates.length,2);c.currentUser={id:'account-b'};c.benzaNotificationPrefs={daily_summary:true};reject(Error('Offline'));await request;assert.equal(c.benzaNotificationPrefs.daily_summary,true);
  assert.equal('price_targets' in updates[1],false);assert.equal(updates[1].daily_summary,true);
 });

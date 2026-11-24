@@ -75,6 +75,7 @@ final class BenzaNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "enable", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "disable", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openSettings", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "test", returnType: CAPPluginReturnPromise)
     ]
 
@@ -136,6 +137,19 @@ final class BenzaNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.reject("Apple did not return a notification device token. Please try again.")
             } catch {
                 call.reject(error.localizedDescription)
+            }
+        }
+    }
+
+    @objc func openSettings(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard let url = URL(string: UIApplication.openNotificationSettingsURLString) else {
+                call.reject("Could not open notification settings.")
+                return
+            }
+            UIApplication.shared.open(url) { opened in
+                if opened { call.resolve() }
+                else { call.reject("Could not open notification settings.") }
             }
         }
     }
