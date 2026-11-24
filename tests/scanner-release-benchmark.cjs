@@ -47,6 +47,21 @@ add('gold-maple-fraction','CANADA 9999 FINE GOLD 1/10 OZ',{product:'Canadian Gol
 add('britannia','BRITANNIA FINE SILVER 1 OZ',{product:'British Silver Britannia',weight:1});
 add('philharmonic','WIENER PHILHARMONIKER FEINSILBER 1 OZ',{product:'Austrian Silver Philharmonic',weight:1});
 add('krugerrand','KRUGERRAND FINE GOLD 1 OZ',{product:'South African Gold Krugerrand',weight:1});
+// Stamped metric weights, unfamiliar refiners and mixed face-value inscriptions.
+add('metric-gold-bar','EXAMPLE REFINER 5 G FINE GOLD BAR .9999',{metal:'gold',product:'Gold Bar',weight:5/31.1034768});
+add('metric-silver-kilo','EXAMPLE REFINER 1 KG FINE SILVER BAR 999',{metal:'silver',product:'Silver Bar',weight:1000/31.1034768});
+add('metric-platinum-bar','10 GRAMS FINE PLATINUM BAR .9995',{metal:'platinum',product:'Platinum Bar',weight:10/31.1034768});
+add('metric-palladium-bar','5 G FINE PALLADIUM BAR .9995',{metal:'palladium',product:'Palladium Bar',weight:5/31.1034768});
+add('metric-copper-bar','100 G FINE COPPER BAR',{metal:'copper',product:'Copper Bullion Bar',weight:100/28.349523125});
+add('french-silver-bar','LINGOT ARGENT PUR 100 G',{metal:'silver',product:'Silver Bar',weight:100/31.1034768});
+add('spanish-gold-bar','LINGOTE ORO PURO 10 G',{metal:'gold',product:'Gold Bar',weight:10/31.1034768});
+add('german-silver-bar','FEINSILBER SILBERBARREN 250 G',{metal:'silver',product:'Silver Bar',weight:250/31.1034768});
+add('mint-name-on-bar','MONNAIE ROYALE CANADIENNE LINGOT ARGENT PUR 100 G',{metal:'silver',product:'Silver Bar',weight:100/31.1034768});
+add('spanish-generic-coin','MONEDA PLATA PURA 1 ONZA 20 PESOS 2024',{metal:'silver',product:'Silver Bullion Coin',weight:1,year:2024});
+add('generic-platinum-coin','FINE PLATINUM COIN 1/4 TROY OZ 10 DOLLARS 2023',{metal:'platinum',product:'Platinum Bullion Coin',weight:.25,year:2023});
+add('ambiguous-shape','BAR COIN FINE SILVER 10 G',{metal:'silver',product:'',weight:10/31.1034768});
+add('bar-with-serial-and-fineness','FINE GOLD BAR .9999 SERIAL 2039 20 G',{metal:'gold',product:'Gold Bar',weight:20/31.1034768});
+add('face-value-only','FINE SILVER COIN 10 DOLLARS 2024',{metal:'silver',product:'Silver Bullion Coin',weight:0,year:2024});
 add('blank','',{product:'',metal:'',weight:0,usable:false});
 add('mixed-metal','FINE GOLD FINE SILVER 1 OZ',{metal:'',usable:false});
 const map=vm.runInContext('PRODUCT_MAP',context),catalog=vm.runInContext('SMART_CAMERA_CATALOG',context);

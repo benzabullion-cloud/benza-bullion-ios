@@ -5830,9 +5830,9 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
     </div>
     <div class="marketCard copper" role="button" tabindex="0" onclick="openMarkets();setMarketsFocus('copper')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openMarkets();setMarketsFocus('copper')}">
       <div class="marketAccent"></div><div class="metalGlyph"><span class="metalBadge"><i></i><i></i><i></i></span></div>
-      <div class="marketIdentity"><b>COPPER</b><span>HG</span></div>
+      <div class="marketIdentity"><b>COPPER</b><span>HG · USD / oz</span></div>
       <div class="marketLive">LIVE</div>
-      <strong id="copperSpot">—</strong><em id="copperMove">USD / lb</em>
+      <strong id="copperSpot">—</strong><em id="copperMove">— today</em>
     </div>
   </div>
   <div class="marketStatus">
@@ -5941,7 +5941,7 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
           <svg viewBox="0 0 24 24"><path d="M4 8.5h3l1.4-2h7.2l1.4 2h3v10H4Z"/><circle cx="12" cy="13.5" r="3.4"/></svg>
         </div>
         <h2 class="smartCameraTitle">Scan your bullion</h2>
-        <p class="smartCameraCopy">An assistant for identifying bullion markings. Scan both sides, then review or complete the details before adding.</p>
+        <p class="smartCameraCopy">Scan a coin or bar. For more detail, photograph the other side, then review the markings before adding.</p>
         <p class="smartCameraCopy smartCameraBetaNote">Bullion Scan Assist is in beta and may misread some details. Please review each result before saving. Found a mistake? Use “Report a scan issue” to help us improve.</p>
       </div>
       <div id="smartCameraAnalysis" class="smartCameraAnalysis" aria-live="polite">
@@ -5957,6 +5957,10 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
           <div><span>Purity</span><strong id="smartScanPurity"></strong></div>
           <div><span>Mint / refiner</span><strong id="smartScanMint"></strong></div>
         </div>
+        <details id="smartScanMarkings" class="smartCameraFine" hidden>
+          <summary>Markings read from your photos</summary>
+          <p id="smartScanMarkingsText"></p>
+        </details>
         <div class="smartAnalysisActions">
           <button id="smartScanEditButton" aria-controls="smartScanEditor" aria-expanded="false" class="smartAnalysisAgain" type="button" data-scan-control onclick="openSmartScanEditor()">Quick edit details</button>
         </div>
@@ -7107,7 +7111,15 @@ function smartCameraHistoricalSilverSpec(text,metal){
 function smartCameraProductGuess(text,metal){
   const match=smartCameraCatalogMatch(text,metal);
   if(match)return match.item.product;
-  const kind=/\bbar\b/.test(text)?'bar':/\bround\b/.test(text)?'round':/\bcoin\b/.test(text)?'coin':'';
+  // Explicit shape words support unfamiliar pieces without assigning a mint or series.
+  const shapeText=text.replace(/\b(?:casa de moneda|monnaie royale canadienne)\b/g,'');
+  const kinds=[
+    ['bar',/\b(?:bar|lingot|lingote|barren|(?:gold|silber|platin)barren)\b/],
+    ['round',/\bround\b/],
+    ['coin',/\b(?:coin|monnaie|moneda|munze)\b/]
+  ].filter(([,pattern])=>pattern.test(shapeText));
+  if(kinds.length!==1)return '';
+  const [kind]=kinds[0];
   if(!kind)return '';
   const name=kind==='coin'
     ? METAL_NAMES[metal]+' Bullion Coin'
@@ -7682,12 +7694,13 @@ function canUseSmartCameraSuggestion(suggestion){
 }
 function canCorrectSmartCameraSuggestion(suggestion){
   // Warnings block automatic handoff, not the user's correction form.
-  return !!(suggestion&&Object.hasOwn(PRODUCT_MAP,suggestion.metal)&&
-    (!suggestion.product||(PRODUCT_MAP[suggestion.metal]||[]).includes(suggestion.product))&&
-    Array.isArray(suggestion.warnings));
+  if(!suggestion||!Array.isArray(suggestion.warnings))return false;
+  if(!suggestion.metal)return !!(suggestion.year||suggestion.mint||suggestion.purity);
+  return Object.hasOwn(PRODUCT_MAP,suggestion.metal)&&
+    (!suggestion.product||PRODUCT_MAP[suggestion.metal].includes(suggestion.product));
 }
 function canReviewSmartCameraSuggestion(suggestion){
-  return canCorrectSmartCameraSuggestion(suggestion)&&suggestion.warnings.every(w=>/weight/i.test(w));
+  return canCorrectSmartCameraSuggestion(suggestion)&&!!suggestion.metal&&suggestion.warnings.every(w=>/weight/i.test(w));
 }
 function closeSmartScanFeedback(){
   document.getElementById('smartScanFeedback').hidden=true;
@@ -7734,7 +7747,7 @@ function openSmartScanEditor(){
   const s=pendingSmartCameraSuggestion;
   document.getElementById('smartEditMetal').value=Object.hasOwn(PRODUCT_MAP,s.metal)?s.metal:'';
   updateSmartScanEditorProducts(s.product);
-  document.getElementById('smartEditWeight').value=s.weight>0?s.weight:'';
+  document.getElementById('smartEditWeight').value=s.metal&&s.weight>0&&!s.warnings.some(w=>/weight/i.test(w))?s.weight:'';
   document.getElementById('smartEditYear').value=s.year||'';
   document.getElementById('smartEditPurity').value=s.purity||'';
   document.getElementById('smartEditMint').value=s.mint||'';
@@ -7785,7 +7798,7 @@ function renderSmartCameraAnalysis(suggestion){
   document.getElementById('smartAnalysisSub').textContent=suggestion.userReviewed?'You confirmed these details. Review once more, then continue to your holding.':ready
     ? (smartCameraAwaitingReverse?'Review these details or add the opposite side to complete missing information.':'Review the details below, then continue to your holding.')
     : smartCameraAwaitingReverse
-      ? 'First photo received. Photograph or choose a photo of the opposite side of the same item.'
+      ? 'First photo received. '+smartCameraFailureReason(suggestion)+' You can add a photo of the opposite side of the same item.'
       : smartCameraFailureReason(suggestion);
   document.getElementById('smartScanProduct').textContent=suggestion.product||'Not identified';
   document.getElementById('smartScanMetal').textContent=METAL_NAMES[suggestion.metal]||'Not identified';
@@ -7794,6 +7807,13 @@ function renderSmartCameraAnalysis(suggestion){
   document.getElementById('smartScanYear').textContent=suggestion.year||'Not identified';
   document.getElementById('smartScanPurity').textContent=suggestion.purity||'Not identified';
   document.getElementById('smartScanMint').textContent=suggestion.mint||'Not identified';
+  const markings=document.getElementById('smartScanMarkings');
+  if(markings){
+    const read=String((suggestion.scanEvidence||suggestion).raw||'').trim().slice(0,600);
+    markings.hidden=!read;
+    markings.open=false;
+    document.getElementById('smartScanMarkingsText').textContent=read;
+  }
   const use=document.getElementById('smartAnalysisUseButton');
   if(use){
     const correctable=canCorrectSmartCameraSuggestion(suggestion);
@@ -11218,11 +11238,9 @@ async function performMarketPriceRefresh(){
 
       livePrices[m]=normalized;
 
-      // Copper portfolio math is stored per avoirdupois ounce,
-      // while the ticker continues showing the HG quote per pound.
-      const displayPrice=m==='copper'?normalized*16:normalized;
+      // The feed already returns copper in USD per avoirdupois ounce.
       const el=document.getElementById(m+'Spot');
-      if(el)el.textContent=money(displayPrice);
+      if(el)el.textContent=money(normalized);
 
       renderMetalDayChange(m,data?.day_change_pct?.[m]);
       successCount++;

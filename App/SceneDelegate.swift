@@ -373,7 +373,10 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
 
                 let picker = UIImagePickerController()
                 picker.sourceType = source
-                if source == .camera { picker.cameraCaptureMode = .photo }
+                if source == .camera {
+                    picker.cameraCaptureMode = .photo
+                    picker.cameraOverlayView = self.makeCaptureGuide(in: presenter.view.bounds)
+                }
                 picker.allowsEditing = false
                 picker.delegate = self
                 self.activePicker = picker
@@ -381,6 +384,37 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
                 presenter.present(picker, animated: true)
             }
         }
+    }
+
+    private func makeCaptureGuide(in bounds: CGRect) -> UIView {
+        let overlay = UIView(frame: bounds)
+        overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        overlay.isUserInteractionEnabled = false
+
+        let hint = UILabel()
+        hint.translatesAutoresizingMaskIntoConstraints = false
+        hint.text = "Fit the whole coin or bar in the frame. Tap the markings to focus, then tilt slightly if there’s glare."
+        hint.textColor = .white
+        hint.backgroundColor = UIColor.black.withAlphaComponent(0.78)
+        hint.layer.cornerRadius = 12
+        hint.clipsToBounds = true
+        hint.font = .preferredFont(forTextStyle: .footnote)
+        hint.adjustsFontForContentSizeCategory = true
+        hint.textAlignment = .center
+        hint.numberOfLines = 0
+        overlay.addSubview(hint)
+
+        let guide = overlay.safeAreaLayoutGuide
+        let preferredWidth = hint.widthAnchor.constraint(equalTo: guide.widthAnchor, constant: -48)
+        preferredWidth.priority = .defaultHigh
+        NSLayoutConstraint.activate([
+            hint.topAnchor.constraint(equalTo: guide.topAnchor, constant: 56),
+            hint.centerXAnchor.constraint(equalTo: guide.centerXAnchor),
+            hint.widthAnchor.constraint(lessThanOrEqualTo: guide.widthAnchor, constant: -48),
+            hint.widthAnchor.constraint(lessThanOrEqualToConstant: 340),
+            preferredWidth
+        ])
+        return overlay
     }
 
     @objc func refine(_ call: CAPPluginCall) {
@@ -425,6 +459,32 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
         dismissPicker(picker) {
             self.recognizeText(in: image, call: call, generation: generation)
         }
+    }
+
+    private func straightenedRectangle(in image: CIImage, context: CIContext) -> CGImage? {
+        let request = VNDetectRectanglesRequest()
+        request.maximumObservations = 1
+        request.minimumConfidence = 0.75
+        request.minimumAspectRatio = 0.25
+        request.minimumSize = 0.25
+        guard (try? VNImageRequestHandler(ciImage: image, options: [:]).perform([request])) != nil,
+              let rectangle = request.results?.first else { return nil }
+
+        let extent = image.extent
+        func pixel(_ point: CGPoint) -> CIVector {
+            CIVector(x: extent.minX + point.x * extent.width,
+                     y: extent.minY + point.y * extent.height)
+        }
+        let corrected = image.applyingFilter("CIPerspectiveCorrection", parameters: [
+            "inputTopLeft": pixel(rectangle.topLeft),
+            "inputTopRight": pixel(rectangle.topRight),
+            "inputBottomLeft": pixel(rectangle.bottomLeft),
+            "inputBottomRight": pixel(rectangle.bottomRight)
+        ])
+        let bounds = corrected.extent
+        guard !bounds.isEmpty, bounds.width.isFinite, bounds.height.isFinite,
+              bounds.width <= extent.width * 2, bounds.height <= extent.height * 2 else { return nil }
+        return context.createCGImage(corrected, from: bounds)
     }
 
     // Multiple bounded OCR passes recover rotated rim inscriptions and small dates.
@@ -506,12 +566,20 @@ final class BenzaSmartCameraPlugin: CAPPlugin, CAPBridgedPlugin, UIImagePickerCo
             appendPasses(rect: left, orientations: [.right])
             appendPasses(rect: right, orientations: [.left])
             passes.append(contentsOf: [(cgImage, .right, true), (cgImage, .left, true), (cgImage, .down, true)])
+            // Leave the established passes and their order intact. An optional
+            // rectangle crop runs only after those readings, within the same deadline.
             var found: [String: (String, Float)] = [:]
             var completed = 0
             var passReadings: [[String: Any]] = []
             var lastError: Error?
-            for (passIndex, pass) in passes.enumerated() {
-                let (photo, orientation, correction) = pass
+            for passIndex in 0..<(passes.count + (fast ? 0 : 2)) {
+                if passIndex >= passes.count {
+                    guard self.isCurrent(generation), Date().timeIntervalSince(started) < 12,
+                          let bar = self.straightenedRectangle(in: input, context: context) else { break }
+                    passes.append((bar, .up, false))
+                    passes.append((bar, .down, false))
+                }
+                let (photo, orientation, correction) = passes[passIndex]
                 if !self.isCurrent(generation) || (fast && completed >= 4) || (completed >= 4 && Date().timeIntervalSince(started) > 12) { break }
                 autoreleasepool {
                     let request = VNRecognizeTextRequest()

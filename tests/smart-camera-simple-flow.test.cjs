@@ -151,3 +151,22 @@ test('Reviewed scan feedback reports the original reading rather than replacing 
  assert.match(get('smartFeedbackReport').value,/Scan product: American Silver Eagle/);
  assert.match(get('smartFeedbackReport').value,/Correct product: Canadian Silver Maple Leaf/);
 });
+
+test('Unfamiliar bar retains stamped fields without needing a catalog identity',()=>{
+ const result=scan('EXAMPLE REFINERY 10 TROY OZ .999 FINE SILVER');
+ context.renderSmartCameraAnalysis(result);
+ assert.equal(get('smartScanMarkings').hidden,false);
+ assert.match(get('smartScanMarkingsText').textContent,/10 TROY OZ/);
+ context.useSmartCameraAnalysis();
+ assert.equal(get('weight').value,10);
+ assert.match(get('holdingPurity').value,/\.999 silver/);
+ assert.equal(get('product').selectedIndex,-1);
+});
+test('Date-only scan can be corrected without guessing the metal or weight',()=>{
+ context.renderSmartCameraAnalysis(scan('2024'));
+ context.useSmartCameraAnalysis();
+ assert.equal(get('smartScanEditor').hidden,false);
+ assert.equal(get('smartEditYear').value,2024);
+ assert.equal(get('smartEditMetal').value,'');
+ assert.equal(get('smartEditWeight').value,'');
+});
