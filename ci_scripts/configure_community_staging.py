@@ -35,6 +35,24 @@ def configure(source: str, url: str, key: str) -> str:
     if count != 1:
         raise ValueError("Expected the Explore screen title in the app shell.")
 
+    preview_changes = {
+        "Your metals. Your stack. All in one place.": (
+            "Community Preview uses a separate account. Create a test account "
+            "with email to get started."
+        ),
+        "const plugin=isBenzaNativeRuntime()?window.Capacitor?.Plugins?.BenzaSocialAuth:null;":
+            "const plugin=null; // Social providers are not configured on staging.",
+        "return window.Capacitor?.isNativePlatform?.()?window.Capacitor?.Plugins?.BenzaSavedLogin:null;":
+            "return null; // Do not read or modify the live app's saved password.",
+        "'Need an account? Create one'": "'New to this preview? Create a test account'",
+        "'benzaRememberedEmail'": "'benzaPreviewRememberedEmail'",
+        "'benzaRecentEmails'": "'benzaPreviewRecentEmails'",
+    }
+    for original, replacement in preview_changes.items():
+        if original not in source:
+            raise ValueError("Expected a matching Community sign-in control in the app shell.")
+        source = source.replace(original, replacement)
+
     return source
 
 
