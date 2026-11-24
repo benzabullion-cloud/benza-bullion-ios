@@ -27,6 +27,14 @@ def configure(source: str, url: str, key: str) -> str:
     source, count = re.subn(r"const BENZA_COMMUNITY_PREVIEW=false;", "const BENZA_COMMUNITY_PREVIEW=true;", source)
     if count != 1:
         raise ValueError("Expected the Community preview flag in the app shell.")
+    source, count = re.subn(
+        r"<h1>Explore</h1>",
+        "<h1>Explore <small class='communityBadge'>Preview</small></h1>",
+        source,
+    )
+    if count != 1:
+        raise ValueError("Expected the Explore screen title in the app shell.")
+
     return source
 
 
