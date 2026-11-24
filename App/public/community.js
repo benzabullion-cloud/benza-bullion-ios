@@ -359,9 +359,21 @@ function composeBullionPost() {
   caption.placeholder = 'What makes this piece interesting?';
   caption.maxLength = 280; caption.minLength = 3; caption.required = true;
   const fields = hasProfile ? [] : [communityFormField('Public display name', name)];
-  fields.push(communityFormField('Bullion photo', photo), communityFormField('Metal', metal),
-    communityFormField('Item type', type), communityFormField('Caption', caption),
-    communityElement('p', 'communityBadge', 'Share bullion photos and stories about the piece. Submissions are reviewed. Leave out sales offers, personal details, and storage locations.'));
+  const picker = communityElement('label', 'communityPhotoPicker');
+  const pickerTitle = communityElement('strong', '', 'Choose a bullion photo');
+  const pickerDetail = communityElement('span', '', 'Up to 25 MB');
+  photo.setAttribute('aria-label', 'Choose a bullion photo');
+  photo.onchange = () => {
+    const file = photo.files[0];
+    pickerTitle.textContent = file ? 'Change photo' : 'Choose a bullion photo';
+    pickerDetail.textContent = file ? file.name : 'Up to 25 MB';
+    photo.setCustomValidity(file && file.size > 25 * 1024 * 1024 ? 'Choose a photo under 25 MB.' : '');
+  };
+  picker.append(photo, pickerTitle, pickerDetail);
+  const details = communityElement('div', 'communityPieceDetails');
+  details.append(communityFormField('Metal', metal), communityFormField('Item type', type));
+  fields.push(picker, details, communityFormField('Caption', caption),
+    communityElement('p', 'communitySubmissionNote', 'A moderator reviews each photo. Leave out sales offers, personal details, and storage locations.'));
   openCommunityDialog('Share a bullion photo', fields, 'Submit for review', async () => {
     const image = await prepareBullionPhoto(photo.files[0]);
     if (currentUser?.id !== userId) throw new Error('Account changed.');

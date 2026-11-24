@@ -45,3 +45,26 @@
 .communityProfileStats div{display:flex;flex-direction:column-reverse;justify-content:flex-end;gap:2px;min-width:0}
 .communityProfileStats dt{color:var(--muted);font-size:11px;line-height:1.25;overflow-wrap:anywhere}
 .communityProfileStats dd{margin:0;color:var(--text);font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
+
+/* Community photo composer */
+.communityDialog:has(.communityPhotoPicker){
+  padding:clamp(16px,5vw,24px);border-radius:22px;max-height:85dvh;overflow:auto;
+  box-shadow:0 18px 60px #0005
+}
+.communityDialog:has(.communityPhotoPicker) #communityFormFields{display:grid;gap:14px;margin:16px 0}
+.communityDialog:has(.communityPhotoPicker) label{margin:0;gap:6px}
+.communityDialog label.communityPhotoPicker{
+  position:relative;padding:16px;border:1px dashed var(--gold);border-radius:14px;
+  background:var(--surface2);text-align:center;cursor:pointer
+}
+.communityPhotoPicker strong{color:var(--text);font-size:16px}
+.communityPhotoPicker span,.communitySubmissionNote{color:var(--muted);font-size:13px;font-weight:400;overflow-wrap:anywhere}
+.communityDialog .communityPhotoPicker input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.communityPhotoPicker:focus-within{outline:2px solid var(--gold);outline-offset:2px}
+.communityPieceDetails{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(125px,100%),1fr));gap:10px}
+.communityDialog:has(.communityPhotoPicker) :is(select,textarea,input:not([type=file])){
+  min-height:44px;padding:10px;border-radius:12px;font-size:16px;font-weight:400
+}
+.communitySubmissionNote{line-height:1.45;margin:0}
+.communityDialog:has(.communityPhotoPicker) .communityDialogActions{display:grid;grid-template-columns:1fr 2fr}
+.communityDialog:has(.communityPhotoPicker) .communityDialogActions button{min-height:44px}
