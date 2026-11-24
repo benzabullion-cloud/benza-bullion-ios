@@ -68,3 +68,5 @@
 .communitySubmissionNote{line-height:1.45;margin:0}
 .communityDialog:has(.communityPhotoPicker) .communityDialogActions{display:grid;grid-template-columns:1fr 2fr}
 .communityDialog:has(.communityPhotoPicker) .communityDialogActions button{min-height:44px}
+
+.communityPieceDetails[hidden]{display:none}

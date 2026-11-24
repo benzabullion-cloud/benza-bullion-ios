@@ -125,6 +125,7 @@ async function loadBullionGallery(append = false) {
     const {data: results} = await communityData(query.order(dateColumn, {ascending: view === 'review'})
       .order('id').range(offset, offset + communityPageSize));
     const posts = results.slice(0, communityPageSize);
+    const photoPosts = posts.filter(post => post.item_type !== 'Discussion');
     const authors = [...new Set(posts.map(post => post.author_id))];
     if (author && !authors.includes(author)) authors.push(author);
     const [likeRows, followRows, photos, profileCard] = await Promise.all([
@@ -132,7 +133,7 @@ async function loadBullionGallery(append = false) {
         .eq('user_id', userId).in('post_id', posts.map(post => post.id))) : {data:[]},
       userId && authors.length ? communityData(supabaseClient.from('community_follows').select('followed_id')
         .eq('follower_id', userId).in('followed_id', authors)) : {data:[]},
-      posts.length ? supabaseClient.storage.from('bullion-community').createSignedUrls(posts.map(communityPhotoPath), 120) : {data:[]},
+      photoPosts.length ? supabaseClient.storage.from('bullion-community').createSignedUrls(photoPosts.map(communityPhotoPath), 120) : {data:[]},
       !append && (view === 'profile' || view === 'mine')
         ? getBullionProfile(view === 'mine' ? userId : author, view === 'mine')
         : null
@@ -147,11 +148,11 @@ async function loadBullionGallery(append = false) {
       feed.append(renderBullionPost(post, signed.get(communityPhotoPath(post)), liked, followed, reports));
     }
     communityStatus(posts.length ? '' : {
-      discover:'No approved photos yet. Post a photo from your collection.',
-      mine:'You haven’t submitted a photo yet.',
-      following:'No approved photos from collectors you follow yet.',
+      discover:'No published posts yet. Start a bullion discussion or share a photo.',
+      mine:'You haven’t submitted a post yet.',
+      following:'No approved posts from collectors you follow yet.',
       review:'The review queue is clear.',
-      profile:'No approved photos from this collector.'
+      profile:'No approved posts from this collector.'
     }[view]);
     bullionCommunity.page = offset / communityPageSize + 1;
     more.hidden = results.length <= communityPageSize;
@@ -212,7 +213,7 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
     photo.alt = post.metal + ' ' + post.item_type.toLowerCase() + ' shared by ' + name;
     photo.referrerPolicy = 'no-referrer';
     article.append(photo);
-  }else if(post.status==='pending'||post.status==='approved'){
+  } else if (post.item_type !== 'Discussion' && (post.status === 'pending' || post.status === 'approved')) {
     article.append(communityElement('p', 'communityPhotoStatus', 'Photo unavailable'));
   }
   const body = communityElement('div', 'communityPostBody');
@@ -227,7 +228,7 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
     const heart = communityButton((selected ? '♥ ' : '♡ ') + count,
       () => updateBullionReaction('like', post, selected, heart));
     heart.setAttribute('aria-pressed', selected);
-    heart.setAttribute('aria-label', selected ? 'Unlike photo' : 'Like photo');
+    heart.setAttribute('aria-label', selected ? 'Unlike post' : 'Like post');
     actions.append(heart);
     if (post.author_id !== currentUser?.id) {
       const follows = followed.has(post.author_id);
@@ -245,7 +246,7 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
   if (bullionCommunity.view === 'review' && bullionCommunity.moderator) {
     if (post.status === 'pending') {
       const approve = communityButton('Approve', () => moderateBullionPost(post, 'approved'), 'communityPrimary');
-      approve.disabled = !photoUrl;
+      approve.disabled = post.item_type !== 'Discussion' && !photoUrl;
       actions.append(approve, communityButton('Decline', () => moderateBullionPost(post, 'declined')));
     }
     const reasons = reports.filter(report => report.post_id === post.id).map(report => report.reason);
@@ -344,7 +345,7 @@ async function prepareBullionPhoto(file) {
 }
 
 function composeBullionPost() {
-  if (!communitySignIn('post a photo')) return;
+  if (!communitySignIn('post in Community')) return;
   const userId = currentUser.id;
   const hasProfile = bullionCommunity.account === userId && !!bullionCommunity.profile;
   const name = communityElement('input');
@@ -352,30 +353,32 @@ function composeBullionPost() {
   name.minLength = 2;
   name.required = !hasProfile;
   const photo = communityElement('input');
-  photo.type = 'file'; photo.accept = 'image/*'; photo.required = true;
+  photo.type = 'file'; photo.accept = 'image/*'; photo.required = false;
   const metal = communitySelect(['Gold','Silver','Platinum','Palladium','Copper']);
   const type = communitySelect(['Coin','Round','Bar','Display']);
   const caption = communityElement('textarea');
-  caption.placeholder = 'What makes this piece interesting?';
+  caption.placeholder = 'What would you like to share about bullion?';
   caption.maxLength = 280; caption.minLength = 3; caption.required = true;
   const fields = hasProfile ? [] : [communityFormField('Public display name', name)];
   const picker = communityElement('label', 'communityPhotoPicker');
-  const pickerTitle = communityElement('strong', '', 'Choose a bullion photo');
+  const pickerTitle = communityElement('strong', '', 'Add a photo (optional)');
   const pickerDetail = communityElement('span', '', 'Up to 25 MB');
-  photo.setAttribute('aria-label', 'Choose a bullion photo');
+  photo.setAttribute('aria-label', 'Add a photo (optional)');
   photo.onchange = () => {
     const file = photo.files[0];
-    pickerTitle.textContent = file ? 'Change photo' : 'Choose a bullion photo';
+    details.hidden = !file;
+    pickerTitle.textContent = file ? 'Change photo' : 'Add a photo (optional)';
     pickerDetail.textContent = file ? file.name : 'Up to 25 MB';
     photo.setCustomValidity(file && file.size > 25 * 1024 * 1024 ? 'Choose a photo under 25 MB.' : '');
   };
   picker.append(photo, pickerTitle, pickerDetail);
   const details = communityElement('div', 'communityPieceDetails');
+  details.hidden = true;
   details.append(communityFormField('Metal', metal), communityFormField('Item type', type));
-  fields.push(picker, details, communityFormField('Caption', caption),
-    communityElement('p', 'communitySubmissionNote', 'Our community is for bullion collectors. We review each photo before it appears in the feed to keep posts focused on bullion. Leave out sales offers, personal details, and storage locations.'));
-  openCommunityDialog('Post a photo', fields, 'Submit for review', async () => {
-    const image = await prepareBullionPhoto(photo.files[0]);
+  fields.push(picker, details, communityFormField('Your post', caption),
+    communityElement('p', 'communitySubmissionNote', 'Our community is for bullion collectors. We review each post before it appears in the feed to keep posts focused on bullion. Leave out sales offers, personal details, and storage locations.'));
+  openCommunityDialog('Post', fields, 'Submit for review', async () => {
+    const image = photo.files[0] ? await prepareBullionPhoto(photo.files[0]) : null;
     if (currentUser?.id !== userId) throw new Error('Account changed.');
     if (!hasProfile) {
       const own = await communityData(supabaseClient.from('community_profiles').select('id').eq('id', userId).maybeSingle());
@@ -384,16 +387,16 @@ function composeBullionPost() {
     if (currentUser?.id !== userId) throw new Error('Account changed.');
     const id = crypto.randomUUID();
     await communityData(supabaseClient.from('community_posts').insert({
-      id, author_id:userId, metal:metal.value.toLowerCase(), item_type:type.value, caption:caption.value.trim()
+      id, author_id:userId, metal:image ? metal.value.toLowerCase() : 'bullion', item_type:image ? type.value : 'Discussion', caption:caption.value.trim()
     }));
     try {
       if (currentUser?.id !== userId) throw new Error('Account changed.');
-      await communityData(supabaseClient.storage.from('bullion-community').upload(userId + '/' + id + '.jpg', image));
+      if (image) await communityData(supabaseClient.storage.from('bullion-community').upload(userId + '/' + id + '.jpg', image));
     } catch (error) {
       if (currentUser?.id === userId) await supabaseClient.from('community_posts').delete().eq('id', id);
       throw error;
     }
-    return 'Photo submitted. It will appear in the feed once approved.';
+    return 'Post submitted. It will appear in the feed once approved.';
   });
 }
 
@@ -421,6 +424,7 @@ function blockBullionCollector(post) {
 function deleteBullionPost(post) {
   openCommunityDialog('Delete your post?', [], 'Delete post', async () => {
     await communityData(supabaseClient.from('community_posts').delete().eq('id', post.id));
+    if (post.item_type === 'Discussion') return 'Post deleted.';
     const {error} = await supabaseClient.storage.from('bullion-community').remove([post.photo_path, post.public_photo_path]);
     if (error) console.warn('Community photo cleanup failed:', error);
     return 'Post deleted.';
@@ -433,7 +437,7 @@ function moderateBullionPost(post, status) {
   const reason = status === 'declined'
     ? communitySelect(['Off topic','Privacy concern','Spam or promotion','Inappropriate content','Photo quality']) : null;
   openCommunityDialog(title, reason ? [communityFormField('Reason', reason)] : [], title.split(' ')[0], async () => {
-    if (status === 'approved') {
+    if (status === 'approved' && post.item_type !== 'Discussion') {
       // Publish a new JPEG rendered from pixels. The submitted file stays private.
       const bucket = supabaseClient.storage.from('bullion-community');
       const {data: original} = await communityData(bucket.download(post.photo_path));
