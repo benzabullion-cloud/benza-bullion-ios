@@ -244,6 +244,10 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
   }
   const body = communityElement('div', 'communityPostBody');
   const actions = communityElement('div', 'communityPostActions');
+  const options = communityElement('details', 'communityPostOptions');
+  const toggle = communityElement('summary', '', '•••');
+  toggle.setAttribute('aria-label', 'Post options');
+  options.append(toggle);
   body.append(communityElement('p', '', post.caption));
   if (post.status !== 'approved') body.append(communityElement('p', 'communityBadge',
     post.status === 'pending' ? 'Awaiting review' : post.status === 'declined' ? 'Declined' : 'Removed'));
@@ -261,13 +265,14 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
       const follow = communityButton(follows ? 'Following' : 'Follow',
         () => updateBullionReaction('follow', post, follows, follow));
       follow.setAttribute('aria-pressed', follows);
-      actions.append(follow, communityButton('Report', () => reportBullionPost(post)),
+      actions.append(follow);
+      options.append(communityButton('Report', () => reportBullionPost(post)),
         communityButton('Block', () => blockBullionCollector(post)));
     }
   }
-  if (post.author_id === currentUser?.id) actions.append(communityButton('Delete', () => deleteBullionPost(post)));
+  if (post.author_id === currentUser?.id) options.append(communityButton('Delete my post', () => deleteBullionPost(post)));
   if (post.status === 'approved' && bullionCommunity.moderator) {
-    actions.append(communityButton('Remove', () => moderateBullionPost(post, 'removed')));
+    options.append(communityButton('Remove as moderator', () => moderateBullionPost(post, 'removed')));
   }
   if (bullionCommunity.view === 'review' && bullionCommunity.moderator) {
     if (post.status === 'pending') {
@@ -281,6 +286,7 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
       actions.append(communityButton('Resolve reports', () => resolveBullionReports(post.id)));
     }
   }
+  if (options.childElementCount > 1) actions.append(options);
   body.append(actions);
   article.append(body);
   return article;

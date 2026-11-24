@@ -75,3 +75,10 @@
 .communityTabs button{min-height:44px;border:0;background:transparent;color:var(--muted)}
 .communityTabs button[aria-pressed=true]{background:var(--surface);color:var(--gold);box-shadow:0 1px 4px #0003}
 .communityProfile .communityBio{margin:12px 0 0;white-space:pre-line}
+
+.communityPostOptions{margin-inline-start:auto}
+.communityPostOptions summary{display:grid;place-items:center;margin-inline-start:auto;width:44px;min-height:44px;color:var(--muted);cursor:pointer;list-style:none;border-radius:12px}
+.communityPostOptions summary::-webkit-details-marker{display:none}
+.communityPostOptions[open]{flex-basis:100%;display:block;text-align:end}
+.communityPostOptions[open] summary{background:var(--surface2);color:var(--text)}
+.communityPostOptions button{display:block;margin:4px 0 0 auto;min-height:44px}
