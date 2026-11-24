@@ -147,7 +147,7 @@ async function loadBullionGallery(append = false) {
       feed.append(renderBullionPost(post, signed.get(communityPhotoPath(post)), liked, followed, reports));
     }
     communityStatus(posts.length ? '' : {
-      discover:'No approved photos yet. Share a piece from your collection.',
+      discover:'No approved photos yet. Post a photo from your collection.',
       mine:'You haven’t submitted a photo yet.',
       following:'No approved photos from collectors you follow yet.',
       review:'The review queue is clear.',
@@ -344,7 +344,7 @@ async function prepareBullionPhoto(file) {
 }
 
 function composeBullionPost() {
-  if (!communitySignIn('share a bullion photo')) return;
+  if (!communitySignIn('post a photo')) return;
   const userId = currentUser.id;
   const hasProfile = bullionCommunity.account === userId && !!bullionCommunity.profile;
   const name = communityElement('input');
@@ -373,8 +373,8 @@ function composeBullionPost() {
   const details = communityElement('div', 'communityPieceDetails');
   details.append(communityFormField('Metal', metal), communityFormField('Item type', type));
   fields.push(picker, details, communityFormField('Caption', caption),
-    communityElement('p', 'communitySubmissionNote', 'A moderator reviews each photo. Leave out sales offers, personal details, and storage locations.'));
-  openCommunityDialog('Share a bullion photo', fields, 'Submit for review', async () => {
+    communityElement('p', 'communitySubmissionNote', 'Our community is for bullion collectors. We review each photo before it appears in the feed to keep posts focused on bullion. Leave out sales offers, personal details, and storage locations.'));
+  openCommunityDialog('Post a photo', fields, 'Submit for review', async () => {
     const image = await prepareBullionPhoto(photo.files[0]);
     if (currentUser?.id !== userId) throw new Error('Account changed.');
     if (!hasProfile) {
@@ -393,7 +393,7 @@ function composeBullionPost() {
       if (currentUser?.id === userId) await supabaseClient.from('community_posts').delete().eq('id', id);
       throw error;
     }
-    return 'Photo submitted for review.';
+    return 'Photo submitted. It will appear in the feed once approved.';
   });
 }
 
