@@ -182,7 +182,7 @@ async function getBullionProfile(authorId, inMyPosts = false) {
   const card = communityElement('section', 'communityProfile');
   const header = communityElement('div', 'communityProfileHead');
   header.append(communityElement('h3', '', profile.data?.display_name || 'Your collector profile'));
-  if (inMyPosts) header.append(communityButton('View profile', () => showBullionGallery('profile', authorId)));
+  if (inMyPosts) header.append(communityButton('View public profile', () => showBullionGallery('profile', authorId)));
   const stats = communityElement('dl', 'communityProfileStats');
   for (const [label, count] of [
     ['Published posts', posts.count], ['Followers', followers.count],
