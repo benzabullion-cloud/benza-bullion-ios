@@ -70,3 +70,8 @@
 .communityDialog:has(.communityPhotoPicker) .communityDialogActions button{min-height:44px}
 
 .communityPieceDetails[hidden]{display:none}
+
+.communityTabs{gap:3px;padding:3px;background:var(--surface2);border-radius:14px}
+.communityTabs button{min-height:44px;border:0;background:transparent;color:var(--muted)}
+.communityTabs button[aria-pressed=true]{background:var(--surface);color:var(--gold);box-shadow:0 1px 4px #0003}
+.communityProfile .communityBio{margin:12px 0 0;white-space:pre-line}

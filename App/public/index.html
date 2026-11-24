@@ -6437,10 +6437,10 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
     <button id="newsRefreshButton" class="newsRefresh" type="button" aria-busy="false" onclick="loadMarketNews(true)">Refresh</button>
   </div>
   <div class="newsBody">
-    <nav class="communityTabs" aria-label="Explore sections">
+    <div role="group" class="communityTabs" aria-label="Explore sections">
       <button id="communityNewsTab" type="button" onclick="openBullionNewsSection('news')" aria-pressed="true">News</button>
       <button id="communityGalleryTab" type="button" onclick="openBullionNewsSection('community')" aria-pressed="false">Community</button>
-    </nav>
+    </div>
     <section id="communityPanel" hidden aria-label="Bullion community">
       <div class="communityHeading">
         <div><h2>Benza Bullion Community</h2><p>Coins, bars, and the stories behind them.</p></div>

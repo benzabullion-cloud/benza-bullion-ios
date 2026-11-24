@@ -171,7 +171,7 @@ async function loadBullionGallery(append = false) {
 async function getBullionProfile(authorId, inMyPosts = false) {
   const isOwner = currentUser?.id === authorId;
   const [profile, posts, followers, following, likes] = await Promise.all([
-    communityData(supabaseClient.from('community_profiles').select('display_name').eq('id', authorId).maybeSingle()),
+    communityData(supabaseClient.from('community_profiles').select('display_name,bio').eq('id', authorId).maybeSingle()),
     communityData(supabaseClient.from('community_posts').select('id', {count:'exact', head:true})
       .eq('author_id', authorId).eq('status', 'approved')),
     communityData(supabaseClient.from('community_follows').select('follower_id', {count:'exact', head:true}).eq('followed_id', authorId)),
@@ -183,6 +183,7 @@ async function getBullionProfile(authorId, inMyPosts = false) {
   const card = communityElement('section', 'communityProfile');
   const header = communityElement('div', 'communityProfileHead');
   header.append(communityElement('h3', '', profile.data?.display_name || 'Your collector profile'));
+  if (isOwner) header.append(communityButton('Edit profile', () => editBullionProfile(authorId, profile.data)));
   if (inMyPosts) header.append(communityButton('View public profile', () => showBullionGallery('profile', authorId)));
   const stats = communityElement('dl', 'communityProfileStats');
   for (const [label, count] of [
@@ -194,8 +195,33 @@ async function getBullionProfile(authorId, inMyPosts = false) {
       communityElement('dd', '', (count ?? 0).toLocaleString()));
     stats.append(stat);
   }
-  card.append(header, stats);
+  card.append(header);
+  if (profile.data?.bio) card.append(communityElement('p', 'communityBio', profile.data.bio));
+  card.append(stats);
   return card;
+}
+
+function editBullionProfile(authorId, profile) {
+  if (currentUser?.id !== authorId) return;
+  const name = communityElement('input');
+  name.value = profile?.display_name || '';
+  name.required = true;
+  name.minLength = 2;
+  name.maxLength = 32;
+  name.pattern = '.*\\S.*\\S.*';
+  const bio = communityElement('textarea');
+  bio.value = profile?.bio || '';
+  bio.maxLength = 160;
+  bio.rows = 3;
+  bio.placeholder = 'What do you enjoy collecting?';
+  const fields = [communityFormField('Public display name', name), communityFormField('Public bio (optional, 160 characters)', bio)];
+  openCommunityDialog('Edit community profile', fields, 'Save changes', async () => {
+    const values = {display_name:name.value.trim(), bio:bio.value.trim()};
+    const profiles = supabaseClient.from('community_profiles');
+    const write = profile ? profiles.update(values).eq('id', authorId) : profiles.insert({id:authorId, ...values});
+    await communityData(write.select('id').single());
+    return 'Community profile saved.';
+  });
 }
 
 function renderBullionPost(post, photoUrl, liked, followed, reports) {
