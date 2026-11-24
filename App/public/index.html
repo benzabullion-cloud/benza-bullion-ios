@@ -1083,14 +1083,16 @@ button:disabled{opacity:.58;cursor:not-allowed}
 .settingsNotificationTitle{font-size:15px;font-weight:800;color:var(--text)}
 .settingsNotificationStatus{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.4}
 .settingsNotificationButton{border:0;border-radius:11px;padding:10px 13px;background:#c88719;color:#111;font-size:12px;font-weight:800;white-space:nowrap}
-.notificationInvite{margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface3);color:var(--text)}
+.notificationInvite{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:10px 0;padding:8px 0;border-top:1px solid var(--line)}
 .notificationInvite[hidden]{display:none}
-.notificationInvite p{margin:0 0 8px;font-size:13px}
-#priceNotificationInvite{width:min(86vw,360px);padding:20px;background:var(--surface3);color:var(--text);border:1px solid var(--line);border-radius:16px}
-#priceNotificationInvite::backdrop{background:#0008}
-#priceNotificationInvite h2{margin:0 0 8px;font-size:19px}
-#priceNotificationInvite p{margin:0 0 14px;font-size:14px;line-height:1.45}
-#priceNotificationInvite button+button{margin-left:8px}
+.notificationInvite p{margin:0;color:var(--muted);font-size:12px;line-height:1.35}
+.notificationInviteLink{flex:none;padding:8px 0 8px 6px;border:0;background:none;color:var(--text);font:inherit;font-size:12px;font-weight:750}
+.notificationInviteLink span{margin-left:3px;color:var(--muted)}
+#priceNotificationInvite{box-sizing:border-box;width:min(calc(100vw - 36px),350px);padding:20px;background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:18px;box-shadow:0 12px 40px #0004}
+#priceNotificationInvite::backdrop{background:#0006}
+#priceNotificationInvite h2{margin:0 0 6px;font-size:19px}
+#priceNotificationInvite p{margin:0;color:var(--muted);font-size:13px;line-height:1.5}
+.priceNotificationActions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:16px}
 .settingsNotificationButton.off{background:var(--surface3);color:var(--text);border:1px solid var(--line)}
 .settingsNotificationTest{width:100%;margin-top:12px;border:1px solid var(--line);border-radius:11px;padding:10px 12px;background:transparent;color:var(--text);font-size:12px;font-weight:750}
 .settingsNotificationNote{font-size:11px;color:var(--muted);line-height:1.45;margin-top:10px}
@@ -3323,17 +3325,21 @@ button:disabled{opacity:.58;cursor:not-allowed}
 .marketsMetricGrid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:9px 0}.marketsMetric{display:flex;flex-direction:column;gap:5px}.marketsMetric span{font-size:10px;color:var(--muted)}.marketsMetric strong{font-size:18px}
 .marketsSectionHead{display:flex;align-items:center;justify-content:space-between;gap:10px}.marketsSectionHead h2,.marketsCard h2{font-size:17px;margin:3px 0 0}.marketsLivePill{font-size:8px;font-weight:900;color:#168447;border:1px solid rgba(22,132,71,.28);background:rgba(22,132,71,.08);padding:4px 7px;border-radius:999px}
 .marketsPriceRow{display:grid;grid-template-columns:36px 1fr auto;gap:10px;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)}.marketsPriceRow:last-child{border-bottom:0}.marketsPriceName{font-weight:780;font-size:13px}.marketsPriceSymbol{font-size:9px;color:var(--muted);margin-top:2px}.marketsPriceValue{font-weight:820;font-size:14px;text-align:right}.marketsUnitNote{font-size:9px;line-height:1.4;color:var(--muted);padding-top:8px}
-.watchQuoteTicker{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin-top:12px;container-type:inline-size}
-.watchQuoteCard{min-width:0;padding:8px 1px;border:1px solid var(--border);border-radius:10px;text-align:center;background:linear-gradient(180deg,var(--metal-tint),var(--surface2))}
-.watchQuoteCard:nth-child(1){--metal-tint:rgba(245,184,46,.14)}
-.watchQuoteCard:nth-child(2){--metal-tint:rgba(205,210,218,.13)}
-.watchQuoteCard:nth-child(3){--metal-tint:rgba(98,185,255,.14)}
-.watchQuoteCard:nth-child(4){--metal-tint:rgba(120,201,168,.14)}
-.watchQuoteCard:nth-child(5){--metal-tint:rgba(230,129,82,.15)}
-.watchQuoteCard span,.watchQuoteCard strong{display:block;white-space:nowrap}
-.watchQuoteCard span{color:var(--muted);font-size:8px;font-size:clamp(7px,2.75cqw,10px);font-weight:700;text-transform:uppercase}
-.watchQuoteCard strong{margin-top:4px;color:var(--text);font-size:10px;font-size:clamp(8px,3.4cqw,14px);font-variant-numeric:tabular-nums;letter-spacing:-.15px}
-.watchQuoteUnits{margin-top:4px;color:var(--muted);font-size:10px}
+.watchQuoteTicker{margin-bottom:12px;container-type:inline-size}
+.watchQuoteGrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;border:1px solid var(--border);border-radius:12px;background:var(--border);overflow:hidden}
+.watchQuoteCard{min-width:0;padding:8px 1px;text-align:center;background:linear-gradient(var(--metal-tint),transparent),var(--surface2)}
+.watchQuoteCard:nth-child(1){--metal-dot:#c88719;--metal-tint:rgba(245,184,46,.09)}
+.watchQuoteCard:nth-child(2){--metal-dot:#a6abb2;--metal-tint:rgba(205,210,218,.08)}
+.watchQuoteCard:nth-child(3){--metal-dot:#81adcf;--metal-tint:rgba(98,185,255,.08)}
+.watchQuoteCard:nth-child(4){--metal-dot:#65ab90;--metal-tint:rgba(120,201,168,.08)}
+.watchQuoteCard:nth-child(5){--metal-dot:#d8845c;--metal-tint:rgba(230,129,82,.09)}
+.watchQuoteName{display:flex;justify-content:center;align-items:center;gap:3px;color:var(--muted);font-size:10px;font-size:clamp(8px,2.8cqw,10px);font-weight:650;white-space:nowrap}
+.watchQuoteName::before{content:"";width:5px;height:5px;flex:none;border-radius:50%;background:var(--metal-dot)}
+.watchQuoteCard strong{display:block;margin-top:3px;color:var(--text);font-size:12px;font-size:clamp(8px,3.45cqw,13px);line-height:1.2;font-variant-numeric:tabular-nums;letter-spacing:-.2px;white-space:nowrap}
+@container (max-width:290px){
+  .watchQuoteName::before{display:none}
+}
+.watchQuoteUnits{margin-top:5px;color:var(--muted);font-size:10px}
 .marketsWatchIntro{margin-top:5px;line-height:1.45}.marketsWatchForm{display:grid;gap:8px;margin-top:12px}.marketsWatchForm select,.marketsWatchForm input{width:100%;box-sizing:border-box;border:1px solid var(--border);background:var(--surface3);color:var(--text);border-radius:11px;padding:12px;font-size:13px}.marketsWatchForm button{border:0;border-radius:11px;background:var(--button);color:var(--buttonText);padding:12px;font-weight:800}.marketsWatchList{display:flex;flex-direction:column;gap:9px;margin-top:9px}.marketsWatchItem{display:grid;grid-template-columns:36px 1fr 30px;gap:10px;align-items:center}.marketsWatchMeta{font-size:10px;color:var(--muted);margin-top:3px;line-height:1.4}.marketsWatchProgress{height:5px;background:var(--surface3);border-radius:999px;overflow:hidden;margin-top:7px}.marketsWatchProgress span{display:block;height:100%;background:#c88719;border-radius:999px}.marketsWatchRemove{border:0;background:transparent;color:var(--muted);font-size:21px;padding:4px}
 .marketsComingHero{position:relative;overflow:hidden;background:linear-gradient(145deg,var(--surface) 0%,var(--surface) 62%,rgba(200,135,25,.10) 100%);border:1px solid var(--border);border-radius:18px;padding:20px 16px;box-shadow:0 3px 14px var(--shadow)}
 .marketsComingBadge{display:inline-flex;align-items:center;border:1px solid rgba(200,135,25,.38);background:rgba(200,135,25,.10);color:#b26d00;border-radius:999px;padding:5px 9px;font-size:9px;font-weight:900;letter-spacing:.8px}
@@ -6090,8 +6096,8 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
           <div class="milestoneProgressTrack"><div id="milestoneProgressFill"></div></div>
         </div>
         <div id="milestoneNotificationInvite" class="notificationInvite" hidden>
-          <p>Get notified when you reach a portfolio milestone.</p>
-          <button type="button" class="settingsNotificationButton" onclick="enableFromNotificationInvite()">Enable notifications</button>
+          <p>Milestone notifications</p>
+          <button type="button" class="notificationInviteLink" onclick="openNotificationInviteSettings()">Set up alerts <span aria-hidden="true">›</span></button>
         </div>
         <div class="milestoneGrid" id="milestoneGrid"></div>
       </div>
@@ -6323,18 +6329,20 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
     </div>
 
     <div id="marketsWatchPanel" style="display:none">
+      <div id="watchQuoteTicker" class="watchQuoteTicker" role="group" aria-label="Current spot prices" aria-describedby="watchQuoteUnits">
+        <div class="watchQuoteGrid">
+          <div class="watchQuoteCard"><span class="watchQuoteName">Gold</span><strong id="watchQuoteGold">—</strong></div>
+          <div class="watchQuoteCard"><span class="watchQuoteName">Silver</span><strong id="watchQuoteSilver">—</strong></div>
+          <div class="watchQuoteCard"><span class="watchQuoteName">Platinum</span><strong id="watchQuotePlatinum">—</strong></div>
+          <div class="watchQuoteCard"><span class="watchQuoteName">Palladium</span><strong id="watchQuotePalladium">—</strong></div>
+          <div class="watchQuoteCard"><span class="watchQuoteName">Copper</span><strong id="watchQuoteCopper">—</strong></div>
+        </div>
+        <div id="watchQuoteUnits" class="watchQuoteUnits">USD per troy oz · Copper per standard oz</div>
+      </div>
       <div class="marketsCard">
         <div class="marketsEyebrow">WATCHLIST</div>
         <h2>Price Targets</h2>
         <div class="marketsMuted marketsWatchIntro">Choose a metal and set the price you want Benza Bullion to track.</div>
-        <div id="watchQuoteTicker" class="watchQuoteTicker" role="group" aria-label="Current spot prices">
-          <div class="watchQuoteCard"><span>Gold</span><strong id="watchQuoteGold">—</strong></div>
-          <div class="watchQuoteCard"><span>Silver</span><strong id="watchQuoteSilver">—</strong></div>
-          <div class="watchQuoteCard"><span>Platinum</span><strong id="watchQuotePlatinum">—</strong></div>
-          <div class="watchQuoteCard"><span>Palladium</span><strong id="watchQuotePalladium">—</strong></div>
-          <div class="watchQuoteCard"><span>Copper</span><strong id="watchQuoteCopper">—</strong></div>
-        </div>
-        <div class="watchQuoteUnits">USD per troy oz · Copper per standard oz</div>
         <div class="marketsWatchForm">
           <select id="marketsWatchMetal">
             <option value="gold">Gold</option><option value="silver">Silver</option><option value="platinum">Platinum</option><option value="palladium">Palladium</option><option value="copper">Copper</option>
@@ -6354,8 +6362,8 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
         <button type="button" onclick="openProUpgrade('alerts')">See Pro</button>
       </div>
       <div id="watchNotificationInvite" class="notificationInvite" hidden>
-        <p>Get notified when your price target is hit.</p>
-        <button type="button" class="settingsNotificationButton" onclick="enableFromNotificationInvite()">Enable notifications</button>
+        <p>Price alert notifications</p>
+        <button type="button" class="notificationInviteLink" onclick="openNotificationInviteSettings()">Set up alerts <span aria-hidden="true">›</span></button>
       </div>
       <div id="marketsWatchList" class="marketsWatchList"></div>
     </div>
@@ -13096,7 +13104,6 @@ async function removeNativeBenzaSubscriptions(){
   if(error)throw error;
 }
 let notificationInviteStatus=null;
-let notificationInviteBusy=false;
 const presentedPriceNotificationInvites=new Set();
 function setNotificationInviteStatus(userId,state){
   notificationInviteStatus={userId,state};
@@ -13111,10 +13118,6 @@ function renderNotificationInvites(){
   ]){
     const invite=document.getElementById(id);
     if(invite)invite.hidden=!visible;
-  }
-  for(const id of ['watchNotificationInvite','milestoneNotificationInvite','priceNotificationInvite']){
-    const button=document.getElementById(id)?.querySelector('button');
-    if(button)button.textContent=state==='blocked'?'Open iPhone Settings':'Enable notifications';
   }
   const dialog=document.getElementById('priceNotificationInvite');
   if(!available&&dialog?.open)dialog.close();
@@ -13145,21 +13148,10 @@ async function enableNativeNotifications(plugin){
   await saveNativeBenzaSubscription(result.token);
   if(currentUser?.id===userId)await updateNotificationUI('Notifications are enabled. Benza Bullion can alert you even when the app is closed.');
 }
-async function enableFromNotificationInvite(){
-  const plugin=nativeBenzaNotifications();
-  if(notificationInviteBusy||!currentUser||!plugin)return;
-  const userId=currentUser.id;
-  notificationInviteBusy=true;
-  document.getElementById('priceNotificationInvite')?.close();
-  try{
-    const state=await plugin.status();
-    if(currentUser?.id!==userId)return;
-    if(state?.permission==='denied'&&plugin.openSettings)await plugin.openSettings();
-    else await enableNativeNotifications(plugin);
-  }catch(error){
-    if(currentUser?.id===userId)alert('Could not set up notifications. Please try again.');
-    console.warn('Notification invitation failed:',error);
-  }finally{notificationInviteBusy=false;}
+function openNotificationInviteSettings(){
+  const dialog=document.getElementById('priceNotificationInvite');
+  if(dialog?.open)dialog.close();
+  openSettings('notifications');
 }
 document.addEventListener('visibilitychange',()=>{
   if(!document.hidden&&currentUser&&isBenzaNativeRuntime())void updateNotificationUI();
@@ -13303,10 +13295,12 @@ loadBenzaWatchlist();
 
 
 <dialog id="priceNotificationInvite" aria-labelledby="priceNotificationInviteTitle" aria-describedby="priceNotificationInviteCopy">
-  <h2 id="priceNotificationInviteTitle">Get notified when your target is hit</h2>
-  <p id="priceNotificationInviteCopy">Your price alert is saved. Enable notifications to get it on your iPhone, even when Benza Bullion is closed.</p>
-  <button type="button" class="settingsNotificationButton" onclick="enableFromNotificationInvite()">Enable notifications</button>
-  <button type="button" class="settingsNotificationButton off" onclick="this.closest('dialog').close()">Not now</button>
+  <h2 id="priceNotificationInviteTitle">Price alert saved</h2>
+  <p id="priceNotificationInviteCopy">Choose which alerts you’d like to receive on your iPhone.</p>
+  <div class="priceNotificationActions">
+    <button type="button" class="settingsNotificationButton off" onclick="this.closest('dialog').close()">Not now</button>
+    <button type="button" class="settingsNotificationButton" onclick="openNotificationInviteSettings()">Notification settings</button>
+  </div>
 </dialog>
 
 <div id="saleModal" class="saleModal" role="dialog" aria-modal="true" aria-labelledby="saleTitle" onclick="if(event.target===this)closeSaleModal()">

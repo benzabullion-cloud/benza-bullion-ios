@@ -40,6 +40,7 @@ test('first alert invites once per account and inline reminders follow delivery 
   const watch={hidden:true,querySelector:()=>null};
   const milestones={hidden:true,querySelector:()=>null};
   const values=new Map();
+  let settingsTab;
   const context=createContext({
     currentUser:{id:'current-user'},benzaWatchlist:[{}],activeMarketsTab:'watchlist',
     document:{addEventListener(){},getElementById:id=>({
@@ -47,7 +48,8 @@ test('first alert invites once per account and inline reminders follow delivery 
       marketsScreen:{classList:{contains:()=>true}}
     })[id]},
     localStorage:{getItem:key=>values.get(key),setItem:(key,value)=>values.set(key,value)},
-    updateNotificationUI:async()=>{}
+    updateNotificationUI:async()=>{},
+    openSettings:tab=>{settingsTab=tab}
   });
   runInContext(html.slice(html.indexOf('let notificationInviteStatus'),html.indexOf('let nativeNotificationStatusLoad')),context);
   context.setNotificationInviteStatus('current-user','off');
@@ -59,6 +61,10 @@ test('first alert invites once per account and inline reminders follow delivery 
   dialog.close();
   await context.refreshPriceNotificationInvite('current-user',true);
   assert.equal(dialog.shown,1);
+  dialog.open=true;
+  context.openNotificationInviteSettings();
+  assert.equal(dialog.open,false);
+  assert.equal(settingsTab,'notifications');
   context.setNotificationInviteStatus('current-user','enabled');
   assert.equal(watch.hidden,true);
   assert.equal(milestones.hidden,true);
