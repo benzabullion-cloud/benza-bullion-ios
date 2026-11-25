@@ -386,7 +386,7 @@ function editBullionProfile(authorId, profile) {
   bio.addEventListener('input', updatePreview);
   updatePreview();
   const fields = [
-    communityElement('p', 'communityProfileHint', 'This is how other collectors will see you.'),
+    communityElement('p', 'communityProfileHint', 'Choose a unique display name so other collectors can find you.'),
     preview, communityFormField('Display name', name), bioField
   ];
   openCommunityDialog('Edit community profile', fields, 'Save changes', async () => {
@@ -732,8 +732,10 @@ function openCommunityDialog(title, fields, action, submit) {
         await loadBullionGallery();
         if (message) communityStatus(message);
       }
-    } catch {
-      status.textContent = 'Couldn’t complete that action. Please try again.';
+    } catch (error) {
+      const nameTaken = error.code === '23505' && error.message?.includes('community_profiles_display_name_unique');
+      status.textContent = nameTaken ? 'That display name is already taken. Choose another name.'
+        : 'Couldn’t complete that action. Please try again.';
     } finally {
       button.disabled = cancel.disabled = false;
     }
