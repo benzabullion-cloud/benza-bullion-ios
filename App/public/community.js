@@ -445,7 +445,11 @@ async function getBullionProfile(authorId) {
     const edit = communityButton('Edit', () => editBullionProfile(authorId, profile.data), 'communityProfileAction');
     edit.setAttribute('aria-label', 'Edit profile');
     const bell = communityReactionButton('M18 8a6 6 0 0 0-12 0c0 7-3 8-3 9h18c0-1-3-2-3-9ZM10 20a2 2 0 0 0 4 0', '', () => openCommunityList('Activity'));
-    bell.lastChild.remove();
+    bell.classList.add('communityBell');
+    bell.dataset.activityOwner = authorId;
+    bell.lastChild.className = 'communityUnread';
+    bell.lastChild.hidden = true;
+    void refreshCommunityBadge(bell);
     bell.setAttribute('aria-label', 'Community activity');
     header.append(bell, edit);
   }
@@ -464,6 +468,7 @@ async function getBullionProfile(authorId) {
     if (isOwner && ['Followers','Following'].includes(label)) {
       const button = communityButton('', () => openCommunityList(label), 'communityStatLink');
       button.setAttribute('aria-label', label + ', ' + (count ?? 0));
+      if (label === 'Following') button.dataset.followingFor = authorId;
       value.replaceChildren(button);
       button.textContent = (count ?? 0).toLocaleString();
     }
@@ -852,7 +857,7 @@ async function updateBullionFollow(post, selected, button) {
   const controls = () => document.querySelectorAll('[data-follow-author="' + post.author_id + '"]');
   function paint(active, busy) {
     for (const control of controls()) {
-      control.textContent = active ? 'Following' : 'Follow';
+      control.textContent = active ? 'Following' : control.dataset.inactiveLabel || 'Follow';
       control.setAttribute('aria-pressed', active);
       control.disabled = busy;
     }
@@ -863,14 +868,49 @@ async function updateBullionFollow(post, selected, button) {
     await communityData(selected ? target.delete().match(keys) : target.insert(keys));
     if (currentUser?.id !== userId) return;
     paint(!selected, false);
+    const ownCount = document.querySelector('[data-following-for="' + userId + '"]');
+    if (ownCount) {
+      const next = Math.max(0, Number(ownCount.textContent.replace(/[^0-9]/g,'')) + (selected ? -1 : 1));
+      ownCount.textContent = next.toLocaleString();
+      ownCount.setAttribute('aria-label', 'Following, ' + next);
+    }
     const count = document.querySelector('[data-followers-for="' + post.author_id + '"]');
     if (count) count.textContent = Math.max(0, Number(count.textContent.replace(/[^0-9]/g,'')) + (selected ? -1 : 1)).toLocaleString();
   } catch {
     if (currentUser?.id !== userId) return;
     paint(selected, false);
-    communityStatus('Couldn’t save that change. Try again.');
+    const status = button.closest('dialog')?.querySelector('[role=status]');
+    if (status) status.textContent = 'Couldn’t save that change. Try again.';
+    else communityStatus('Couldn’t save that change. Try again.');
   }
 }
+
+function communitySeenKey(id) {
+  return 'benza.community.activity.seen.' + id;
+}
+
+async function refreshCommunityBadge(bell) {
+  const id = bell?.dataset.activityOwner;
+  if (!id || currentUser?.id !== id) return;
+  const key = communitySeenKey(id);
+  try {
+    const seen = localStorage.getItem(key);
+    let query = supabaseClient.rpc('community_personal_activity', {}, {head:true,count:'exact'});
+    if (seen) query = query.gt('occurred_at', seen);
+    const {count} = await communityData(query);
+    if (currentUser?.id !== id || localStorage.getItem(key) !== seen) return;
+    bell.lastChild.textContent = count > 99 ? '99+' : String(count || 0);
+    bell.lastChild.hidden = !count;
+    bell.setAttribute('aria-label', count ? 'Community activity, ' + count + ' unread' : 'Community activity');
+  } catch { /* Keep the last successful count during a connection interruption. */ }
+}
+
+function refreshVisibleCommunityBadge() {
+  const bell = document.querySelector('.communityBell');
+  if (bell && !document.hidden && bell.getClientRects().length) void refreshCommunityBadge(bell);
+}
+setInterval(refreshVisibleCommunityBadge, 30000);
+document.addEventListener('visibilitychange', refreshVisibleCommunityBadge);
 
 function openCommunityList(title) {
   const userId = currentUser?.id;
@@ -882,31 +922,42 @@ function openCommunityList(title) {
   const status = communityElement('p', 'communityStatus');
   status.setAttribute('role', 'status');
   const more = communityButton('Load more', load, 'communitySecondary');
-  const close = communityButton('Close', () => dialog.close(), 'communityProfileAction');
+  const close = communityButton('×', () => dialog.close(), 'communityListClose');
+  close.setAttribute('aria-label', 'Close ' + title);
   const head = communityElement('header', 'communityProfileHead');
   head.append(communityElement('h3', '', title), close);
   dialog.setAttribute('aria-label', title);
-  dialog.append(head, list, status, more);
+  const scroll = communityElement('div', 'communityListScroll');
+  scroll.append(list, status, more);
+  dialog.append(head, scroll);
   dialog.onclose = () => dialog.remove();
   document.body.append(dialog);
   dialog.showModal();
   let offset = 0;
+  let after = null;
   async function load() {
     more.disabled = true;
     status.textContent = 'Loading…';
     const key = followers ? 'follower_id' : 'followed_id';
     try {
-      const query = activity ? supabaseClient.rpc('community_personal_activity')
+      let query = activity ? supabaseClient.rpc('community_personal_activity')
         .order('occurred_at', {ascending:false}).order('actor').order('kind').order('post_id')
         : supabaseClient.from('community_follows').select(key)
           .eq(followers ? 'followed_id' : 'follower_id', userId).order(key);
-      const {data} = await communityData(query.range(offset, offset + 30));
+      if (!activity && after) query = query.gt(key, after);
+      const {data} = await communityData(activity ? query.range(offset, offset + 30) : query.limit(31));
       const page = data.slice(0,30);
       const ids = page.map(row => row.actor || row[key]);
-      const profiles = ids.length ? (await communityData(supabaseClient.from('community_profiles')
-        .select('id,display_name,avatar_style,avatar_initials').in('id', [...new Set(ids)]))).data : [];
+      const uniqueIds = [...new Set(ids)];
+      const [profiles, relations, incoming] = ids.length ? await Promise.all([
+        communityData(supabaseClient.from('community_profiles').select('id,display_name,avatar_style,avatar_initials').in('id',uniqueIds)),
+        communityData(supabaseClient.from('community_follows').select('followed_id').eq('follower_id',userId).in('followed_id',uniqueIds)),
+        followers ? {data:[]} : communityData(supabaseClient.from('community_follows').select('follower_id').eq('followed_id',userId).in('follower_id',uniqueIds))
+      ]) : [{data:[]},{data:[]},{data:[]}];
+      const followed = new Set(relations.data.map(row => row.followed_id));
+      const followsMe = new Set(incoming.data.map(row => row.follower_id));
       if (!dialog.open || currentUser?.id !== userId) return;
-      const names = new Map(profiles.map(profile => [profile.id, profile]));
+      const names = new Map(profiles.data.map(profile => [profile.id, profile]));
       for (const row of page) {
         const profile = names.get(row.actor || row[key]);
         const name = profile?.display_name || 'Collector';
@@ -919,12 +970,31 @@ function openCommunityList(title) {
         }, 'communityAuthor') : communityElement('strong','',label));
         if (activity) {
           if (row.caption) body.append(communityElement('p','',row.caption));
-          body.append(communityElement('small','',new Date(row.occurred_at).toLocaleString()));
+          body.append(communityElement('small','',new Date(row.occurred_at).toLocaleString(undefined,
+            {month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})));
         }
         entry.append(communityAvatar(profile), body);
+        if (profile && profile.id !== userId) {
+          const inactive = followers || followsMe.has(profile.id) ? 'Follow back' : 'Follow';
+          const active = followed.has(profile.id);
+          const follow = communityButton(active ? 'Following' : inactive, () =>
+            updateBullionFollow({author_id:profile.id}, follow.getAttribute('aria-pressed') === 'true', follow), 'communityRowFollow');
+          follow.dataset.followAuthor = profile.id;
+          follow.dataset.inactiveLabel = inactive;
+          follow.setAttribute('aria-pressed', active);
+          entry.append(follow);
+        }
         list.append(entry);
       }
+      if (activity && !offset && page.length) {
+        const key = communitySeenKey(userId);
+        const latest = page[0].occurred_at;
+        if (!localStorage.getItem(key) || latest > localStorage.getItem(key)) localStorage.setItem(key, latest);
+        refreshVisibleCommunityBadge();
+      }
+      if (!activity && page.length) after = page[page.length - 1][key];
       offset += page.length;
+      more.textContent = 'Load more';
       status.textContent = offset ? '' : ({Activity:'New follows and likes will appear here.', Followers:'No followers yet.', Following:'You haven’t followed anyone yet.'})[title];
       more.hidden = data.length <= 30;
     } catch {
