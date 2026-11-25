@@ -354,7 +354,18 @@ async function loadBullionGallery(append = false, filterOnly = false) {
       feed.querySelectorAll('.communityPost,.communityMyPostsEmpty,.communityFilterRetry').forEach(node => node.remove());
     }
     if (commentFlags.length) feed.append(renderFlaggedBullionComments(commentFlags));
-    if (profileCard) feed.append(profileCard);
+    if (profileCard) {
+      if (view === 'profile' && author !== userId) {
+        const selected = followRows.data.some(row => row.followed_id === author);
+        const follow = communityButton(selected ? 'Unfollow' : 'Follow', () =>
+          updateBullionFollow({author_id:author}, follow.getAttribute('aria-pressed') === 'true', follow), 'communityRowFollow');
+        follow.dataset.followAuthor = author;
+        follow.dataset.activeLabel = 'Unfollow';
+        follow.setAttribute('aria-pressed', selected);
+        profileCard.querySelector('.communityProfileHead').append(follow);
+      }
+      feed.append(profileCard);
+    }
     if (!append && view === 'mine') {
       if (!filterOnly) feed.append(renderMyCommunityPostFilters(myPostType));
       if (!posts.length) {
@@ -451,7 +462,9 @@ async function getBullionProfile(authorId) {
     bell.lastChild.hidden = true;
     void refreshCommunityBadge(bell);
     bell.setAttribute('aria-label', 'Community activity');
-    header.append(bell, edit);
+    const actions = communityElement('div', 'communityProfileActions');
+    actions.append(bell, edit);
+    header.append(actions);
   }
   const stats = communityElement('dl', 'communityProfileStats');
   for (const [label, count] of [
@@ -857,7 +870,7 @@ async function updateBullionFollow(post, selected, button) {
   const controls = () => document.querySelectorAll('[data-follow-author="' + post.author_id + '"]');
   function paint(active, busy) {
     for (const control of controls()) {
-      control.textContent = active ? 'Following' : control.dataset.inactiveLabel || 'Follow';
+      control.textContent = active ? (control.dataset.activeLabel || 'Following') : (control.dataset.inactiveLabel || 'Follow');
       control.setAttribute('aria-pressed', active);
       control.disabled = busy;
     }
