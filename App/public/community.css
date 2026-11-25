@@ -39,7 +39,12 @@
 #communityMore{display:block;margin:12px auto}
 .communitySupport a{color:inherit}
 
-.communityProfileHead{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.communityProfileHead{display:flex;align-items:center;justify-content:space-between;gap:0 8px;flex-wrap:wrap}
+.communityProfileActions{display:flex;flex-wrap:wrap;align-items:center;gap:0 4px;min-width:0}
+.communityProfileAction{
+  border:0;background:transparent;color:var(--text);padding:3px 4px;min-height:36px;
+  font:inherit;font-size:12px;font-weight:650;text-decoration:underline;text-underline-offset:3px;cursor:pointer
+}
 .communityProfileHead h3{margin:0;color:var(--text);font-size:16px;overflow-wrap:anywhere}
 .communityProfileStats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0 0;padding-top:10px;border-top:1px solid var(--border)}
 .communityProfileStats div{display:flex;flex-direction:column-reverse;justify-content:flex-end;gap:2px;min-width:0}

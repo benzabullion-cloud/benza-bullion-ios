@@ -219,8 +219,20 @@ async function getBullionProfile(authorId, inMyPosts = false) {
   const card = communityElement('section', 'communityProfile');
   const header = communityElement('div', 'communityProfileHead');
   header.append(communityElement('h3', '', profile.data?.display_name || 'Your collector profile'));
-  if (isOwner) header.append(communityButton('Edit profile', () => editBullionProfile(authorId, profile.data)));
-  if (inMyPosts) header.append(communityButton('View public profile', () => showBullionGallery('profile', authorId)));
+  if (isOwner || inMyPosts) {
+    const actions = communityElement('div', 'communityProfileActions');
+    if (isOwner) {
+      const edit = communityButton('Edit', () => editBullionProfile(authorId, profile.data), 'communityProfileAction');
+      edit.setAttribute('aria-label', 'Edit profile');
+      actions.append(edit);
+    }
+    if (inMyPosts) {
+      const view = communityButton('Public profile', () => showBullionGallery('profile', authorId), 'communityProfileAction');
+      view.setAttribute('aria-label', 'View public profile');
+      actions.append(view);
+    }
+    header.append(actions);
+  }
   const stats = communityElement('dl', 'communityProfileStats');
   for (const [label, count] of [
     ['Published posts', posts.count], ['Followers', followers.count],
