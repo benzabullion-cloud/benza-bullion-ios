@@ -88,7 +88,7 @@ async function showBullionGallery(view, author = null) {
   await loadBullionGallery();
 }
 
-function renderCommunitySearch(galleryRequest, userId) {
+function renderCommunitySearch(userId) {
   const panel = communityElement('section', 'communityPeopleSearch');
   const form = communityElement('form', 'communityPeopleForm');
   form.setAttribute('role', 'search');
@@ -105,7 +105,7 @@ function renderCommunitySearch(galleryRequest, userId) {
   status.setAttribute('role', 'status');
   const results = communityElement('ul', 'communityPeopleResults');
   form.append(field, submit);
-  panel.append(form, status, results);
+  panel.append(communityElement('h3', '', 'Find collectors'), form, status, results);
   form.onsubmit = async event => {
     event.preventDefault();
     const term = field.value.trim();
@@ -122,7 +122,7 @@ function renderCommunitySearch(galleryRequest, userId) {
       const {data} = await communityData(supabaseClient.from('community_profiles')
         .select('id,display_name').ilike('display_name', '%' + literal + '%')
         .order('display_name').order('id').limit(21));
-      if (!communityCurrent(galleryRequest, userId)) return;
+      if (!panel.isConnected || (currentUser?.id || null) !== userId) return;
       for (const profile of data.slice(0, 20)) {
         const row = communityElement('li');
         const action = communityButton('', () => showBullionGallery('profile', profile.id), 'communityPersonResult');
@@ -135,7 +135,7 @@ function renderCommunitySearch(galleryRequest, userId) {
       status.textContent = data.length > 20 ? 'Showing 20 matches. Enter more of the name to narrow your search.'
         : data.length ? '' : 'No collectors found.';
     } catch {
-      if (communityCurrent(galleryRequest, userId)) status.textContent = 'Couldn’t search for collectors. Try again.';
+      if (panel.isConnected && (currentUser?.id || null) === userId) status.textContent = 'Couldn’t search for collectors. Try again.';
     } finally {
       submit.disabled = false;
     }
@@ -161,11 +161,6 @@ async function loadBullionGallery(append = false) {
 
   try {
     if (!supabaseClient) throw new Error('Community is unavailable.');
-    if (view === 'people') {
-      communityStatus('');
-      feed.append(renderCommunitySearch(request, userId));
-      return;
-    }
     const [profile, membership] = userId ? await Promise.all([
       communityData(supabaseClient.from('community_profiles').select('id,display_name').eq('id', userId).maybeSingle()),
       communityData(supabaseClient.from('community_moderators').select('user_id').eq('user_id', userId).maybeSingle())
@@ -232,6 +227,7 @@ async function loadBullionGallery(append = false) {
 
     if (commentFlags.length) feed.append(renderFlaggedBullionComments(commentFlags));
     if (profileCard) feed.append(profileCard);
+    if (!append && view === 'mine') feed.append(renderCommunitySearch(userId));
     const liked = new Set(likeRows.data.map(row => row.post_id));
     const followed = new Set(followRows.data.map(row => row.followed_id));
     const signed = new Map((photos.data || []).map(photo => [photo.path, photo.signedUrl]));
