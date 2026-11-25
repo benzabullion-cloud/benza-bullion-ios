@@ -18,7 +18,13 @@ const id=n=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0');
   grant insert,delete on storage.objects to authenticated;
   insert into auth.users values ('${id(1)}'),('${id(2)}'),('${id(3)}');
  `);
- await db.exec(fs.readFileSync('supabase/migrations/20261124212200_bullion_community.sql','utf8'));
+ for (const migration of [
+  '20261124212200_bullion_community.sql',
+  '20261124234000_community_text_posts.sql',
+  '20261124235100_community_profile_edits.sql',
+  '20261125013000_community_comments.sql',
+  '20261125140000_unique_community_display_names.sql'
+ ]) await db.exec(fs.readFileSync('supabase/migrations/'+migration,'utf8'));
  async function as(n){ await db.exec(`reset role; set "request.jwt.claim.sub"='${n?id(n):''}'; set role ${n?'authenticated':'anon'}`); }
  const rows=async(sql)=>(await db.query(sql)).rows;
  const count=async(table)=>Number((await rows('select count(*) as n from '+table))[0].n);
@@ -41,18 +47,29 @@ const id=n=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0');
  assert.equal(await count('storage.objects'),1);
  assert.match((await rows('select name from storage.objects'))[0].name,/^published\//);
  await as(2);
+ await assert.rejects(db.exec(`insert into community_profiles(id,display_name) values ('${id(2)}','collector  one')`));
  await db.exec(`insert into community_profiles values ('${id(2)}','Collector Two');
  insert into community_follows values ('${id(2)}','${id(1)}');
  insert into community_likes values ('${id(10)}','${id(2)}');
  insert into community_reports(post_id,reporter_id,reason) values ('${id(10)}','${id(2)}','Off topic');`);
  await assert.rejects(db.exec(`insert into community_likes values ('${id(10)}','${id(2)}')`));
  assert.equal(await count('community_reports'),0);
+ await db.exec(`update community_profiles set bio='I collect silver' where id='${id(2)}';
+   insert into community_comments(post_id,author_id,body) values ('${id(10)}','${id(2)}','Nice coin');`);
+ await db.exec(`insert into community_comment_flags(comment_id,reporter_id,reason)
+   select id,'${id(2)}','Off topic' from community_comments;`);
+ assert.equal(await count('community_comment_flags'),0);
+ await as(0);
+ assert.equal(await count('community_comments'),1);
+ assert.equal((await rows(`select bio from community_profiles where id='${id(2)}'`))[0].bio,'I collect silver');
  await as(3);
  assert.equal(await count('community_reports'),1);
+ assert.equal(await count('community_comment_flags'),1);
  await as(2);
  await db.exec(`insert into community_blocks values ('${id(2)}','${id(1)}')`);
  assert.equal(await count('community_posts'),0);
  assert.equal(await count('community_follows'),0);
+ assert.equal(await count('community_comments'),0);
  assert.equal(await count('storage.objects'),0);
  await as(3);
  await db.exec(`update community_posts set status='removed' where id='${id(10)}'`);
