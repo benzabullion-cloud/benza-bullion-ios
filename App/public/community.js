@@ -22,6 +22,27 @@ function communityButton(label, action, className = 'communitySecondary') {
   return button;
 }
 
+function communityOptions(label, className = 'communityPostOptions') {
+  const options = communityElement('details', className);
+  const toggle = communityElement('summary', '', '•••');
+  toggle.setAttribute('aria-label', label);
+  options.append(toggle);
+  return options;
+}
+
+function communityReactionButton(path, count, action) {
+  const svgNamespace = 'http://www.w3.org/2000/svg';
+  const button = communityButton('', action, 'communityReaction');
+  const icon = document.createElementNS(svgNamespace, 'svg');
+  icon.setAttribute('viewBox', '0 0 24 24');
+  icon.setAttribute('aria-hidden', 'true');
+  const outline = document.createElementNS(svgNamespace, 'path');
+  outline.setAttribute('d', path);
+  icon.append(outline);
+  button.append(icon, communityElement('span', '', String(count)));
+  return button;
+}
+
 function openBullionNewsSection(section) {
   const community = section === 'community';
   communityNode('communityPanel').hidden = !community;
@@ -254,10 +275,8 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
   }
   const body = communityElement('div', 'communityPostBody');
   const actions = communityElement('div', 'communityPostActions');
-  const options = communityElement('details', 'communityPostOptions');
-  const toggle = communityElement('summary', '', '•••');
-  toggle.setAttribute('aria-label', 'Post options');
-  options.append(toggle);
+  const options = communityOptions('Post options');
+  let comments;
   body.append(communityElement('p', '', post.caption));
   if (post.status !== 'approved') body.append(communityElement('p', 'communityBadge',
     post.status === 'pending' ? 'Awaiting review' : post.status === 'declined' ? 'Declined' : 'Removed'));
@@ -265,11 +284,12 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
   if (post.status === 'approved') {
     const selected = liked.has(post.id);
     const count = post.community_likes?.[0]?.count || 0;
-    const heart = communityButton((selected ? '♥ ' : '♡ ') + count,
-      () => updateBullionReaction('like', post, selected, heart));
+    const heart = communityReactionButton('M20.8 4.6a5.2 5.2 0 0 0-7.4 0L12 6l-1.4-1.4a5.2 5.2 0 0 0-7.4 7.4l1.4 1.4L12 21l7.4-7.6 1.4-1.4a5.2 5.2 0 0 0 0-7.4Z',
+      count, () => updateBullionReaction('like', post, selected, heart));
     heart.setAttribute('aria-pressed', selected);
     heart.setAttribute('aria-label', selected ? 'Unlike post' : 'Like post');
-    actions.append(heart);
+    comments = renderBullionComments(post, post.community_comments?.[0]?.count || 0);
+    actions.append(heart, comments.toggle);
     if (post.author_id !== currentUser?.id) {
       const follows = followed.has(post.author_id);
       const follow = communityButton(follows ? 'Following' : 'Follow',
@@ -298,14 +318,27 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
   }
   if (options.childElementCount > 1) actions.append(options);
   body.append(actions);
-  if (post.status === 'approved') body.append(renderBullionComments(post, post.community_comments?.[0]?.count || 0));
+  if (comments) body.append(comments.thread);
   article.append(body);
   return article;
 }
 
 function renderBullionComments(post, count) {
-  const thread = communityElement('details', 'communityComments');
-  const toggle = communityElement('summary', '', count ? 'Comments · ' + count : 'Comments');
+  const thread = communityElement('section', 'communityComments');
+  thread.id = 'communityComments-' + post.id;
+  thread.hidden = true;
+  const toggle = communityReactionButton('M21 11.5a8.5 8.5 0 0 1-8.5 8.5 8.7 8.7 0 0 1-4.1-1L3 21l1.8-5.1A8.5 8.5 0 1 1 21 11.5Z', count, () => {
+    thread.hidden = !thread.hidden;
+    toggle.setAttribute('aria-expanded', String(!thread.hidden));
+    if (!thread.hidden) void loadComments();
+  });
+  toggle.setAttribute('aria-controls', thread.id);
+  toggle.setAttribute('aria-expanded', 'false');
+  function updateCommentCount() {
+    toggle.lastElementChild.textContent = String(count);
+    toggle.setAttribute('aria-label', count === 1 ? '1 comment' : count + ' comments');
+  }
+  updateCommentCount();
   const list = communityElement('div', 'communityCommentList');
   const status = communityElement('p', 'communityBadge');
   status.setAttribute('role', 'status');
@@ -333,15 +366,12 @@ function renderBullionComments(post, count) {
     }
   }
 
-  thread.append(toggle, list, status);
-  thread.addEventListener('toggle', () => {
-    if (thread.open) void loadComments();
-  });
+  thread.append(list, status);
   if (!currentUser || !bullionCommunity.profile) {
     thread.append(communityButton(currentUser ? 'Set up your profile to comment' : 'Sign in to comment', () => {
       if (communitySignIn('comment on a post')) editBullionProfile(currentUser.id, null);
     }));
-    return thread;
+    return {thread, toggle};
   }
 
   const form = communityElement('form', 'communityCommentForm');
@@ -366,7 +396,8 @@ function renderBullionComments(post, count) {
       await communityData(supabaseClient.from('community_comments')
         .insert({post_id:post.id, author_id:userId, body}));
       field.value = '';
-      toggle.textContent = 'Comments · ' + (++count);
+      count++;
+      updateCommentCount();
       void loadComments();
     } catch (error) {
       feedback.textContent = error.code === '23514' ? 'Leave links and email addresses out of comments.' : 'Couldn’t post your comment. Try again.';
@@ -375,21 +406,28 @@ function renderBullionComments(post, count) {
     }
   };
   thread.append(form);
-  return thread;
+  return {thread, toggle};
 }
 
 function renderBullionComment(comment) {
   const item = communityElement('article', 'communityComment');
-  item.append(communityElement('strong', '', comment.community_profiles?.display_name || 'Collector'),
-    communityElement('p', '', comment.body));
+  const heading = communityElement('div', 'communityCommentHead');
+  heading.append(communityElement('strong', '', comment.community_profiles?.display_name || 'Collector'));
   if (currentUser) {
-    const actions = communityElement('div', 'communityPostActions');
-    actions.append(communityButton('Flag comment', () => flagBullionComment(comment)));
+    const options = communityOptions('Comment options', 'communityCommentOptions');
+    options.append(communityButton('Flag comment', () => {
+      options.open = false;
+      flagBullionComment(comment);
+    }));
     if (comment.author_id === currentUser.id || bullionCommunity.moderator) {
-      actions.append(communityButton('Remove comment', () => removeBullionComment(comment)));
+      options.append(communityButton('Remove comment', () => {
+        options.open = false;
+        removeBullionComment(comment);
+      }));
     }
-    item.append(actions);
+    heading.append(options);
   }
+  item.append(heading, communityElement('p', '', comment.body));
   return item;
 }
 
