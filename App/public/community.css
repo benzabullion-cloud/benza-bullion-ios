@@ -165,3 +165,26 @@
 .communityBioCount{justify-self:end;font-variant-numeric:tabular-nums}
 .communityDialog:has(.communityProfilePreview) .communityDialogActions{display:grid;grid-template-columns:1fr 2fr}
 .communityDialog:has(.communityProfilePreview) .communityDialogActions button{min-height:44px}
+
+.communityProfile{
+  padding:14px;border-radius:20px;box-shadow:0 5px 16px #0001;
+  background:linear-gradient(140deg,color-mix(in srgb,var(--gold) 7%,var(--surface)),var(--surface) 58%)
+}
+.communityProfileIdentity{display:flex;align-items:center;gap:9px;min-width:0}
+.communityProfileIdentity .communityAvatar{width:38px;height:38px}
+.communityProfileStats dd{color:var(--gold)}
+.communitySearchLaunch[aria-pressed=true]{border-color:var(--gold)}
+.communityPeopleSearch{padding:12px;border:1px solid var(--border);border-radius:16px;background:var(--surface)}
+.communityPeopleForm{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.communityPeopleForm input{
+  min-width:0;min-height:44px;padding:8px 10px;border:1px solid var(--border);border-radius:11px;
+  background:var(--surface2);color:var(--text);font:inherit;font-size:16px
+}
+.communitySearchStatus{margin:8px 0 0;color:var(--muted);font-size:13px}
+.communitySearchStatus:empty,.communityPeopleResults:empty{display:none}
+.communityPeopleResults{list-style:none;padding:0;margin:8px 0 0}
+.communityPeopleResults li+li{border-top:1px solid var(--border)}
+.communityPersonResult{
+  display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:6px 2px;border:0;
+  background:none;color:var(--text);font:inherit;text-align:start;cursor:pointer;overflow-wrap:anywhere
+}

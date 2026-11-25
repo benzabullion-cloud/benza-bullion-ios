@@ -88,6 +88,61 @@ async function showBullionGallery(view, author = null) {
   await loadBullionGallery();
 }
 
+function renderCommunitySearch(galleryRequest, userId) {
+  const panel = communityElement('section', 'communityPeopleSearch');
+  const form = communityElement('form', 'communityPeopleForm');
+  form.setAttribute('role', 'search');
+  form.setAttribute('aria-label', 'Find collectors');
+  const field = communityElement('input');
+  field.type = 'search';
+  field.placeholder = 'Search by display name';
+  field.setAttribute('aria-label', 'Search by display name');
+  field.maxLength = 32;
+  field.required = true;
+  const submit = communityElement('button', 'communityPrimary', 'Search');
+  submit.type = 'submit';
+  const status = communityElement('p', 'communitySearchStatus');
+  status.setAttribute('role', 'status');
+  const results = communityElement('ul', 'communityPeopleResults');
+  form.append(field, submit);
+  panel.append(form, status, results);
+  form.onsubmit = async event => {
+    event.preventDefault();
+    const term = field.value.trim();
+    if (submit.disabled) return;
+    results.replaceChildren();
+    if (term.length < 2) {
+      status.textContent = 'Enter at least two characters.';
+      return;
+    }
+    submit.disabled = true;
+    status.textContent = 'Searching…';
+    try {
+      const literal = term.replace(/[\\%_]/g, character => '\\' + character);
+      const {data} = await communityData(supabaseClient.from('community_profiles')
+        .select('id,display_name').ilike('display_name', '%' + literal + '%')
+        .order('display_name').order('id').limit(21));
+      if (!communityCurrent(galleryRequest, userId)) return;
+      for (const profile of data.slice(0, 20)) {
+        const row = communityElement('li');
+        const action = communityButton('', () => showBullionGallery('profile', profile.id), 'communityPersonResult');
+        const avatar = communityElement('span', 'communityAvatar', communityInitials(profile.display_name));
+        avatar.setAttribute('aria-hidden', 'true');
+        action.append(avatar, communityElement('strong', '', profile.display_name));
+        row.append(action);
+        results.append(row);
+      }
+      status.textContent = data.length > 20 ? 'Showing 20 matches. Enter more of the name to narrow your search.'
+        : data.length ? '' : 'No collectors found.';
+    } catch {
+      if (communityCurrent(galleryRequest, userId)) status.textContent = 'Couldn’t search for collectors. Try again.';
+    } finally {
+      submit.disabled = false;
+    }
+  };
+  return panel;
+}
+
 async function loadMoreBullionPosts() {
   if (!bullionCommunity.loading) await loadBullionGallery(true);
 }
@@ -106,6 +161,11 @@ async function loadBullionGallery(append = false) {
 
   try {
     if (!supabaseClient) throw new Error('Community is unavailable.');
+    if (view === 'people') {
+      communityStatus('');
+      feed.append(renderCommunitySearch(request, userId));
+      return;
+    }
     const [profile, membership] = userId ? await Promise.all([
       communityData(supabaseClient.from('community_profiles').select('id,display_name').eq('id', userId).maybeSingle()),
       communityData(supabaseClient.from('community_moderators').select('user_id').eq('user_id', userId).maybeSingle())
@@ -183,7 +243,7 @@ async function loadBullionGallery(append = false) {
       mine:'You haven’t submitted a post yet.',
       following:'No approved posts from collectors you follow yet.',
       review:'The review queue is clear.',
-      profile:'No approved posts from this collector.'
+      profile:profileCard ? 'No approved posts from this collector.' : 'This collector profile is unavailable.'
     }[view]);
     bullionCommunity.page = offset / communityPageSize + 1;
     more.hidden = results.length <= communityPageSize;
@@ -218,7 +278,12 @@ async function getBullionProfile(authorId, inMyPosts = false) {
   if (!profile.data && !isOwner) return null;
   const card = communityElement('section', 'communityProfile');
   const header = communityElement('div', 'communityProfileHead');
-  header.append(communityElement('h3', '', profile.data?.display_name || 'Your collector profile'));
+  const identity = communityElement('div', 'communityProfileIdentity');
+  const name = profile.data?.display_name || 'Your collector profile';
+  const avatar = communityElement('span', 'communityAvatar', communityInitials(profile.data?.display_name || ''));
+  avatar.setAttribute('aria-hidden', 'true');
+  identity.append(avatar, communityElement('h3', '', name));
+  header.append(identity);
   if (isOwner || inMyPosts) {
     const actions = communityElement('div', 'communityProfileActions');
     if (isOwner) {
