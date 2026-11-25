@@ -230,3 +230,16 @@ html[data-theme="dark"] .communityPostCategory[data-metal]{
 .communityHeading .communityWordmark + p{margin-top:8px}
 
 .newsWordmark{margin:18px 0 8px}
+
+.communityAvatar img{width:76%;height:76%;object-fit:contain}
+.communityAvatarPicker{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.communityAvatarChoice{
+  display:grid;justify-items:center;gap:4px;min-height:60px;padding:5px 2px;
+  border:1px solid var(--border);border-radius:11px;background:var(--surface2);color:var(--text);
+  font:inherit;font-size:11px;cursor:pointer
+}
+.communityAvatarChoice[aria-pressed=true]{border-color:var(--gold)}
+.communityAvatarChoice .communityAvatar,.communityCommentByline .communityAvatar{width:26px;height:26px;font-size:9px}
+.communityCommentByline{display:flex;align-items:center;gap:6px}
+.communityDialog:has(.communityProfilePreview) label[hidden]{display:none}
+#communityReviewAlertsRow[hidden]{display:none}

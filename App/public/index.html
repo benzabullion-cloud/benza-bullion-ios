@@ -6609,6 +6609,10 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
             <div class="settingsNotificationTypeText"><div class="settingsNotificationTypeName">Portfolio Milestones</div><div class="settingsNotificationTypeDesc">Celebrate when your bullion portfolio reaches a new value milestone.</div></div>
             <button id="notifyMilestones" class="settingsToggle" type="button" onclick="toggleNotificationPreference('portfolio_milestones')" aria-label="Toggle Portfolio Milestones"><span class="settingsToggleTrack"></span><span class="settingsToggleKnob"></span></button>
           </div>
+          <div id="communityReviewAlertsRow" class="settingsNotificationTypeRow" hidden>
+            <div class="settingsNotificationTypeText"><div class="settingsNotificationTypeName">Community review alerts</div><div class="settingsNotificationTypeDesc">Notify me when another collector submits a post for review.</div></div>
+            <button id="communityReviewAlertsToggle" class="settingsToggle" type="button" onclick="toggleCommunityReviewAlerts()" aria-label="Toggle Community review alerts" aria-pressed="false"><span class="settingsToggleTrack"></span><span class="settingsToggleKnob"></span></button>
+          </div>
         </div>
         <div id="notificationPrefsStatus" role="status" aria-live="polite" class="settingsNotificationPrefsStatus"></div>
         <button id="notificationTestButton" class="settingsNotificationTest" type="button" onclick="this.textContent='Sending…';this.disabled=true;sendBenzaTestNotification().finally(()=>{this.disabled=false;this.textContent='Send Test Notification';})" style="display:none">Send Test Notification</button>
@@ -9193,6 +9197,7 @@ async function onSignedIn(){
 
   // Honor Settings/legal return routes before waiting on portfolio data.
   handleBenzaDeepLink();
+  if(typeof connectCommunityNotificationRoute==='function')void connectCommunityNotificationRoute();
 
   await loadHoldingsFromSupabase();
   if(currentUser?.id!==userId)return;
@@ -9499,6 +9504,7 @@ function clearBenzaAccountState(){
   liveCloudLoaded=false;lastLiveCloudSync=0;
   benzaWatchlist=[];
   benzaNotificationPrefs={...DEFAULT_NOTIFICATION_PREFS};
+  document.getElementById('communityReviewAlertsRow')?.setAttribute('hidden','');
   closeSmartCamera();closeAdd();closeAddChoice();closeProUpgrade();closeSaleModal();
   resetProInventoryForm();resetBullionDetails();
   hideMainOverlays();
@@ -9537,6 +9543,11 @@ function handleBenzaDeepLink(){
   const params=new URLSearchParams(location.search);
   const requested=params.get('open');
   let tab=null;
+  if(location.hash==='#community-review'){
+    history.replaceState(null,'',location.pathname+location.search);
+    void openCommunityReviewFromAlert();
+    return;
+  }
   if(requested==='settings'||location.hash==='#settings') tab='settings';
   if(requested==='notifications'||location.hash==='#notifications') tab='notifications';
   if(requested==='activity'||location.hash==='#activity') tab='activity';
@@ -12525,10 +12536,10 @@ function goPortfolio(){
   setActiveNav('portfolio');
 }
 
-function openNews(){
+function openNews(section='community'){
   hideMainOverlays();
   setActiveNav('news');document.getElementById('newsScreen').classList.add('show');
-  if(typeof openBullionNewsSection==='function')openBullionNewsSection('community');
+  if(typeof openBullionNewsSection==='function')openBullionNewsSection(section);
   else loadMarketNews(false)
 }
 function closeNews(){if(guestBrowsing){activeMarketsTab='market';openMarkets();return;}document.getElementById('newsScreen').classList.remove('show');setActiveNav('portfolio')}
@@ -13006,6 +13017,7 @@ const notificationPreferenceRequests=new Set();
 async function loadNotificationPreferences(){
   renderNotificationPreferences();
   if(!supabaseClient||!currentUser)return;
+  if(typeof loadCommunityReviewAlertPreference==='function')void loadCommunityReviewAlertPreference();
   const userId=currentUser.id;
   const tz=detectedBenzaTimezone();
   const load=++notificationPreferenceLoad;

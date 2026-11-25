@@ -5,6 +5,17 @@ import UserNotifications
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
+    static let communityReviewTap = Notification.Name("BenzaCommunityReviewTap")
+    static let communityReviewTapKey = "benza.communityReviewTap"
+
+    static func handleCommunityReviewTap(_ response: UNNotificationResponse) {
+        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
+              let payload = response.notification.request.content.userInfo["benza"] as? [String: Any],
+              let tag = payload["tag"] as? String,
+              tag.hasPrefix("community-review-") else { return }
+        UserDefaults.standard.set(true, forKey: communityReviewTapKey)
+        NotificationCenter.default.post(name: communityReviewTap, object: nil)
+    }
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         UNUserNotificationCenter.current().delegate = self
@@ -51,6 +62,7 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
+        Self.handleCommunityReviewTap(response)
         completionHandler()
     }
 }

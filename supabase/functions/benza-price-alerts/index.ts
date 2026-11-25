@@ -411,6 +411,36 @@ async function recordEvent(
   }
 }
 
+async function processCommunityReviewAlerts() {
+  const { data, error } = await supabase.rpc("benza_pending_community_review_alerts");
+  if (error) throw error;
+  let sent = 0;
+  for (const { user_id, post_id } of data ?? []) {
+    const event = { user_id, event_type: "community_review", event_key: post_id };
+    const reservation = await supabase.from("notification_events").insert(event);
+    if (reservation.error?.code === "23505") continue;
+    if (reservation.error) throw reservation.error;
+
+    let accepted = false;
+    try {
+      const result = await sendPush(user_id, {
+        title: "New Community post awaiting review",
+        body: "Open Benza Bullion to review the submission.",
+        tag: "community-review-" + post_id,
+        url: APP_URL + "/#community-review",
+      });
+      accepted = result.sent > 0;
+      sent += result.sent;
+    } finally {
+      if (!accepted) {
+        const { error: releaseError } = await supabase.from("notification_events").delete().match(event);
+        if (releaseError) console.error("Could not release Community notification reservation", releaseError);
+      }
+    }
+  }
+  return sent;
+}
+
 async function getPortfolioValue(
   userId: string,
   prices: Record<string, number>,
@@ -979,6 +1009,13 @@ Deno.serve(async (req) => {
       vapid.privateKey,
     );
 
+    let communityReviews = 0;
+    try {
+      communityReviews = await processCommunityReviewAlerts();
+    } catch (error) {
+      console.error("Community review notifications failed", error);
+    }
+
     const prices = await fetchAllPrices();
 
     const users = await getActiveUserIds();
@@ -988,6 +1025,7 @@ Deno.serve(async (req) => {
       big_market_moves: 0,
       portfolio_milestones: 0,
       daily_summaries: 0,
+      community_reviews: communityReviews,
     };
 
     results.price_targets =
@@ -1022,7 +1060,7 @@ Deno.serve(async (req) => {
         results.price_targets +
         results.big_market_moves +
         results.portfolio_milestones +
-        results.daily_summaries,
+        results.daily_summaries + results.community_reviews,
     });
 
     return jsonResponse({
@@ -1032,7 +1070,7 @@ Deno.serve(async (req) => {
         results.price_targets +
         results.big_market_moves +
         results.portfolio_milestones +
-        results.daily_summaries,
+        results.daily_summaries + results.community_reviews,
       results,
       prices,
     });

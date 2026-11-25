@@ -76,11 +76,33 @@ final class BenzaNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "enable", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "disable", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "openSettings", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "test", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "test", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "consumeCommunityReviewTap", returnType: CAPPluginReturnPromise)
     ]
 
     private let tokenKey = "benza.apnsToken"
     private let errorKey = "benza.apnsRegistrationError"
+
+    private var reviewTapObserver: NSObjectProtocol?
+
+    override func load() {
+        reviewTapObserver = NotificationCenter.default.addObserver(
+            forName: AppDelegate.communityReviewTap, object: nil, queue: .main
+        ) { [weak self] _ in self?.notifyListeners("communityReviewTap", data: [:]) }
+    }
+
+    deinit {
+        if let reviewTapObserver { NotificationCenter.default.removeObserver(reviewTapObserver) }
+    }
+
+    @objc func consumeCommunityReviewTap(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let defaults = UserDefaults.standard
+            let pending = defaults.bool(forKey: AppDelegate.communityReviewTapKey)
+            defaults.removeObject(forKey: AppDelegate.communityReviewTapKey)
+            call.resolve(["pending": pending])
+        }
+    }
 
     private func permissionName(_ status: UNAuthorizationStatus) -> String {
         switch status {
@@ -1429,6 +1451,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
+        if let response = connectionOptions.notificationResponse {
+            AppDelegate.handleCommunityReviewTap(response)
+        }
         guard let windowScene = scene as? UIWindowScene else { return }
 
         window = UIWindow(windowScene: windowScene)

@@ -6,6 +6,7 @@ const bullionCommunity = {
 };
 const communityPageSize = 12;
 const communityMetals = ['Gold','Silver','Platinum','Palladium','Copper'];
+const communityAvatarMetals = ['gold','silver','platinum','palladium','copper'];
 const communityPhotoTypes = ['Coin','Round','Bar','Display'];
 const communityItemTypeLabel = type => type === 'Display' ? 'Collection display' : type;
 const communityNode = id => document.getElementById(id);
@@ -47,18 +48,95 @@ function communityReactionButton(path, count, action) {
 }
 
 function openBullionNewsSection(section) {
-  const community = section === 'community';
+  const community = section === 'community' || section === 'review';
   communityNode('communityPanel').hidden = !community;
   communityNode('communityMarketNews').hidden = community;
   communityNode('newsRefreshButton').hidden = community;
   communityNode('communityNewsTab').setAttribute('aria-pressed', !community);
   communityNode('communityGalleryTab').setAttribute('aria-pressed', community);
-  if (community) void showBullionGallery('discover');
+  if (community) void showBullionGallery(section === 'review' ? 'review' : 'discover');
   else {
     bullionCommunity.request++;
     bullionCommunity.loading = false;
     communityNode('communityFeed').replaceChildren();
     if (communityNode('newsScreen').classList.contains('show')) void loadMarketNews(false);
+  }
+}
+
+async function loadCommunityReviewAlertPreference() {
+  const row = communityNode('communityReviewAlertsRow');
+  const toggle = communityNode('communityReviewAlertsToggle');
+  const userId = currentUser?.id;
+  if (!row || !toggle || !userId || toggle.disabled) return;
+  try {
+    const {data} = await communityData(supabaseClient.from('community_moderators')
+      .select('review_alerts_since').eq('user_id', userId).maybeSingle());
+    if (currentUser?.id !== userId || toggle.disabled) return;
+    row.hidden = !data;
+    toggle.classList.toggle('on', !!data?.review_alerts_since);
+    toggle.setAttribute('aria-pressed', String(!!data?.review_alerts_since));
+  } catch {
+    if (currentUser?.id === userId) row.hidden = true;
+  }
+}
+
+async function toggleCommunityReviewAlerts() {
+  const row = communityNode('communityReviewAlertsRow');
+  const toggle = communityNode('communityReviewAlertsToggle');
+  const status = communityNode('notificationPrefsStatus');
+  const userId = currentUser?.id;
+  if (!userId || row.hidden || toggle.disabled) return;
+  const enable = toggle.getAttribute('aria-pressed') !== 'true';
+  toggle.disabled = true;
+  try {
+    await communityData(supabaseClient.from('community_moderators')
+      .update({review_alerts_since:enable ? new Date().toISOString() : null})
+      .eq('user_id', userId).select('user_id').single());
+    if (currentUser?.id === userId) {
+      toggle.classList.toggle('on', enable);
+      toggle.setAttribute('aria-pressed', String(enable));
+      status.textContent = enable ? 'Community review alerts enabled.' : 'Community review alerts disabled.';
+    }
+  } catch {
+    if (currentUser?.id === userId) status.textContent = 'Could not save this setting. Please try again.';
+  } finally {
+    toggle.disabled = false;
+    if (currentUser?.id !== userId) void loadCommunityReviewAlertPreference();
+  }
+}
+
+async function openCommunityReviewFromAlert() {
+  const userId = currentUser?.id;
+  if (!userId) return;
+  try {
+    const {data} = await communityData(supabaseClient.from('community_moderators')
+      .select('user_id').eq('user_id', userId).maybeSingle());
+    if (data && currentUser?.id === userId) openNews('review');
+  } catch (error) {
+    console.warn('Could not open the Community review queue:', error);
+  }
+}
+
+let communityNotificationListener;
+async function connectCommunityNotificationRoute() {
+  const plugin = nativeBenzaNotifications();
+  if (!plugin?.consumeCommunityReviewTap) return;
+  try {
+    communityNotificationListener ??= plugin.addListener('communityReviewTap', () => void consumeTap());
+    await communityNotificationListener;
+    await consumeTap();
+  } catch (error) {
+    communityNotificationListener = null;
+    console.warn('Could not connect Community notification routing:', error);
+  }
+  async function consumeTap() {
+    if (!currentUser) return;
+    try {
+      const {pending} = await plugin.consumeCommunityReviewTap();
+      if (pending) await openCommunityReviewFromAlert();
+    } catch (error) {
+      console.warn('Could not read Community notification route:', error);
+    }
   }
 }
 
@@ -155,14 +233,13 @@ function renderCommunitySearch(userId) {
     try {
       const literal = term.replace(/[\\%_]/g, character => '\\' + character);
       const {data} = await communityData(supabaseClient.from('community_profiles')
-        .select('id,display_name').ilike('display_name', '%' + literal + '%')
+        .select('id,display_name,avatar_style,avatar_initials').ilike('display_name', '%' + literal + '%')
         .order('display_name').order('id').limit(21));
       if (!panel.isConnected || (currentUser?.id || null) !== userId) return;
       for (const profile of data.slice(0, 20)) {
         const row = communityElement('li');
         const action = communityButton('', () => showBullionGallery('profile', profile.id), 'communityPersonResult');
-        const avatar = communityElement('span', 'communityAvatar', communityInitials(profile.display_name));
-        avatar.setAttribute('aria-hidden', 'true');
+        const avatar = communityAvatar(profile);
         action.append(avatar, communityElement('strong', '', profile.display_name));
         row.append(action);
         results.append(row);
@@ -215,7 +292,7 @@ async function loadBullionGallery(append = false) {
     let reports = [];
     let commentFlags = [];
     let query = supabaseClient.from('community_posts')
-      .select('id,author_id,metal,item_type,caption,photo_path,public_photo_path,status,created_at,published_at,review_reason,community_profiles(display_name),community_likes(count),community_comments(count)');
+      .select('id,author_id,metal,item_type,caption,photo_path,public_photo_path,status,created_at,published_at,review_reason,community_profiles(display_name,avatar_style,avatar_initials),community_likes(count),community_comments(count)');
     if (view === 'mine') {
       query = query.eq('author_id', userId);
       if (myPostType === 'discussions') query = query.eq('item_type', 'Discussion');
@@ -225,7 +302,7 @@ async function loadBullionGallery(append = false) {
         communityData(supabaseClient.from('community_reports')
           .select('post_id,reason').is('resolved_at', null).limit(100)),
         !append ? communityData(supabaseClient.from('community_comment_flags')
-          .select('comment_id,reason,community_comments!inner(id,body,community_profiles(display_name),community_posts!inner(caption,status))')
+          .select('comment_id,reason,community_comments!inner(id,body,community_profiles(display_name,avatar_style,avatar_initials),community_posts!inner(caption,status))')
           .is('resolved_at', null).eq('community_comments.community_posts.status', 'approved')
           .order('created_at').limit(100)) : {data:[]}
       ]);
@@ -341,7 +418,7 @@ function renderMyCommunityPostFilters(selected) {
 async function getBullionProfile(authorId) {
   const isOwner = currentUser?.id === authorId;
   const [profile, posts, followers, following, likes] = await Promise.all([
-    communityData(supabaseClient.from('community_profiles').select('display_name,bio').eq('id', authorId).maybeSingle()),
+    communityData(supabaseClient.from('community_profiles').select('display_name,bio,avatar_style,avatar_initials').eq('id', authorId).maybeSingle()),
     communityData(supabaseClient.from('community_posts').select('id', {count:'exact', head:true})
       .eq('author_id', authorId).eq('status', 'approved')),
     communityData(supabaseClient.from('community_follows').select('follower_id', {count:'exact', head:true}).eq('followed_id', authorId)),
@@ -354,8 +431,7 @@ async function getBullionProfile(authorId) {
   const header = communityElement('div', 'communityProfileHead');
   const identity = communityElement('div', 'communityProfileIdentity');
   const name = profile.data?.display_name || 'Your collector profile';
-  const avatar = communityElement('span', 'communityAvatar', communityInitials(profile.data?.display_name || ''));
-  avatar.setAttribute('aria-hidden', 'true');
+  const avatar = communityAvatar(profile.data);
   identity.append(avatar, communityElement('h3', '', name));
   header.append(identity);
   if (isOwner) {
@@ -383,6 +459,21 @@ async function getBullionProfile(authorId) {
   return card;
 }
 
+function communityAvatar(profile, avatar = communityElement('span', 'communityAvatar')) {
+  avatar.setAttribute('aria-hidden', 'true');
+  avatar.replaceChildren();
+  const metal = profile?.avatar_style;
+  if (communityAvatarMetals.includes(metal)) {
+    const image = communityElement('img');
+    image.src = './assets/metal-emblems-svg/' + metal + '.svg';
+    image.alt = '';
+    avatar.append(image);
+  } else {
+    avatar.textContent = profile?.avatar_initials || communityInitials(profile?.display_name || '');
+  }
+  return avatar;
+}
+
 function editBullionProfile(authorId, profile) {
   if (currentUser?.id !== authorId) return;
   const name = communityElement('input');
@@ -391,6 +482,16 @@ function editBullionProfile(authorId, profile) {
   name.minLength = 2;
   name.maxLength = 32;
   name.pattern = '.*\\S.*\\S.*';
+  const initials = communityElement('input');
+  initials.value = profile?.avatar_initials || '';
+  initials.maxLength = 3;
+  initials.pattern = '[A-Za-z0-9]{1,3}';
+  initials.placeholder = 'Auto';
+  const initialsField = communityFormField('Custom initials (optional)', initials);
+  const avatarPicker = communityElement('div', 'communityAvatarPicker');
+  avatarPicker.setAttribute('role', 'group');
+  avatarPicker.setAttribute('aria-label', 'Profile image');
+  let avatarStyle = profile?.avatar_style || 'initials';
   const bio = communityElement('textarea');
   bio.value = profile?.bio || '';
   bio.maxLength = 160;
@@ -413,21 +514,35 @@ function editBullionProfile(authorId, profile) {
   bioField.append(bioCount);
   function updatePreview() {
     const displayName = name.value.trim();
-    avatar.textContent = communityInitials(displayName);
+    communityAvatar({display_name:displayName, avatar_style:avatarStyle, avatar_initials:initials.value.toUpperCase()}, avatar);
+    initialsField.hidden = avatarStyle !== 'initials';
+    initials.disabled = initialsField.hidden;
+    for (const choice of avatarPicker.children) choice.setAttribute('aria-pressed', String(choice.dataset.style === avatarStyle));
     previewName.textContent = displayName || 'Your collector name';
     previewBio.textContent = bio.value.trim();
     previewBio.hidden = !previewBio.textContent;
     bioCount.textContent = bio.value.length + ' / ' + bio.maxLength;
   }
+  for (const style of ['initials', ...communityAvatarMetals]) {
+    const label = style[0].toUpperCase() + style.slice(1);
+    const choice = communityButton('', () => { avatarStyle = style; updatePreview(); }, 'communityAvatarChoice');
+    choice.dataset.style = style;
+    choice.append(communityAvatar({display_name:'Aa', avatar_style:style, avatar_initials:'Aa'}), communityElement('span', '', label));
+    avatarPicker.append(choice);
+  }
+  initials.addEventListener('input', () => {
+    initials.value = initials.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    updatePreview();
+  });
   name.addEventListener('input', updatePreview);
   bio.addEventListener('input', updatePreview);
   updatePreview();
   const fields = [
     communityElement('p', 'communityProfileHint', 'Choose a unique display name so other collectors can find you.'),
-    preview, communityFormField('Display name', name), bioField
+    preview, avatarPicker, initialsField, communityFormField('Display name', name), bioField
   ];
   openCommunityDialog('Edit community profile', fields, 'Save changes', async () => {
-    const values = {display_name:name.value.trim(), bio:bio.value.trim()};
+    const values = {display_name:name.value.trim(), bio:bio.value.trim(), avatar_style:avatarStyle, avatar_initials:initials.value.toUpperCase()};
     const profiles = supabaseClient.from('community_profiles');
     const write = profile ? profiles.update(values).eq('id', authorId) : profiles.insert({id:authorId, ...values});
     await communityData(write.select('id').single());
@@ -440,8 +555,7 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
   const heading = communityElement('div', 'communityPostHead');
   const name = post.community_profiles?.display_name || 'Collector';
   const identity = communityElement('div', 'communityPostIdentity');
-  const avatar = communityElement('span', 'communityAvatar', communityInitials(name));
-  avatar.setAttribute('aria-hidden', 'true');
+  const avatar = communityAvatar(post.community_profiles || {display_name:name});
   const author = communityElement('div', 'communityPostByline');
   author.append(communityButton(name, () => showBullionGallery('profile', post.author_id), 'communityAuthor'));
   const timestamp = post.published_at || post.created_at;
@@ -551,7 +665,7 @@ function renderBullionComments(post, count) {
     status.textContent = 'Loading comments…';
     try {
       const {data} = await communityData(supabaseClient.from('community_comments')
-        .select('id,author_id,body,community_profiles(display_name)')
+        .select('id,author_id,body,community_profiles(display_name,avatar_style,avatar_initials)')
         .eq('post_id', post.id).order('created_at', {ascending:false})
         .order('id', {ascending:false}).limit(limit + 1));
       if (version !== request || currentUser?.id !== userId) return;
@@ -614,7 +728,9 @@ function renderBullionComments(post, count) {
 function renderBullionComment(comment) {
   const item = communityElement('article', 'communityComment communityCommentRow');
   const heading = communityElement('div', 'communityCommentText');
-  heading.append(communityElement('strong', '', comment.community_profiles?.display_name || 'Collector'));
+  const byline = communityElement('div', 'communityCommentByline');
+  byline.append(communityAvatar(comment.community_profiles), communityElement('strong', '', comment.community_profiles?.display_name || 'Collector'));
+  heading.append(byline);
   if (currentUser) {
     const options = communityOptions('Comment options', 'communityCommentOptions');
     options.append(communityButton('Flag comment', () => {
