@@ -220,7 +220,7 @@ html[data-theme="dark"] .communityPostCategory[data-metal]{
 }
 .communityMyPostsEmpty{margin:0}
 
-.communityHeading .communityWordmark{
+.communityWordmark{
   display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 10px;line-height:1.15
 }
 .communityWordmarkSection{
@@ -228,3 +228,5 @@ html[data-theme="dark"] .communityPostCategory[data-metal]{
   color:var(--text);font-size:clamp(15px,5vw,21px);font-weight:650;letter-spacing:-.4px;white-space:nowrap
 }
 .communityHeading .communityWordmark + p{margin-top:8px}
+
+.newsWordmark{margin:18px 0 8px}

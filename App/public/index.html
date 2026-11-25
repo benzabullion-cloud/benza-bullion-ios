@@ -3340,9 +3340,9 @@ button:disabled{opacity:.58;cursor:not-allowed}
 .watchQuoteCard strong{display:block;margin-top:4px;color:var(--text);font-size:12px;font-size:clamp(8px,3.25cqw,14px);font-weight:800;line-height:1.2;font-variant-numeric:tabular-nums;letter-spacing:-.2px;white-space:nowrap}
 .watchQuoteUnits{margin-top:5px;text-align:center;color:var(--muted);font-size:10px;line-height:1.3}
 .marketsWatchIntro{margin-top:5px;line-height:1.45}.marketsWatchForm{display:grid;gap:8px;margin-top:12px}.marketsWatchForm select,.marketsWatchForm input{width:100%;box-sizing:border-box;border:1px solid var(--border);background:var(--surface3);color:var(--text);border-radius:11px;padding:12px;font-size:13px}.marketsWatchForm button{border:0;border-radius:11px;background:var(--button);color:var(--buttonText);padding:12px;font-weight:800}.marketsWatchList{display:flex;flex-direction:column;gap:9px;margin-top:9px}.marketsWatchItem{display:grid;grid-template-columns:36px 1fr 30px;gap:10px;align-items:center}.marketsWatchMeta{font-size:10px;color:var(--muted);margin-top:3px;line-height:1.4}.marketsWatchProgress{height:5px;background:var(--surface3);border-radius:999px;overflow:hidden;margin-top:7px}.marketsWatchProgress span{display:block;height:100%;background:#c88719;border-radius:999px}.marketsWatchRemove{border:0;background:transparent;color:var(--muted);font-size:21px;padding:4px}
-.marketsComingHero{position:relative;overflow:hidden;background:linear-gradient(145deg,var(--surface) 0%,var(--surface) 62%,rgba(200,135,25,.10) 100%);border:1px solid var(--border);border-radius:18px;padding:20px 16px;box-shadow:0 3px 14px var(--shadow)}
+.marketsComingHero{container-type:inline-size;position:relative;overflow:hidden;background:linear-gradient(145deg,var(--surface) 0%,var(--surface) 62%,rgba(200,135,25,.10) 100%);border:1px solid var(--border);border-radius:18px;padding:20px 16px;box-shadow:0 3px 14px var(--shadow)}
 .marketsComingBadge{display:inline-flex;align-items:center;border:1px solid rgba(200,135,25,.38);background:rgba(200,135,25,.10);color:#b26d00;border-radius:999px;padding:5px 9px;font-size:9px;font-weight:900;letter-spacing:.8px}
-.marketsComingTitle{font-size:24px;font-weight:850;letter-spacing:-.5px;margin:13px 0 7px}
+.marketsComingTitle{font-size:clamp(16px,4.8vw,22px);font-size:clamp(16px,5.55cqi,22px);line-height:1.2;font-weight:850;letter-spacing:-.5px;margin:13px 0 7px}
 .marketsComingCopy{color:var(--muted);font-size:12px;line-height:1.55;margin:0}
 .marketsComingNote{margin:12px 0 0;padding-inline-start:9px;border-inline-start:2px solid var(--gold);color:var(--muted);font-size:12px;line-height:1.45}
 .marketsComingGrid{display:grid;gap:9px;margin-top:12px}
@@ -6474,7 +6474,10 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
       <p class="communitySupport"><a href="support.html">Community support</a></p>
     </section>
     <section id="communityMarketNews" aria-label="Market news">
-    <div class="newsEyebrow">Bullion news</div>
+    <h2 class="communityWordmark newsWordmark" aria-label="Benza Bullion News">
+      <span class="brand dashboardBrand">benza <span>bullion</span></span>
+      <span class="communityWordmarkSection">News</span>
+    </h2>
     <div class="newsIntro">Current stories that may matter to physical precious-metal owners. Swipe or use the arrows to browse, then open the original article for full context.</div>
     <div id="newsStatus" class="newsStatus">Loading current bullion news…</div>
     <div class="newsRail">
