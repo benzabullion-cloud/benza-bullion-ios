@@ -7,6 +7,7 @@ const bullionCommunity = {
 const communityPageSize = 12;
 const communityMetals = ['Gold','Silver','Platinum','Palladium','Copper'];
 const communityPhotoTypes = ['Coin','Round','Bar','Display'];
+const communityItemTypeLabel = type => type === 'Display' ? 'Collection display' : type;
 const communityNode = id => document.getElementById(id);
 const communityPhotoPath = post => post.status === 'approved' ? post.public_photo_path : post.photo_path;
 
@@ -92,7 +93,7 @@ async function showBullionGallery(view, author = null) {
 
 function updateCommunityDiscoverFilters() {
   const {view, discoverMetal, discoverType} = bullionCommunity;
-  const selection = [discoverMetal, discoverType].filter(Boolean).join(' · ');
+  const selection = [discoverMetal, communityItemTypeLabel(discoverType)].filter(Boolean).join(' · ');
   communityNode('communityDiscoverFilters').hidden = view !== 'discover';
   communityNode('communityDiscoverSelection').textContent = selection;
   communityNode('communityClearFilters').hidden = !selection;
@@ -102,11 +103,16 @@ function openCommunityDiscoverFilters() {
   const metal = communitySelect(['All metals', ...communityMetals]);
   metal.options[0].value = '';
   metal.value = bullionCommunity.discoverMetal;
-  const type = communitySelect(['All types', ...communityPhotoTypes]);
+  const type = communitySelect(['All types', ...communityPhotoTypes, 'Discussion'], communityItemTypeLabel);
   type.options[0].value = '';
   type.value = bullionCommunity.discoverType;
+  function syncMetalFilter() {
+    metal.disabled = type.value === 'Discussion';
+  }
+  type.addEventListener('change', syncMetalFilter);
+  syncMetalFilter();
   openCommunityDialog('Filter Discover', [communityFormField('Metal', metal), communityFormField('Item type', type)], 'Apply filters', () => {
-    bullionCommunity.discoverMetal = metal.value;
+    bullionCommunity.discoverMetal = metal.disabled ? '' : metal.value;
     bullionCommunity.discoverType = type.value;
   });
 }
@@ -450,7 +456,7 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
   identity.append(avatar, author);
   const discussion = post.item_type === 'Discussion';
   article.classList.toggle('communityDiscussion', discussion);
-  const label = discussion ? 'Discussion' : post.metal[0].toUpperCase() + post.metal.slice(1) + ' · ' + post.item_type;
+  const label = discussion ? 'Discussion' : post.metal[0].toUpperCase() + post.metal.slice(1) + ' · ' + communityItemTypeLabel(post.item_type);
   const category = communityElement('span', 'communityPostCategory', label);
   if (!discussion) category.dataset.metal = post.metal;
   heading.append(identity, category);
@@ -459,7 +465,7 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
   if (photoUrl) {
     const photo = communityElement('img', 'communityPhoto');
     photo.src = photoUrl;
-    photo.alt = post.metal + ' ' + post.item_type.toLowerCase() + ' shared by ' + name;
+    photo.alt = post.metal + ' ' + communityItemTypeLabel(post.item_type).toLowerCase() + ' shared by ' + name;
     photo.referrerPolicy = 'no-referrer';
     photo.decoding = 'async';
     article.append(photo);
@@ -734,9 +740,13 @@ function communityFormField(label, input) {
   return wrapper;
 }
 
-function communitySelect(values) {
+function communitySelect(values, labelForValue = value => value) {
   const select = communityElement('select');
-  for (const value of values) select.append(communityElement('option', '', value));
+  for (const value of values) {
+    const option = communityElement('option', '', labelForValue(value));
+    option.value = value;
+    select.append(option);
+  }
   return select;
 }
 
@@ -808,7 +818,7 @@ function composeBullionPost() {
   const photo = communityElement('input');
   photo.type = 'file'; photo.accept = 'image/*'; photo.required = false;
   const metal = communitySelect(communityMetals);
-  const type = communitySelect(communityPhotoTypes);
+  const type = communitySelect(communityPhotoTypes, communityItemTypeLabel);
   const caption = communityElement('textarea');
   caption.placeholder = 'What would you like to share about bullion?';
   caption.maxLength = 280; caption.minLength = 3; caption.required = true;
