@@ -40,7 +40,6 @@
 .communitySupport a{color:inherit}
 
 .communityProfileHead{display:flex;align-items:center;justify-content:space-between;gap:0 8px;flex-wrap:wrap}
-.communityProfileActions{display:flex;flex-wrap:wrap;align-items:center;gap:0 4px;min-width:0}
 .communityProfileAction{
   border:0;background:transparent;color:var(--text);padding:3px 4px;min-height:36px;
   font:inherit;font-size:12px;font-weight:650;text-decoration:underline;text-underline-offset:3px;cursor:pointer
@@ -188,3 +187,6 @@
   display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:6px 2px;border:0;
   background:none;color:var(--text);font:inherit;text-align:start;cursor:pointer;overflow-wrap:anywhere
 }
+
+.communityProfilePostsHeading{display:flex;align-items:center;gap:10px;margin:4px 0 0;color:var(--text);font-size:14px}
+.communityProfilePostsHeading::after{content:"";flex:1;height:1px;background:var(--border)}

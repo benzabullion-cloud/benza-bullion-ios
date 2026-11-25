@@ -225,13 +225,16 @@ async function loadBullionGallery(append = false) {
         .eq('follower_id', userId).in('followed_id', authors)) : {data:[]},
       photoPosts.length ? supabaseClient.storage.from('bullion-community').createSignedUrls(photoPosts.map(communityPhotoPath), 120) : {data:[]},
       !append && (view === 'profile' || view === 'mine')
-        ? getBullionProfile(view === 'mine' ? userId : author, view === 'mine')
+        ? getBullionProfile(view === 'mine' ? userId : author)
         : null
     ]);
     if (!communityCurrent(request, userId)) return;
 
     if (commentFlags.length) feed.append(renderFlaggedBullionComments(commentFlags));
     if (profileCard) feed.append(profileCard);
+    if (!append && view === 'mine' && posts.length) {
+      feed.append(communityElement('h3', 'communityProfilePostsHeading', 'My posts'));
+    }
     const liked = new Set(likeRows.data.map(row => row.post_id));
     const followed = new Set(followRows.data.map(row => row.followed_id));
     const signed = new Map((photos.data || []).map(photo => [photo.path, photo.signedUrl]));
@@ -264,7 +267,7 @@ function communityInitials(name) {
     .map(word => Array.from(word)[0].toLocaleUpperCase()).join('') || '•';
 }
 
-async function getBullionProfile(authorId, inMyPosts = false) {
+async function getBullionProfile(authorId) {
   const isOwner = currentUser?.id === authorId;
   const [profile, posts, followers, following, likes] = await Promise.all([
     communityData(supabaseClient.from('community_profiles').select('display_name,bio').eq('id', authorId).maybeSingle()),
@@ -284,19 +287,10 @@ async function getBullionProfile(authorId, inMyPosts = false) {
   avatar.setAttribute('aria-hidden', 'true');
   identity.append(avatar, communityElement('h3', '', name));
   header.append(identity);
-  if (isOwner || inMyPosts) {
-    const actions = communityElement('div', 'communityProfileActions');
-    if (isOwner) {
-      const edit = communityButton('Edit', () => editBullionProfile(authorId, profile.data), 'communityProfileAction');
-      edit.setAttribute('aria-label', 'Edit profile');
-      actions.append(edit);
-    }
-    if (inMyPosts) {
-      const view = communityButton('Public profile', () => showBullionGallery('profile', authorId), 'communityProfileAction');
-      view.setAttribute('aria-label', 'View public profile');
-      actions.append(view);
-    }
-    header.append(actions);
+  if (isOwner) {
+    const edit = communityButton('Edit', () => editBullionProfile(authorId, profile.data), 'communityProfileAction');
+    edit.setAttribute('aria-label', 'Edit profile');
+    header.append(edit);
   }
   const stats = communityElement('dl', 'communityProfileStats');
   for (const [label, count] of [
@@ -304,8 +298,12 @@ async function getBullionProfile(authorId, inMyPosts = false) {
     ['Following', following.count], ['Likes received', likes.count]
   ]) {
     const stat = communityElement('div');
-    stat.append(communityElement('dt', '', label),
-      communityElement('dd', '', (count ?? 0).toLocaleString()));
+    const value = communityElement('dd', '', (count ?? 0).toLocaleString());
+    if (label === 'Likes received') {
+      value.dataset.communityLikesFor = authorId;
+      value.dataset.count = String(count ?? 0);
+    }
+    stat.append(communityElement('dt', '', label), value);
     stats.append(stat);
   }
   card.append(header);
@@ -413,7 +411,7 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
     const selected = liked.has(post.id);
     const count = post.community_likes?.[0]?.count || 0;
     const heart = communityReactionButton('M20.8 4.6a5.2 5.2 0 0 0-7.4 0L12 6l-1.4-1.4a5.2 5.2 0 0 0-7.4 7.4l1.4 1.4L12 21l7.4-7.6 1.4-1.4a5.2 5.2 0 0 0 0-7.4Z',
-      count, () => updateBullionReaction('like', post, selected, heart));
+      count, () => toggleBullionLike(post, heart));
     heart.setAttribute('aria-pressed', selected);
     heart.setAttribute('aria-label', selected ? 'Unlike post' : 'Like post');
     comments = renderBullionComments(post, post.community_comments?.[0]?.count || 0);
@@ -421,7 +419,7 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
     if (post.author_id !== currentUser?.id) {
       const follows = followed.has(post.author_id);
       const follow = communityButton(follows ? 'Following' : 'Follow',
-        () => updateBullionReaction('follow', post, follows, follow));
+        () => updateBullionFollow(post, follows, follow));
       follow.setAttribute('aria-pressed', follows);
       actions.append(follow);
       options.append(communityButton('Report', () => reportBullionPost(post)),
@@ -612,14 +610,48 @@ function renderFlaggedBullionComments(flags) {
   return section;
 }
 
-async function updateBullionReaction(kind, post, selected, button) {
-  if (!communitySignIn(kind === 'like' ? 'like bullion photos' : 'follow collectors') || button.disabled) return;
+async function toggleBullionLike(post, button) {
+  if (button.disabled || !communitySignIn('like bullion posts')) return;
   const userId = currentUser.id;
-  const table = kind === 'like' ? 'community_likes' : 'community_follows';
-  const keys = kind === 'like' ? {user_id:userId, post_id:post.id} : {follower_id:userId, followed_id:post.author_id};
+  const wasLiked = button.getAttribute('aria-pressed') === 'true';
+  const countLabel = button.lastElementChild;
+  const previousCount = Number(countLabel.textContent);
+  const delta = wasLiked ? -1 : 1;
+  function showLike(liked, count) {
+    button.setAttribute('aria-pressed', String(liked));
+    button.setAttribute('aria-label', liked ? 'Unlike post' : 'Like post');
+    countLabel.textContent = String(Math.max(0, count));
+  }
+
+  button.disabled = true;
+  showLike(!wasLiked, previousCount + delta);
+  try {
+    const target = supabaseClient.from('community_likes');
+    const keys = {user_id:userId, post_id:post.id};
+    await communityData(wasLiked ? target.delete().match(keys) : target.insert(keys));
+    if (currentUser?.id === userId && button.isConnected) {
+      const total = communityNode('communityFeed').querySelector('[data-community-likes-for]');
+      if (total?.dataset.communityLikesFor === post.author_id) {
+        const count = Math.max(0, Number(total.dataset.count) + delta);
+        total.dataset.count = String(count);
+        total.textContent = count.toLocaleString();
+      }
+    }
+  } catch {
+    showLike(wasLiked, previousCount);
+    if (currentUser?.id === userId && button.isConnected) communityStatus('Couldn’t save your like. Try again.');
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function updateBullionFollow(post, selected, button) {
+  if (!communitySignIn('follow collectors') || button.disabled) return;
+  const userId = currentUser.id;
+  const keys = {follower_id:userId, followed_id:post.author_id};
   button.disabled = true;
   try {
-    const target = supabaseClient.from(table);
+    const target = supabaseClient.from('community_follows');
     await communityData(selected ? target.delete().match(keys) : target.insert(keys));
     if (currentUser?.id === userId) await loadBullionGallery();
   } catch {
