@@ -161,6 +161,11 @@ async function loadBullionGallery(append = false) {
 
   try {
     if (!supabaseClient) throw new Error('Community is unavailable.');
+    if (view === 'people') {
+      communityStatus('');
+      feed.append(renderCommunitySearch(userId));
+      return;
+    }
     const [profile, membership] = userId ? await Promise.all([
       communityData(supabaseClient.from('community_profiles').select('id,display_name').eq('id', userId).maybeSingle()),
       communityData(supabaseClient.from('community_moderators').select('user_id').eq('user_id', userId).maybeSingle())
@@ -227,7 +232,6 @@ async function loadBullionGallery(append = false) {
 
     if (commentFlags.length) feed.append(renderFlaggedBullionComments(commentFlags));
     if (profileCard) feed.append(profileCard);
-    if (!append && view === 'mine') feed.append(renderCommunitySearch(userId));
     const liked = new Set(likeRows.data.map(row => row.post_id));
     const followed = new Set(followRows.data.map(row => row.followed_id));
     const signed = new Map((photos.data || []).map(photo => [photo.path, photo.signedUrl]));
