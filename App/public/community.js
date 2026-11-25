@@ -362,7 +362,8 @@ async function loadBullionGallery(append = false, filterOnly = false) {
         follow.dataset.followAuthor = author;
         follow.dataset.activeLabel = 'Unfollow';
         follow.setAttribute('aria-pressed', selected);
-        profileCard.querySelector('.communityProfileHead').append(follow);
+        profileCard.querySelector('.communityProfileHead').append(follow,
+          communityButton('Block collector', () => blockBullionCollector(author), 'communityProfileAction'));
       }
       feed.append(profileCard);
     }
@@ -639,7 +640,7 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
       follow.setAttribute('aria-pressed', follows);
       identity.append(follow);
       options.append(communityButton('Report', () => reportBullionPost(post)),
-        communityButton('Block', () => blockBullionCollector(post)));
+        communityButton('Block', () => blockBullionCollector(post.author_id)));
     }
   }
   if (post.author_id === currentUser?.id) options.append(communityButton('Delete my post', () => deleteBullionPost(post)));
@@ -745,7 +746,9 @@ function renderBullionComments(post, count) {
       updateCommentCount();
       void loadComments();
     } catch (error) {
-      feedback.textContent = error.code === '23514' ? 'Leave links and email addresses out of comments.' : 'Couldn’t post your comment. Try again.';
+      feedback.textContent = error.message?.includes('community_comment_content_allowed')
+        ? 'Edit your comment to remove the abusive or explicit language.'
+        : error.code === '23514' ? 'Leave links and email addresses out of comments.' : 'Couldn’t post your comment. Try again.';
     } finally {
       submit.disabled = false;
     }
@@ -766,6 +769,12 @@ function renderBullionComment(comment) {
       options.open = false;
       flagBullionComment(comment);
     }));
+    if (comment.author_id !== currentUser.id) {
+      options.append(communityButton('Block collector', () => {
+        options.open = false;
+        blockBullionCollector(comment.author_id);
+      }));
+    }
     if (comment.author_id === currentUser.id || bullionCommunity.moderator) {
       options.append(communityButton('Remove comment', () => {
         options.open = false;
@@ -1064,7 +1073,9 @@ function openCommunityDialog(title, fields, action, submit) {
     } catch (error) {
       const nameTaken = error.code === '23505' && error.message?.includes('community_profiles_display_name_unique');
       status.textContent = nameTaken ? 'That display name is already taken. Choose another name.'
-        : 'Couldn’t complete that action. Please try again.';
+        : error.message?.includes('community_profile_content_allowed')
+          ? 'Edit your display name or bio to remove abusive or explicit language.'
+          : 'Couldn’t complete that action. Please try again.';
     } finally {
       button.disabled = cancel.disabled = false;
     }
@@ -1160,11 +1171,11 @@ function reportBullionPost(post) {
   });
 }
 
-function blockBullionCollector(post) {
+function blockBullionCollector(authorId) {
   if (!communitySignIn('block a collector')) return;
   openCommunityDialog('Block this collector?',
-    [communityElement('p', '', 'Their posts will be hidden and any follows between you will be removed.')], 'Block collector', async () => {
-      const result = await supabaseClient.from('community_blocks').insert({blocker_id:currentUser.id, blocked_id:post.author_id});
+    [communityElement('p', '', 'Their posts and comments will be hidden and any follows between you will be removed.')], 'Block collector', async () => {
+      const result = await supabaseClient.from('community_blocks').insert({blocker_id:currentUser.id, blocked_id:authorId});
       if (result.error && result.error.code !== '23505') throw result.error;
       return 'Collector blocked.';
     });
