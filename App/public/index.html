@@ -6438,8 +6438,8 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
   </div>
   <div class="newsBody">
     <div role="group" class="communityTabs" aria-label="Explore sections">
-      <button id="communityNewsTab" type="button" onclick="openBullionNewsSection('news')" aria-pressed="true">News</button>
-      <button id="communityGalleryTab" type="button" onclick="openBullionNewsSection('community')" aria-pressed="false">Community</button>
+      <button id="communityGalleryTab" type="button" onclick="openBullionNewsSection('community')" aria-pressed="true">Community</button>
+      <button id="communityNewsTab" type="button" onclick="openBullionNewsSection('news')" aria-pressed="false">News</button>
     </div>
     <section id="communityPanel" hidden aria-label="Bullion community">
       <div class="communityHeading">
@@ -9165,13 +9165,11 @@ async function onSignedIn(){
   if(typeof BENZA_COMMUNITY_PREVIEW!=='undefined'&&BENZA_COMMUNITY_PREVIEW){
     document.getElementById('authScreen').style.display='none';
     openNews();
-    openBullionNewsSection('community');
     return;
   }
   if(route==='pro')openProUpgrade();
   else if(route==='community'&&typeof openBullionNewsSection==='function'){
     openNews();
-    openBullionNewsSection('community');
   }else goPortfolio();
   document.getElementById('authScreen').style.display='none';
   updateWelcomeBack();
@@ -12513,8 +12511,9 @@ function goPortfolio(){
 function openNews(){
   hideMainOverlays();
   setActiveNav('news');document.getElementById('newsScreen').classList.add('show');
-  if(typeof openBullionNewsSection==='function')openBullionNewsSection('news');
-  loadMarketNews(false)}
+  if(typeof openBullionNewsSection==='function')openBullionNewsSection('community');
+  else loadMarketNews(false)
+}
 function closeNews(){if(guestBrowsing){activeMarketsTab='market';openMarkets();return;}document.getElementById('newsScreen').classList.remove('show');setActiveNav('portfolio')}
 
 function applyTheme(theme){
@@ -12807,7 +12806,7 @@ setInterval(()=>{
   if(lastMarketFeedData)renderLiveFeedStatus(lastMarketFeedData,lastMarketFeedStatusState);
 },60000); 
 initChartInteraction();
-function refreshVisibleMarketNews(){if(!document.hidden&&document.getElementById('newsScreen')?.classList.contains('show'))loadMarketNews(false)}
+function refreshVisibleMarketNews(){if(!document.hidden&&document.getElementById('newsScreen')?.classList.contains('show')&&!document.getElementById('communityMarketNews')?.hidden)loadMarketNews(false)}
 setInterval(refreshVisibleMarketNews,30*60*1000);
 window.addEventListener('online',refreshVisibleMarketNews);
 document.addEventListener('visibilitychange',refreshVisibleMarketNews);

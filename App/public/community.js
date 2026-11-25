@@ -34,6 +34,7 @@ function openBullionNewsSection(section) {
     bullionCommunity.request++;
     bullionCommunity.loading = false;
     communityNode('communityFeed').replaceChildren();
+    if (communityNode('newsScreen').classList.contains('show')) void loadMarketNews(false);
   }
 }
 
@@ -95,12 +96,20 @@ async function loadBullionGallery(append = false) {
     if (view === 'review' && !bullionCommunity.moderator) return;
 
     let reports = [];
+    let commentFlags = [];
     let query = supabaseClient.from('community_posts')
-      .select('id,author_id,metal,item_type,caption,photo_path,public_photo_path,status,created_at,published_at,review_reason,community_profiles(display_name),community_likes(count)');
+      .select('id,author_id,metal,item_type,caption,photo_path,public_photo_path,status,created_at,published_at,review_reason,community_profiles(display_name),community_likes(count),community_comments(count)');
     if (view === 'mine') query = query.eq('author_id', userId);
     else if (view === 'review') {
-      const result = await communityData(supabaseClient.from('community_reports')
-        .select('post_id,reason').is('resolved_at', null).limit(100));
+      const [result, flags] = await Promise.all([
+        communityData(supabaseClient.from('community_reports')
+          .select('post_id,reason').is('resolved_at', null).limit(100)),
+        !append ? communityData(supabaseClient.from('community_comment_flags')
+          .select('comment_id,reason,community_comments!inner(id,body,community_profiles(display_name),community_posts!inner(caption,status))')
+          .is('resolved_at', null).eq('community_comments.community_posts.status', 'approved')
+          .order('created_at').limit(100)) : {data:[]}
+      ]);
+      commentFlags = flags.data;
       reports = result.data || [];
       const reportedIds = [...new Set(reports.map(report => report.post_id))];
       query = reportedIds.length
@@ -140,6 +149,7 @@ async function loadBullionGallery(append = false) {
     ]);
     if (!communityCurrent(request, userId)) return;
 
+    if (commentFlags.length) feed.append(renderFlaggedBullionComments(commentFlags));
     if (profileCard) feed.append(profileCard);
     const liked = new Set(likeRows.data.map(row => row.post_id));
     const followed = new Set(followRows.data.map(row => row.followed_id));
@@ -147,7 +157,7 @@ async function loadBullionGallery(append = false) {
     for (const post of posts) {
       feed.append(renderBullionPost(post, signed.get(communityPhotoPath(post)), liked, followed, reports));
     }
-    communityStatus(posts.length ? '' : {
+    communityStatus(posts.length || commentFlags.length || append ? '' : {
       discover:'No published posts yet. Start a bullion discussion or share a photo.',
       mine:'You haven’t submitted a post yet.',
       following:'No approved posts from collectors you follow yet.',
@@ -288,8 +298,148 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
   }
   if (options.childElementCount > 1) actions.append(options);
   body.append(actions);
+  if (post.status === 'approved') body.append(renderBullionComments(post, post.community_comments?.[0]?.count || 0));
   article.append(body);
   return article;
+}
+
+function renderBullionComments(post, count) {
+  const thread = communityElement('details', 'communityComments');
+  const toggle = communityElement('summary', '', count ? 'Comments · ' + count : 'Comments');
+  const list = communityElement('div', 'communityCommentList');
+  const status = communityElement('p', 'communityBadge');
+  status.setAttribute('role', 'status');
+  let limit = 20;
+  let request = 0;
+
+  async function loadComments() {
+    const version = ++request;
+    const userId = currentUser?.id;
+    status.textContent = 'Loading comments…';
+    try {
+      const {data} = await communityData(supabaseClient.from('community_comments')
+        .select('id,author_id,body,community_profiles(display_name)')
+        .eq('post_id', post.id).order('created_at', {ascending:false})
+        .order('id', {ascending:false}).limit(limit + 1));
+      if (version !== request || currentUser?.id !== userId) return;
+      list.replaceChildren(...data.slice(0, limit).map(comment => renderBullionComment(comment)));
+      if (data.length > limit) list.append(communityButton('Show older comments', () => {
+        limit += 20;
+        void loadComments();
+      }));
+      status.textContent = data.length ? '' : 'No comments yet.';
+    } catch {
+      if (version === request) status.textContent = 'Couldn’t load comments. Reopen the thread to try again.';
+    }
+  }
+
+  thread.append(toggle, list, status);
+  thread.addEventListener('toggle', () => {
+    if (thread.open) void loadComments();
+  });
+  if (!currentUser || !bullionCommunity.profile) {
+    thread.append(communityButton(currentUser ? 'Set up your profile to comment' : 'Sign in to comment', () => {
+      if (communitySignIn('comment on a post')) editBullionProfile(currentUser.id, null);
+    }));
+    return thread;
+  }
+
+  const form = communityElement('form', 'communityCommentForm');
+  const field = communityElement('textarea');
+  field.rows = 2;
+  field.maxLength = 500;
+  field.required = true;
+  field.placeholder = 'Write a comment about bullion';
+  const submit = communityElement('button', 'communityPrimary', 'Post comment');
+  submit.type = 'submit';
+  const feedback = communityElement('p', 'communityBadge');
+  feedback.setAttribute('role', 'status');
+  form.append(communityFormField('Your comment', field), submit, feedback);
+  form.onsubmit = async event => {
+    event.preventDefault();
+    const userId = currentUser?.id;
+    const body = field.value.trim();
+    if (!userId || !body || submit.disabled) return;
+    submit.disabled = true;
+    feedback.textContent = '';
+    try {
+      await communityData(supabaseClient.from('community_comments')
+        .insert({post_id:post.id, author_id:userId, body}));
+      field.value = '';
+      toggle.textContent = 'Comments · ' + (++count);
+      void loadComments();
+    } catch (error) {
+      feedback.textContent = error.code === '23514' ? 'Leave links and email addresses out of comments.' : 'Couldn’t post your comment. Try again.';
+    } finally {
+      submit.disabled = false;
+    }
+  };
+  thread.append(form);
+  return thread;
+}
+
+function renderBullionComment(comment) {
+  const item = communityElement('article', 'communityComment');
+  item.append(communityElement('strong', '', comment.community_profiles?.display_name || 'Collector'),
+    communityElement('p', '', comment.body));
+  if (currentUser) {
+    const actions = communityElement('div', 'communityPostActions');
+    actions.append(communityButton('Flag comment', () => flagBullionComment(comment)));
+    if (comment.author_id === currentUser.id || bullionCommunity.moderator) {
+      actions.append(communityButton('Remove comment', () => removeBullionComment(comment)));
+    }
+    item.append(actions);
+  }
+  return item;
+}
+
+function flagBullionComment(comment) {
+  if (!communitySignIn('flag a comment')) return;
+  const reason = communitySelect(['Off topic','Privacy concern','Spam or promotion','Inappropriate content']);
+  openCommunityDialog('Flag this comment', [communityFormField('Reason', reason)], 'Send flag', async () => {
+    const {error} = await supabaseClient.from('community_comment_flags')
+      .insert({comment_id:comment.id, reporter_id:currentUser.id, reason:reason.value});
+    if (error?.code === '23505') return 'You already flagged this comment.';
+    if (error) throw error;
+    return 'Comment flagged for a moderator.';
+  });
+}
+
+function removeBullionComment(comment) {
+  openCommunityDialog('Remove this comment?', [], 'Remove comment', async () => {
+    await communityData(supabaseClient.from('community_comments').delete().eq('id', comment.id).select('id').single());
+    return 'Comment removed.';
+  });
+}
+
+function renderFlaggedBullionComments(flags) {
+  const section = communityElement('section', 'communityCommentList');
+  section.append(communityElement('h3', '', 'Flagged comments'));
+  const comments = new Map();
+  for (const flag of flags) {
+    if (!flag.community_comments) continue;
+    if (!comments.has(flag.comment_id)) comments.set(flag.comment_id, {comment:flag.community_comments, reasons:new Set()});
+    comments.get(flag.comment_id).reasons.add(flag.reason);
+  }
+  for (const {comment, reasons} of comments.values()) {
+    const card = communityElement('article', 'communityComment');
+    card.append(communityElement('strong', '', comment.community_profiles?.display_name || 'Collector'),
+      communityElement('p', '', comment.body),
+      communityElement('p', 'communityBadge', 'On post “' + comment.community_posts.caption + '”'),
+      communityElement('p', 'communityBadge', Array.from(reasons).join(' · ')));
+    const actions = communityElement('div', 'communityPostActions');
+    actions.append(communityButton('Remove comment', () => removeBullionComment(comment)),
+      communityButton('Dismiss flags', () => {
+        openCommunityDialog('Dismiss flags for this comment?', [], 'Dismiss flags', async () => {
+          await communityData(supabaseClient.from('community_comment_flags')
+            .update({resolved_at:new Date().toISOString()}).eq('comment_id', comment.id).is('resolved_at', null));
+          return 'Flags dismissed.';
+        });
+      }));
+    card.append(actions);
+    section.append(card);
+  }
+  return section;
 }
 
 async function updateBullionReaction(kind, post, selected, button) {
