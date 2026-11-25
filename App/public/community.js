@@ -461,16 +461,10 @@ async function getBullionProfile(authorId) {
 
 function communityAvatar(profile, avatar = communityElement('span', 'communityAvatar')) {
   avatar.setAttribute('aria-hidden', 'true');
-  avatar.replaceChildren();
   const metal = profile?.avatar_style;
-  if (communityAvatarMetals.includes(metal)) {
-    const image = communityElement('img');
-    image.src = './assets/metal-emblems-svg/' + metal + '.svg';
-    image.alt = '';
-    avatar.append(image);
-  } else {
-    avatar.textContent = profile?.avatar_initials || communityInitials(profile?.display_name || '');
-  }
+  if (communityAvatarMetals.includes(metal)) avatar.dataset.metal = metal;
+  else delete avatar.dataset.metal;
+  avatar.textContent = profile?.avatar_initials || communityInitials(profile?.display_name || '');
   return avatar;
 }
 
@@ -490,7 +484,7 @@ function editBullionProfile(authorId, profile) {
   const initialsField = communityFormField('Custom initials (optional)', initials);
   const avatarPicker = communityElement('div', 'communityAvatarPicker');
   avatarPicker.setAttribute('role', 'group');
-  avatarPicker.setAttribute('aria-label', 'Profile image');
+  avatarPicker.setAttribute('aria-label', 'Avatar finish');
   let avatarStyle = profile?.avatar_style || 'initials';
   const bio = communityElement('textarea');
   bio.value = profile?.bio || '';
@@ -515,8 +509,6 @@ function editBullionProfile(authorId, profile) {
   function updatePreview() {
     const displayName = name.value.trim();
     communityAvatar({display_name:displayName, avatar_style:avatarStyle, avatar_initials:initials.value.toUpperCase()}, avatar);
-    initialsField.hidden = avatarStyle !== 'initials';
-    initials.disabled = initialsField.hidden;
     for (const choice of avatarPicker.children) choice.setAttribute('aria-pressed', String(choice.dataset.style === avatarStyle));
     previewName.textContent = displayName || 'Your collector name';
     previewBio.textContent = bio.value.trim();
@@ -524,7 +516,7 @@ function editBullionProfile(authorId, profile) {
     bioCount.textContent = bio.value.length + ' / ' + bio.maxLength;
   }
   for (const style of ['initials', ...communityAvatarMetals]) {
-    const label = style[0].toUpperCase() + style.slice(1);
+    const label = style === 'initials' ? 'Classic' : style[0].toUpperCase() + style.slice(1);
     const choice = communityButton('', () => { avatarStyle = style; updatePreview(); }, 'communityAvatarChoice');
     choice.dataset.style = style;
     choice.append(communityAvatar({display_name:'Aa', avatar_style:style, avatar_initials:'Aa'}), communityElement('span', '', label));
@@ -539,7 +531,8 @@ function editBullionProfile(authorId, profile) {
   updatePreview();
   const fields = [
     communityElement('p', 'communityProfileHint', 'Choose a unique display name so other collectors can find you.'),
-    preview, avatarPicker, initialsField, communityFormField('Display name', name), bioField
+    preview, communityFormField('Display name', name), initialsField,
+    communityElement('p', 'communityAvatarFinishLabel', 'Avatar finish'), avatarPicker, bioField
   ];
   openCommunityDialog('Edit community profile', fields, 'Save changes', async () => {
     const values = {display_name:name.value.trim(), bio:bio.value.trim(), avatar_style:avatarStyle, avatar_initials:initials.value.toUpperCase()};

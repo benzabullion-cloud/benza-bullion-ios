@@ -196,11 +196,11 @@
 .communityDiscoverFilters .communitySecondary{min-height:36px;padding:5px 10px}
 #communityDiscoverSelection{color:var(--gold);font-size:13px;font-weight:650}
 
-.communityPostCategory[data-metal="gold"]{--community-metal:#c88719}
-.communityPostCategory[data-metal="silver"]{--community-metal:#a6abb2}
-.communityPostCategory[data-metal="platinum"]{--community-metal:#89b9e8}
-.communityPostCategory[data-metal="palladium"]{--community-metal:#78c9a8}
-.communityPostCategory[data-metal="copper"]{--community-metal:#d86f3e}
+:is(.communityPostCategory,.communityAvatar)[data-metal="gold"]{--community-metal:#c88719}
+:is(.communityPostCategory,.communityAvatar)[data-metal="silver"]{--community-metal:#a6abb2}
+:is(.communityPostCategory,.communityAvatar)[data-metal="platinum"]{--community-metal:#89b9e8}
+:is(.communityPostCategory,.communityAvatar)[data-metal="palladium"]{--community-metal:#78c9a8}
+:is(.communityPostCategory,.communityAvatar)[data-metal="copper"]{--community-metal:#d86f3e}
 .communityPostCategory[data-metal]{
   background:color-mix(in srgb,var(--community-metal) 16%,var(--surface2));
   color:color-mix(in srgb,var(--community-metal) 50%,var(--text));
@@ -231,7 +231,15 @@ html[data-theme="dark"] .communityPostCategory[data-metal]{
 
 .newsWordmark{margin:18px 0 8px}
 
-.communityAvatar img{width:76%;height:76%;object-fit:contain}
+.communityAvatar{
+  background:var(--surface2);border-color:var(--border);font-variant-numeric:tabular-nums
+}
+.communityAvatar[data-metal]{
+  background:linear-gradient(145deg,color-mix(in srgb,var(--community-metal) 27%,var(--surface2)),var(--surface2) 80%);
+  border-color:color-mix(in srgb,var(--community-metal) 58%,var(--border));
+  color:color-mix(in srgb,var(--community-metal) 33%,var(--text))
+}
+.communityAvatarFinishLabel{margin:0 0 -8px;font-size:13px;font-weight:650}
 .communityAvatarPicker{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 .communityAvatarChoice{
   display:grid;justify-items:center;gap:4px;min-height:60px;padding:5px 2px;
@@ -241,5 +249,4 @@ html[data-theme="dark"] .communityPostCategory[data-metal]{
 .communityAvatarChoice[aria-pressed=true]{border-color:var(--gold)}
 .communityAvatarChoice .communityAvatar,.communityCommentByline .communityAvatar{width:26px;height:26px;font-size:9px}
 .communityCommentByline{display:flex;align-items:center;gap:6px}
-.communityDialog:has(.communityProfilePreview) label[hidden]{display:none}
 #communityReviewAlertsRow[hidden]{display:none}
