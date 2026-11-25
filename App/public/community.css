@@ -83,14 +83,14 @@
 .communityPostOptions[open] summary{background:var(--surface2);color:var(--text)}
 .communityPostOptions button{display:block;margin:4px 0 0 auto;min-height:44px}
 
-.communityComments{margin-top:8px;padding-top:12px;border-top:1px solid var(--border)}
+.communityComments{margin-top:4px;border-top:1px solid var(--border)}
 .communityReaction{
   display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:44px;min-height:44px;
   padding:4px;color:var(--text);border:0;background:transparent;font:inherit;font-size:13px;cursor:pointer
 }
 .communityReaction svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .communityReaction[aria-pressed=true],.communityReaction[aria-expanded=true]{color:var(--gold)}
-.communityCommentHead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+
 .communityCommentOptions{flex-shrink:0;text-align:end}
 .communityCommentOptions summary{
   display:grid;place-items:center;margin-inline-start:auto;width:44px;min-height:44px;
@@ -98,14 +98,34 @@
 }
 .communityCommentOptions summary::-webkit-details-marker{display:none}
 .communityCommentOptions button{display:block;margin:4px 0 0 auto;min-height:44px}
-.communityCommentHead:has(.communityCommentOptions[open]){align-items:start;flex-wrap:wrap}
+
 .communityCommentList{display:grid;gap:8px}
 .communityCommentList h3{margin:0;color:var(--text)}
 .communityComment{padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface2);overflow-wrap:anywhere}
 .communityComment p{margin:4px 0 8px;white-space:pre-wrap}
-.communityCommentForm{display:grid;justify-items:start;gap:8px;margin-top:12px}
-.communityCommentForm label{display:grid;gap:6px;width:100%;font-size:13px;font-weight:600}
-.communityCommentForm textarea{box-sizing:border-box;width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);font:inherit;font-size:16px}
+/* Keep moderation cards separate from the compact in-feed thread. */
+.communityComments .communityCommentList{gap:0}
+.communityComments .communityCommentRow{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:4px 6px;
+  padding:4px 0;border:0;border-bottom:1px solid var(--border);border-radius:0;background:none
+}
+.communityCommentText{padding:5px 0;min-width:0;font-size:13px}
+.communityCommentText strong{font-size:12px}
+.communityPostBody .communityCommentText p{margin:1px 0 0}
+.communityCommentRow:has(.communityCommentOptions[open]) .communityCommentOptions{grid-column:1 / -1}
+.communityMoreComments{
+  justify-self:start;min-height:44px;padding:4px 0;border:0;background:none;
+  color:var(--text);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer
+}
+.communityPostBody .communityCommentStatus{margin:6px 0 0;color:var(--muted);font-size:12px}
+.communityCommentStatus:empty{display:none}
+.communityCommentForm{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:6px;margin-top:8px}
+.communityCommentForm textarea{
+  box-sizing:border-box;width:100%;min-height:44px;padding:10px;border:1px solid var(--border);
+  border-radius:12px;background:var(--surface2);color:var(--text);font:inherit;font-size:16px;resize:vertical
+}
+.communityCommentForm button{min-height:44px}
+.communityCommentForm .communityCommentStatus{grid-column:1 / -1;margin-top:0}
 
 .communityPost{border-radius:20px;box-shadow:0 5px 16px #0001}
 .communityPostHead{padding:14px;gap:10px;background:linear-gradient(120deg,color-mix(in srgb,var(--gold) 6%,var(--surface)),var(--surface) 62%)}

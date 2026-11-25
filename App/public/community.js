@@ -391,9 +391,10 @@ function renderBullionComments(post, count) {
   }
   updateCommentCount();
   const list = communityElement('div', 'communityCommentList');
-  const status = communityElement('p', 'communityBadge');
+  const status = communityElement('p', 'communityCommentStatus');
   status.setAttribute('role', 'status');
-  let limit = 20;
+  const previewSize = 3;
+  let limit = previewSize;
   let request = 0;
 
   async function loadComments() {
@@ -408,9 +409,9 @@ function renderBullionComments(post, count) {
       if (version !== request || currentUser?.id !== userId) return;
       list.replaceChildren(...data.slice(0, limit).map(comment => renderBullionComment(comment)));
       if (data.length > limit) list.append(communityButton('Show older comments', () => {
-        limit += 20;
+        limit += previewSize;
         void loadComments();
-      }));
+      }, 'communityMoreComments'));
       status.textContent = data.length ? '' : 'No comments yet.';
     } catch {
       if (version === request) status.textContent = 'Couldn’t load comments. Reopen the thread to try again.';
@@ -427,15 +428,17 @@ function renderBullionComments(post, count) {
 
   const form = communityElement('form', 'communityCommentForm');
   const field = communityElement('textarea');
-  field.rows = 2;
+  field.rows = 1;
   field.maxLength = 500;
   field.required = true;
-  field.placeholder = 'Write a comment about bullion';
-  const submit = communityElement('button', 'communityPrimary', 'Post comment');
+  field.placeholder = 'Add a comment…';
+  field.setAttribute('aria-label', 'Add a comment');
+  const submit = communityElement('button', 'communityPrimary', 'Post');
   submit.type = 'submit';
-  const feedback = communityElement('p', 'communityBadge');
+  submit.setAttribute('aria-label', 'Post comment');
+  const feedback = communityElement('p', 'communityCommentStatus');
   feedback.setAttribute('role', 'status');
-  form.append(communityFormField('Your comment', field), submit, feedback);
+  form.append(field, submit, feedback);
   form.onsubmit = async event => {
     event.preventDefault();
     const userId = currentUser?.id;
@@ -461,8 +464,8 @@ function renderBullionComments(post, count) {
 }
 
 function renderBullionComment(comment) {
-  const item = communityElement('article', 'communityComment');
-  const heading = communityElement('div', 'communityCommentHead');
+  const item = communityElement('article', 'communityComment communityCommentRow');
+  const heading = communityElement('div', 'communityCommentText');
   heading.append(communityElement('strong', '', comment.community_profiles?.display_name || 'Collector'));
   if (currentUser) {
     const options = communityOptions('Comment options', 'communityCommentOptions');
@@ -476,9 +479,10 @@ function renderBullionComment(comment) {
         removeBullionComment(comment);
       }));
     }
-    heading.append(options);
+    item.append(options);
   }
-  item.append(heading, communityElement('p', '', comment.body));
+  heading.append(communityElement('p', '', comment.body));
+  item.prepend(heading);
   return item;
 }
 
