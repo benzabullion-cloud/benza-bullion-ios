@@ -2,9 +2,11 @@
 
 const bullionCommunity = {
   view: 'discover', author: null, page: 0, request: 0, loading: false,
-  profile: null, moderator: false, account: null
+  profile: null, moderator: false, account: null, discoverMetal: '', discoverType: ''
 };
 const communityPageSize = 12;
+const communityMetals = ['Gold','Silver','Platinum','Palladium','Copper'];
+const communityPhotoTypes = ['Coin','Round','Bar','Display'];
 const communityNode = id => document.getElementById(id);
 const communityPhotoPath = post => post.status === 'approved' ? post.public_photo_path : post.photo_path;
 
@@ -88,6 +90,33 @@ async function showBullionGallery(view, author = null) {
   await loadBullionGallery();
 }
 
+function updateCommunityDiscoverFilters() {
+  const {view, discoverMetal, discoverType} = bullionCommunity;
+  const selection = [discoverMetal, discoverType].filter(Boolean).join(' · ');
+  communityNode('communityDiscoverFilters').hidden = view !== 'discover';
+  communityNode('communityDiscoverSelection').textContent = selection;
+  communityNode('communityClearFilters').hidden = !selection;
+}
+
+function openCommunityDiscoverFilters() {
+  const metal = communitySelect(['All metals', ...communityMetals]);
+  metal.options[0].value = '';
+  metal.value = bullionCommunity.discoverMetal;
+  const type = communitySelect(['All types', ...communityPhotoTypes]);
+  type.options[0].value = '';
+  type.value = bullionCommunity.discoverType;
+  openCommunityDialog('Filter Discover', [communityFormField('Metal', metal), communityFormField('Item type', type)], 'Apply filters', () => {
+    bullionCommunity.discoverMetal = metal.value;
+    bullionCommunity.discoverType = type.value;
+  });
+}
+
+function clearCommunityDiscoverFilters() {
+  bullionCommunity.discoverMetal = '';
+  bullionCommunity.discoverType = '';
+  void loadBullionGallery();
+}
+
 function renderCommunitySearch(userId) {
   const panel = communityElement('section', 'communityPeopleSearch');
   const form = communityElement('form', 'communityPeopleForm');
@@ -150,7 +179,8 @@ async function loadMoreBullionPosts() {
 async function loadBullionGallery(append = false) {
   const request = ++bullionCommunity.request;
   const userId = currentUser?.id || null;
-  const {view, author, page} = bullionCommunity;
+  const {view, author, page, discoverMetal, discoverType} = bullionCommunity;
+  updateCommunityDiscoverFilters();
   const feed = communityNode('communityFeed');
   const more = communityNode('communityMore');
   bullionCommunity.loading = true;
@@ -198,6 +228,10 @@ async function loadBullionGallery(append = false) {
         : query.eq('status', 'pending');
     } else {
       query = query.eq('status', 'approved');
+      if (view === 'discover') {
+        if (discoverMetal) query = query.eq('metal', discoverMetal.toLowerCase());
+        if (discoverType) query = query.eq('item_type', discoverType);
+      }
       if (view === 'profile') query = query.eq('author_id', author);
       if (view === 'following') {
         const result = await communityData(supabaseClient.from('community_follows').select('followed_id').eq('follower_id', userId));
@@ -242,7 +276,7 @@ async function loadBullionGallery(append = false) {
       feed.append(renderBullionPost(post, signed.get(communityPhotoPath(post)), liked, followed, reports));
     }
     communityStatus(posts.length || commentFlags.length || append ? '' : {
-      discover:'No published posts yet. Start a bullion discussion or share a photo.',
+      discover:discoverMetal || discoverType ? 'No posts match these filters.' : 'No published posts yet. Start a bullion discussion or share a photo.',
       mine:'You haven’t submitted a post yet.',
       following:'No approved posts from collectors you follow yet.',
       review:'The review queue is clear.',
@@ -377,7 +411,7 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
   const date = new Date(timestamp);
   if (timestamp && Number.isFinite(date.getTime())) {
     const time = communityElement('time', '', date.toLocaleDateString(undefined, {
-      month:'short', day:'numeric', ...(date.getFullYear() === new Date().getFullYear() ? {} : {year:'numeric'})
+      month:'short', day:'numeric', year:'numeric'
     }));
     time.dateTime = timestamp;
     author.append(time);
@@ -738,8 +772,8 @@ function composeBullionPost() {
   name.required = !hasProfile;
   const photo = communityElement('input');
   photo.type = 'file'; photo.accept = 'image/*'; photo.required = false;
-  const metal = communitySelect(['Gold','Silver','Platinum','Palladium','Copper']);
-  const type = communitySelect(['Coin','Round','Bar','Display']);
+  const metal = communitySelect(communityMetals);
+  const type = communitySelect(communityPhotoTypes);
   const caption = communityElement('textarea');
   caption.placeholder = 'What would you like to share about bullion?';
   caption.maxLength = 280; caption.minLength = 3; caption.required = true;

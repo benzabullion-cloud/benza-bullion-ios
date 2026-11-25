@@ -190,3 +190,8 @@
 
 .communityProfilePostsHeading{display:flex;align-items:center;gap:10px;margin:4px 0 0;color:var(--text);font-size:14px}
 .communityProfilePostsHeading::after{content:"";flex:1;height:1px;background:var(--border)}
+
+.communityDiscoverFilters{display:flex;align-items:center;gap:4px 8px;flex-wrap:wrap;margin:0 0 12px}
+.communityDiscoverFilters[hidden],.communityDiscoverFilters [hidden],#communityDiscoverSelection:empty{display:none}
+.communityDiscoverFilters .communitySecondary{min-height:36px;padding:5px 10px}
+#communityDiscoverSelection{color:var(--gold);font-size:13px;font-weight:650}
