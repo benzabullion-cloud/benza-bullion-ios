@@ -634,10 +634,10 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
     if (post.author_id !== currentUser?.id) {
       const follows = followed.has(post.author_id);
       const follow = communityButton(follows ? 'Following' : 'Follow',
-        () => updateBullionFollow(post, follow.getAttribute('aria-pressed') === 'true', follow));
+        () => updateBullionFollow(post, follow.getAttribute('aria-pressed') === 'true', follow), 'communityRowFollow');
       follow.dataset.followAuthor = post.author_id;
       follow.setAttribute('aria-pressed', follows);
-      actions.append(follow);
+      identity.append(follow);
       options.append(communityButton('Report', () => reportBullionPost(post)),
         communityButton('Block', () => blockBullionCollector(post)));
     }
