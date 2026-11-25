@@ -199,6 +199,11 @@ async function loadBullionGallery(append = false) {
   }
 }
 
+function communityInitials(name) {
+  return name.trim().split(/\s+/).filter(Boolean).slice(0, 2)
+    .map(word => Array.from(word)[0].toLocaleUpperCase()).join('') || '•';
+}
+
 async function getBullionProfile(authorId, inMyPosts = false) {
   const isOwner = currentUser?.id === authorId;
   const [profile, posts, followers, following, likes] = await Promise.all([
@@ -245,7 +250,36 @@ function editBullionProfile(authorId, profile) {
   bio.maxLength = 160;
   bio.rows = 3;
   bio.placeholder = 'What do you enjoy collecting?';
-  const fields = [communityFormField('Public display name', name), communityFormField('Public bio (optional, 160 characters)', bio)];
+  name.autocomplete = 'nickname';
+  name.placeholder = 'Your collector name';
+  const preview = communityElement('div', 'communityProfilePreview');
+  const avatar = communityElement('span', 'communityAvatar');
+  avatar.setAttribute('aria-hidden', 'true');
+  const identity = communityElement('div', 'communityPreviewIdentity');
+  const previewName = communityElement('strong');
+  const previewBio = communityElement('p');
+  const bioCount = communityElement('span', 'communityBioCount');
+  identity.append(previewName, previewBio);
+  preview.append(avatar, identity);
+  const bioField = communityFormField('Bio (optional)', bio);
+  bioCount.id = 'communityProfileBioCount';
+  bio.setAttribute('aria-describedby', bioCount.id);
+  bioField.append(bioCount);
+  function updatePreview() {
+    const displayName = name.value.trim();
+    avatar.textContent = communityInitials(displayName);
+    previewName.textContent = displayName || 'Your collector name';
+    previewBio.textContent = bio.value.trim();
+    previewBio.hidden = !previewBio.textContent;
+    bioCount.textContent = bio.value.length + ' / ' + bio.maxLength;
+  }
+  name.addEventListener('input', updatePreview);
+  bio.addEventListener('input', updatePreview);
+  updatePreview();
+  const fields = [
+    communityElement('p', 'communityProfileHint', 'This is how other collectors will see you.'),
+    preview, communityFormField('Display name', name), bioField
+  ];
   openCommunityDialog('Edit community profile', fields, 'Save changes', async () => {
     const values = {display_name:name.value.trim(), bio:bio.value.trim()};
     const profiles = supabaseClient.from('community_profiles');
@@ -259,9 +293,25 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
   const article = communityElement('article', 'communityPost');
   const heading = communityElement('div', 'communityPostHead');
   const name = post.community_profiles?.display_name || 'Collector';
-  heading.append(communityButton(name, () => showBullionGallery('profile', post.author_id), 'communityAuthor'));
-  const label = post.metal[0].toUpperCase() + post.metal.slice(1) + ' · ' + post.item_type;
-  heading.append(communityElement('span', 'communityBadge', label));
+  const identity = communityElement('div', 'communityPostIdentity');
+  const avatar = communityElement('span', 'communityAvatar', communityInitials(name));
+  avatar.setAttribute('aria-hidden', 'true');
+  const author = communityElement('div', 'communityPostByline');
+  author.append(communityButton(name, () => showBullionGallery('profile', post.author_id), 'communityAuthor'));
+  const timestamp = post.published_at || post.created_at;
+  const date = new Date(timestamp);
+  if (timestamp && Number.isFinite(date.getTime())) {
+    const time = communityElement('time', '', date.toLocaleDateString(undefined, {
+      month:'short', day:'numeric', ...(date.getFullYear() === new Date().getFullYear() ? {} : {year:'numeric'})
+    }));
+    time.dateTime = timestamp;
+    author.append(time);
+  }
+  identity.append(avatar, author);
+  const discussion = post.item_type === 'Discussion';
+  article.classList.toggle('communityDiscussion', discussion);
+  const label = discussion ? 'Discussion' : post.metal[0].toUpperCase() + post.metal.slice(1) + ' · ' + post.item_type;
+  heading.append(identity, communityElement('span', 'communityPostCategory', label));
   article.append(heading);
 
   if (photoUrl) {
@@ -269,6 +319,7 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
     photo.src = photoUrl;
     photo.alt = post.metal + ' ' + post.item_type.toLowerCase() + ' shared by ' + name;
     photo.referrerPolicy = 'no-referrer';
+    photo.decoding = 'async';
     article.append(photo);
   } else if (post.item_type !== 'Discussion' && (post.status === 'pending' || post.status === 'approved')) {
     article.append(communityElement('p', 'communityPhotoStatus', 'Photo unavailable'));
@@ -277,7 +328,7 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
   const actions = communityElement('div', 'communityPostActions');
   const options = communityOptions('Post options');
   let comments;
-  body.append(communityElement('p', '', post.caption));
+  body.append(communityElement('p', 'communityPostCaption', post.caption));
   if (post.status !== 'approved') body.append(communityElement('p', 'communityBadge',
     post.status === 'pending' ? 'Awaiting review' : post.status === 'declined' ? 'Declined' : 'Removed'));
   if (post.status === 'declined' && post.review_reason) body.append(communityElement('p', 'communityBadge', post.review_reason));

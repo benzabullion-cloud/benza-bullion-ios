@@ -106,3 +106,37 @@
 .communityCommentForm{display:grid;justify-items:start;gap:8px;margin-top:12px}
 .communityCommentForm label{display:grid;gap:6px;width:100%;font-size:13px;font-weight:600}
 .communityCommentForm textarea{box-sizing:border-box;width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);font:inherit;font-size:16px}
+
+.communityPost{border-radius:20px;box-shadow:0 5px 16px #0001}
+.communityPostHead{padding:14px;gap:10px;background:linear-gradient(120deg,color-mix(in srgb,var(--gold) 6%,var(--surface)),var(--surface) 62%)}
+.communityPostIdentity,.communityProfilePreview{display:flex;align-items:center;gap:10px;min-width:0}
+.communityPostIdentity{flex:1 1 135px}
+.communityAvatar{
+  display:grid;place-items:center;flex:0 0 auto;width:36px;height:36px;border-radius:50%;
+  background:color-mix(in srgb,var(--gold) 15%,var(--surface2));color:var(--text);
+  border:1px solid color-mix(in srgb,var(--gold) 35%,var(--border));font-size:12px;font-weight:800
+}
+.communityPostByline{min-width:0;display:grid;gap:2px}
+.communityPostByline .communityAuthor{padding:0;text-align:start;overflow-wrap:anywhere;font-size:14px}
+.communityPostByline time{font-size:11px;color:var(--muted)}
+.communityPostCategory{
+  padding:4px 8px;border-radius:99px;background:var(--surface2);color:var(--muted);
+  font-size:11px;font-weight:700;line-height:1.35
+}
+.communityPostBody .communityPostCaption{margin-bottom:8px;white-space:pre-wrap}
+.communityDiscussion .communityPostCaption{font-size:17px}
+.communityPostBody .communityPostActions{column-gap:6px}
+.communityPost > .communityPhoto{border-block:1px solid var(--border)}
+
+.communityDialog:has(.communityProfilePreview){padding:clamp(16px,5vw,24px);border-radius:22px;max-height:85dvh;overflow:auto}
+.communityDialog:has(.communityProfilePreview) #communityFormFields{display:grid;gap:14px;margin-top:8px}
+.communityProfileHint,.communityBioCount{color:var(--muted);font-size:12px;line-height:1.45;margin:0}
+.communityProfilePreview{padding:12px;border-radius:14px;border:1px solid var(--border);background:var(--surface2)}
+.communityProfilePreview .communityAvatar{width:42px;height:42px}
+.communityPreviewIdentity{min-width:0;overflow-wrap:anywhere}
+.communityPreviewIdentity p{margin:3px 0 0;white-space:pre-line;font-size:13px;color:var(--muted)}
+.communityDialog:has(.communityProfilePreview) label{margin:0;gap:6px}
+.communityDialog:has(.communityProfilePreview) :is(input,textarea){font-size:16px;font-weight:400;min-height:44px;padding:10px;border-radius:12px}
+.communityBioCount{justify-self:end;font-variant-numeric:tabular-nums}
+.communityDialog:has(.communityProfilePreview) .communityDialogActions{display:grid;grid-template-columns:1fr 2fr}
+.communityDialog:has(.communityProfilePreview) .communityDialogActions button{min-height:44px}
