@@ -259,7 +259,7 @@ async function loadMoreBullionPosts() {
   if (!bullionCommunity.loading) await loadBullionGallery(true);
 }
 
-async function loadBullionGallery(append = false) {
+async function loadBullionGallery(append = false, filterOnly = false) {
   const request = ++bullionCommunity.request;
   const userId = currentUser?.id || null;
   const {view, author, page, discoverMetal, discoverType, myPostType} = bullionCommunity;
@@ -268,9 +268,9 @@ async function loadBullionGallery(append = false) {
   const more = communityNode('communityMore');
   bullionCommunity.loading = true;
   bullionCommunity.account = userId;
-  if (!append) feed.replaceChildren();
+  if (!append && !filterOnly) feed.replaceChildren();
   more.hidden = true;
-  communityStatus('Loading community…');
+  if (!filterOnly) communityStatus('Loading community…');
 
   try {
     if (!supabaseClient) throw new Error('Community is unavailable.');
@@ -344,16 +344,19 @@ async function loadBullionGallery(append = false) {
       userId && authors.length ? communityData(supabaseClient.from('community_follows').select('followed_id')
         .eq('follower_id', userId).in('followed_id', authors)) : {data:[]},
       photoPosts.length ? supabaseClient.storage.from('bullion-community').createSignedUrls(photoPosts.map(communityPhotoPath), 120) : {data:[]},
-      !append && (view === 'profile' || view === 'mine')
+      !append && !filterOnly && (view === 'profile' || view === 'mine')
         ? getBullionProfile(view === 'mine' ? userId : author)
         : null
     ]);
     if (!communityCurrent(request, userId)) return;
 
+    if (filterOnly) {
+      feed.querySelectorAll('.communityPost,.communityMyPostsEmpty,.communityFilterRetry').forEach(node => node.remove());
+    }
     if (commentFlags.length) feed.append(renderFlaggedBullionComments(commentFlags));
     if (profileCard) feed.append(profileCard);
     if (!append && view === 'mine') {
-      feed.append(renderMyCommunityPostFilters(myPostType));
+      if (!filterOnly) feed.append(renderMyCommunityPostFilters(myPostType));
       if (!posts.length) {
         const emptyMessage = {
           all:'You haven’t submitted a post yet.',
@@ -383,7 +386,10 @@ async function loadBullionGallery(append = false) {
     if (communityCurrent(request, userId)) {
       communityStatus('Couldn’t load the gallery. Try again.');
       if (append) more.hidden = false;
-      else feed.append(communityButton('Try again', () => loadBullionGallery()));
+      else if (filterOnly) {
+        feed.querySelector('.communityFilterRetry')?.remove();
+        feed.append(communityButton('Retry filter', () => loadBullionGallery(false, true), 'communityFilterRetry'));
+      } else feed.append(communityButton('Try again', () => loadBullionGallery()));
     }
     console.warn('Bullion Community load failed:', error);
   } finally {
@@ -406,7 +412,8 @@ function renderMyCommunityPostFilters(selected) {
     const button = communityButton(label, () => {
       if (bullionCommunity.view !== 'mine' || bullionCommunity.myPostType === type) return;
       bullionCommunity.myPostType = type;
-      void loadBullionGallery();
+      for (const option of filters.children) option.setAttribute('aria-pressed', option === button);
+      void loadBullionGallery(false, true);
     }, 'communityMyPostFilter');
     button.setAttribute('aria-pressed', String(selected === type));
     filters.append(button);
@@ -437,7 +444,10 @@ async function getBullionProfile(authorId) {
   if (isOwner) {
     const edit = communityButton('Edit', () => editBullionProfile(authorId, profile.data), 'communityProfileAction');
     edit.setAttribute('aria-label', 'Edit profile');
-    header.append(edit);
+    const bell = communityReactionButton('M18 8a6 6 0 0 0-12 0c0 7-3 8-3 9h18c0-1-3-2-3-9ZM10 20a2 2 0 0 0 4 0', '', () => openCommunityList('Activity'));
+    bell.lastChild.remove();
+    bell.setAttribute('aria-label', 'Community activity');
+    header.append(bell, edit);
   }
   const stats = communityElement('dl', 'communityProfileStats');
   for (const [label, count] of [
@@ -451,6 +461,13 @@ async function getBullionProfile(authorId) {
       value.dataset.count = String(count ?? 0);
     }
     stat.append(communityElement('dt', '', label), value);
+    if (isOwner && ['Followers','Following'].includes(label)) {
+      const button = communityButton('', () => openCommunityList(label), 'communityStatLink');
+      button.setAttribute('aria-label', label + ', ' + (count ?? 0));
+      value.replaceChildren(button);
+      button.textContent = (count ?? 0).toLocaleString();
+    }
+    if (label === 'Followers') value.dataset.followersFor = authorId;
     stats.append(stat);
   }
   card.append(header);
@@ -599,7 +616,8 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
     if (post.author_id !== currentUser?.id) {
       const follows = followed.has(post.author_id);
       const follow = communityButton(follows ? 'Following' : 'Follow',
-        () => updateBullionFollow(post, follows, follow));
+        () => updateBullionFollow(post, follow.getAttribute('aria-pressed') === 'true', follow));
+      follow.dataset.followAuthor = post.author_id;
       follow.setAttribute('aria-pressed', follows);
       actions.append(follow);
       options.append(communityButton('Report', () => reportBullionPost(post)),
@@ -831,16 +849,92 @@ async function updateBullionFollow(post, selected, button) {
   if (!communitySignIn('follow collectors') || button.disabled) return;
   const userId = currentUser.id;
   const keys = {follower_id:userId, followed_id:post.author_id};
-  button.disabled = true;
+  const controls = () => document.querySelectorAll('[data-follow-author="' + post.author_id + '"]');
+  function paint(active, busy) {
+    for (const control of controls()) {
+      control.textContent = active ? 'Following' : 'Follow';
+      control.setAttribute('aria-pressed', active);
+      control.disabled = busy;
+    }
+  }
+  paint(!selected, true);
   try {
     const target = supabaseClient.from('community_follows');
     await communityData(selected ? target.delete().match(keys) : target.insert(keys));
-    if (currentUser?.id === userId) await loadBullionGallery();
+    if (currentUser?.id !== userId) return;
+    paint(!selected, false);
+    const count = document.querySelector('[data-followers-for="' + post.author_id + '"]');
+    if (count) count.textContent = Math.max(0, Number(count.textContent.replace(/[^0-9]/g,'')) + (selected ? -1 : 1)).toLocaleString();
   } catch {
-    if (currentUser?.id === userId) communityStatus('Couldn’t save that change. Try again.');
-  } finally {
-    button.disabled = false;
+    if (currentUser?.id !== userId) return;
+    paint(selected, false);
+    communityStatus('Couldn’t save that change. Try again.');
   }
+}
+
+function openCommunityList(title) {
+  const userId = currentUser?.id;
+  if (!userId) return;
+  const activity = title === 'Activity';
+  const followers = title === 'Followers';
+  const dialog = communityElement('dialog', 'communityListDialog');
+  const list = communityElement('div', 'communityPeopleList');
+  const status = communityElement('p', 'communityStatus');
+  status.setAttribute('role', 'status');
+  const more = communityButton('Load more', load, 'communitySecondary');
+  const close = communityButton('Close', () => dialog.close(), 'communityProfileAction');
+  const head = communityElement('header', 'communityProfileHead');
+  head.append(communityElement('h3', '', title), close);
+  dialog.setAttribute('aria-label', title);
+  dialog.append(head, list, status, more);
+  dialog.onclose = () => dialog.remove();
+  document.body.append(dialog);
+  dialog.showModal();
+  let offset = 0;
+  async function load() {
+    more.disabled = true;
+    status.textContent = 'Loading…';
+    const key = followers ? 'follower_id' : 'followed_id';
+    try {
+      const query = activity ? supabaseClient.rpc('community_personal_activity')
+        .order('occurred_at', {ascending:false}).order('actor').order('kind').order('post_id')
+        : supabaseClient.from('community_follows').select(key)
+          .eq(followers ? 'followed_id' : 'follower_id', userId).order(key);
+      const {data} = await communityData(query.range(offset, offset + 30));
+      const page = data.slice(0,30);
+      const ids = page.map(row => row.actor || row[key]);
+      const profiles = ids.length ? (await communityData(supabaseClient.from('community_profiles')
+        .select('id,display_name,avatar_style,avatar_initials').in('id', [...new Set(ids)]))).data : [];
+      if (!dialog.open || currentUser?.id !== userId) return;
+      const names = new Map(profiles.map(profile => [profile.id, profile]));
+      for (const row of page) {
+        const profile = names.get(row.actor || row[key]);
+        const name = profile?.display_name || 'Collector';
+        const entry = communityElement('div', 'communityListEntry');
+        const label = activity ? name + (row.kind === 'follow' ? ' followed you' : ' liked your post') : name;
+        const body = communityElement('div');
+        body.append(profile ? communityButton(label, () => {
+          dialog.close();
+          void showBullionGallery('profile', profile.id);
+        }, 'communityAuthor') : communityElement('strong','',label));
+        if (activity) {
+          if (row.caption) body.append(communityElement('p','',row.caption));
+          body.append(communityElement('small','',new Date(row.occurred_at).toLocaleString()));
+        }
+        entry.append(communityAvatar(profile), body);
+        list.append(entry);
+      }
+      offset += page.length;
+      status.textContent = offset ? '' : ({Activity:'New follows and likes will appear here.', Followers:'No followers yet.', Following:'You haven’t followed anyone yet.'})[title];
+      more.hidden = data.length <= 30;
+    } catch {
+      status.textContent = 'Couldn’t load this list.';
+      more.textContent = 'Try again';
+    } finally {
+      more.disabled = false;
+    }
+  }
+  void load();
 }
 
 function communityFormField(label, input) {
