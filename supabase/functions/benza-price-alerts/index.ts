@@ -441,6 +441,37 @@ async function processCommunityReviewAlerts() {
   return sent;
 }
 
+async function processCommunityReviewReminders() {
+  const { data, error } = await supabase.rpc("benza_pending_community_review_reminders");
+  if (error) throw error;
+  for (const { user_id, post_ids } of data ?? []) {
+    const events = post_ids.map((id: string) => ({
+      user_id, event_type: "community_review_reminder", event_key: id,
+    }));
+    const claim = await supabase.from("notification_events").upsert(events, {
+      onConflict: "user_id,event_type,event_key", ignoreDuplicates: true,
+    }).select("id");
+    if (claim.error) throw claim.error;
+    if (!claim.data.length) continue;
+    let accepted = false;
+    try {
+      const result = await sendPush(user_id, {
+        title: "Community review reminder",
+        body: "Your review queue still has pending posts. Tap to review.",
+        tag: "community-review-reminder",
+        url: APP_URL + "/#community-review",
+      });
+      accepted = result.sent > 0;
+    } finally {
+      if (!accepted) {
+        const release = await supabase.from("notification_events").delete()
+          .in("id", claim.data.map(row => row.id));
+        if (release.error) throw release.error;
+      }
+    }
+  }
+}
+
 async function getPortfolioValue(
   userId: string,
   prices: Record<string, number>,
@@ -1014,6 +1045,12 @@ Deno.serve(async (req) => {
       communityReviews = await processCommunityReviewAlerts();
     } catch (error) {
       console.error("Community review notifications failed", error);
+    }
+
+    try {
+      await processCommunityReviewReminders();
+    } catch (error) {
+      console.error("Community review reminders failed", error);
     }
 
     const prices = await fetchAllPrices();

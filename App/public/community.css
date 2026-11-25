@@ -10,7 +10,7 @@
 .communityPrimary{background:#ecc17b;color:#2e1c08;border-color:#cf994e}
 .communityHeading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin:18px 0 14px}
 .communityHeading h2,.communityDialog h2{margin:0;font-size:21px;color:var(--text)}
-.communityHeading p,.communityStatus,.communitySupport{color:var(--muted);font-size:13px;line-height:1.45}
+.communityHeading p,.communityStatus,.communityResources{color:var(--muted);font-size:13px;line-height:1.45}
 .communityHeading p{margin:4px 0 0}
 .communityHeading{display:grid;gap:12px}
 .communityToolbar{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
@@ -37,7 +37,8 @@
 .communityPhotoStatus{padding:12px 14px;margin:0;color:var(--muted);font-size:13px}
 #newsRefreshButton[hidden],#communityPanel[hidden],#communityMarketNews[hidden],#communityReviewTab[hidden],#communityMore[hidden]{display:none}
 #communityMore{display:block;margin:12px auto}
-.communitySupport a{color:inherit}
+.communityResources{display:flex;flex-wrap:wrap;column-gap:18px;margin:0 0 8px}
+.communityResources a{display:inline-flex;align-items:center;min-height:44px;color:inherit;text-underline-offset:3px}
 
 .communityProfileHead{display:flex;align-items:center;justify-content:space-between;gap:0 8px;flex-wrap:wrap}
 .communityProfileAction{
