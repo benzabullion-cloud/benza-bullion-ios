@@ -6443,7 +6443,13 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
     </div>
     <section id="communityPanel" hidden aria-label="Bullion community">
       <div class="communityHeading">
-        <div><h2>Benza Bullion Community</h2><p>Coins, bars, and the stories behind them.</p></div>
+        <div>
+          <h2 class="communityWordmark" aria-label="Benza Bullion Community">
+            <span class="brand dashboardBrand">benza <span>bullion</span></span>
+            <span class="communityWordmarkSection">Community</span>
+          </h2>
+          <p>Coins, bars, and the stories behind them.</p>
+        </div>
         <div class="communityToolbar">
           <button class="communityPrimary" type="button" onclick="composeBullionPost()">Post</button>
         <button id="communityReviewTab" type="button" data-community-view="review" onclick="showBullionGallery('review')" hidden>Review queue</button>
