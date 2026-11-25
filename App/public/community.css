@@ -37,14 +37,9 @@
 .communityPhotoStatus{padding:12px 14px;margin:0;color:var(--muted);font-size:13px}
 #newsRefreshButton[hidden],#communityPanel[hidden],#communityMarketNews[hidden],#communityReviewTab[hidden],#communityMore[hidden]{display:none}
 #communityMore{display:block;margin:12px auto}
-.communityResources{position:relative;margin-left:auto}
-.communityResources summary{display:flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:0 6px;list-style:none;cursor:pointer}
-.communityResources summary::-webkit-details-marker{display:none}
-.communityResources[open] summary{color:var(--text)}
-.communityResourcesLinks{position:absolute;z-index:5;right:0;top:100%;min-width:max-content;padding:4px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:0 8px 22px #0004}
-.communityResourcesLinks a{display:flex;align-items:center;min-height:44px;color:var(--text);text-decoration:none}
-.communityResourcesLinks a + a{border-top:1px solid var(--border)}
-.communityResourcesLinks a:hover{text-decoration:underline}
+.communityResources{display:flex;flex-wrap:wrap;gap:0 14px;margin:-8px 0 2px;font-size:12px}
+.communityResources a{display:inline-flex;align-items:center;min-height:32px;color:inherit;text-underline-offset:3px}
+.communityResources a:focus-visible,.communityResources a:hover{color:var(--text)}
 
 .communityProfileHead{display:flex;align-items:center;justify-content:space-between;gap:0 8px;flex-wrap:wrap}
 .communityProfileAction{
