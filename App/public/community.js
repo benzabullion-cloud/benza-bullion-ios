@@ -159,7 +159,7 @@ function communityCurrent(request, userId) {
 }
 
 async function showBullionGallery(view, author = null) {
-  if ((view === 'mine' || view === 'following') && !communitySignIn('use Bullion Community')) return;
+  if ((view === 'mine' || view === 'following' || view === 'blocked') && !communitySignIn('use Bullion Community')) return;
   bullionCommunity.view = view;
   bullionCommunity.author = author;
   bullionCommunity.page = 0;
@@ -264,10 +264,10 @@ async function loadBullionGallery(append = false, filterOnly = false) {
   const userId = currentUser?.id || null;
   const {view, author, page, discoverMetal, discoverType, myPostType} = bullionCommunity;
   updateCommunityDiscoverFilters();
+  communityNode('communityBlockedTab').hidden = !userId;
   const feed = communityNode('communityFeed');
   const more = communityNode('communityMore');
   bullionCommunity.loading = true;
-  bullionCommunity.account = userId;
   if (!append && !filterOnly) feed.replaceChildren();
   more.hidden = true;
   if (!filterOnly) communityStatus('Loading community…');
@@ -279,11 +279,28 @@ async function loadBullionGallery(append = false, filterOnly = false) {
       feed.append(renderCommunitySearch(userId));
       return;
     }
+    if (view === 'blocked') {
+      const {data} = await communityData(supabaseClient.rpc('benza_community_blocked_collectors'));
+      if (!communityCurrent(request, userId)) return;
+      communityStatus(data.length ? '' : 'You haven’t blocked any collectors.');
+      const list = communityElement('section', 'communityCommentList');
+      list.append(communityElement('h3', '', 'Blocked collectors'));
+      for (const collector of data) {
+        const row = communityElement('div', 'communityBlockedRow');
+        const button = communityButton('Unblock', () => unblockBullionCollector(collector));
+        button.setAttribute('aria-label', 'Unblock ' + collector.display_name);
+        row.append(communityElement('strong', '', collector.display_name), button);
+        list.append(row);
+      }
+      if (data.length) feed.append(list);
+      return;
+    }
     const [profile, membership] = userId ? await Promise.all([
       communityData(supabaseClient.from('community_profiles').select('id,display_name').eq('id', userId).maybeSingle()),
       communityData(supabaseClient.from('community_moderators').select('user_id').eq('user_id', userId).maybeSingle())
     ]) : [{data:null}, {data:null}];
     if (!communityCurrent(request, userId)) return;
+    bullionCommunity.account = userId;
     bullionCommunity.profile = profile.data;
     bullionCommunity.moderator = !!membership.data;
     communityNode('communityReviewTab').hidden = !bullionCommunity.moderator;
@@ -302,7 +319,7 @@ async function loadBullionGallery(append = false, filterOnly = false) {
         communityData(supabaseClient.from('community_reports')
           .select('post_id,reason').is('resolved_at', null).limit(100)),
         !append ? communityData(supabaseClient.from('community_comment_flags')
-          .select('comment_id,reason,community_comments!inner(id,body,community_profiles(display_name,avatar_style,avatar_initials),community_posts!inner(caption,status))')
+          .select('id,comment_id,reason,community_comments!inner(id,body,community_profiles(display_name,avatar_style,avatar_initials),community_posts!inner(caption,status))')
           .is('resolved_at', null).eq('community_comments.community_posts.status', 'approved')
           .order('created_at').limit(100)) : {data:[]}
       ]);
@@ -587,22 +604,24 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
   const avatar = communityAvatar(post.community_profiles || {display_name:name});
   const author = communityElement('div', 'communityPostByline');
   author.append(communityButton(name, () => showBullionGallery('profile', post.author_id), 'communityAuthor'));
-  const timestamp = post.published_at || post.created_at;
-  const date = new Date(timestamp);
-  if (timestamp && Number.isFinite(date.getTime())) {
-    const time = communityElement('time', '', date.toLocaleDateString(undefined, {
-      month:'short', day:'numeric', year:'numeric'
-    }));
-    time.dateTime = timestamp;
-    author.append(time);
-  }
   identity.append(avatar, author);
   const discussion = post.item_type === 'Discussion';
   article.classList.toggle('communityDiscussion', discussion);
   const label = discussion ? 'Discussion' : post.metal[0].toUpperCase() + post.metal.slice(1) + ' · ' + communityItemTypeLabel(post.item_type);
   const category = communityElement('span', 'communityPostCategory', label);
   if (!discussion) category.dataset.metal = post.metal;
-  heading.append(identity, category);
+  const metadata = communityElement('div', 'communityPostMetadata');
+  metadata.append(category);
+  const timestamp = post.published_at || post.created_at;
+  const date = new Date(timestamp);
+  if (timestamp && Number.isFinite(date.getTime())) {
+    const day = date.toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
+    const clock = date.toLocaleTimeString(undefined, {hour:'numeric', minute:'2-digit'});
+    const time = communityElement('time', '', day + ' · ' + clock);
+    time.dateTime = timestamp;
+    metadata.append(time);
+  }
+  heading.append(identity, metadata);
   article.append(heading);
 
   if (photoUrl) {
@@ -611,7 +630,10 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
     photo.alt = post.metal + ' ' + communityItemTypeLabel(post.item_type).toLowerCase() + ' shared by ' + name;
     photo.referrerPolicy = 'no-referrer';
     photo.decoding = 'async';
-    article.append(photo);
+    const preview = communityButton('', () => openCommunityPhoto(photo), 'communityPhotoButton');
+    preview.setAttribute('aria-label', 'Enlarge photo of ' + photo.alt);
+    preview.append(photo);
+    article.append(preview);
   } else if (post.item_type !== 'Discussion' && (post.status === 'pending' || post.status === 'approved')) {
     article.append(communityElement('p', 'communityPhotoStatus', 'Photo unavailable'));
   }
@@ -813,10 +835,12 @@ function renderFlaggedBullionComments(flags) {
   const comments = new Map();
   for (const flag of flags) {
     if (!flag.community_comments) continue;
-    if (!comments.has(flag.comment_id)) comments.set(flag.comment_id, {comment:flag.community_comments, reasons:new Set()});
-    comments.get(flag.comment_id).reasons.add(flag.reason);
+    if (!comments.has(flag.comment_id)) comments.set(flag.comment_id, {comment:flag.community_comments, reasons:new Set(), flagIds:[]});
+    const group = comments.get(flag.comment_id);
+    group.reasons.add(flag.reason);
+    group.flagIds.push(flag.id);
   }
-  for (const {comment, reasons} of comments.values()) {
+  for (const {comment, reasons, flagIds} of comments.values()) {
     const card = communityElement('article', 'communityComment');
     card.append(communityElement('strong', '', comment.community_profiles?.display_name || 'Collector'),
       communityElement('p', '', comment.body),
@@ -827,7 +851,7 @@ function renderFlaggedBullionComments(flags) {
       communityButton('Dismiss flags', () => {
         openCommunityDialog('Dismiss flags for this comment?', [], 'Dismiss flags', async () => {
           await communityData(supabaseClient.from('community_comment_flags')
-            .update({resolved_at:new Date().toISOString()}).eq('comment_id', comment.id).is('resolved_at', null));
+            .update({resolved_at:new Date().toISOString()}).in('id', flagIds).is('resolved_at', null));
           return 'Flags dismissed.';
         });
       }));
@@ -1083,6 +1107,62 @@ function openCommunityDialog(title, fields, action, submit) {
   dialog.showModal();
 }
 
+function openCommunityPhoto(photo) {
+  const dialog = communityElement('dialog', 'communityPhotoDialog');
+  dialog.setAttribute('aria-label', 'Community photo viewer');
+  const controls = communityElement('div', 'communityPhotoControls');
+  const viewport = communityElement('div', 'communityPhotoViewport');
+  const frame = communityElement('div', 'communityPhotoFrame');
+  const image = photo.cloneNode();
+  let zoom = 1;
+  let pinch;
+  const zoomOut = communityButton('−', () => setZoom(zoom / 1.5));
+  const zoomIn = communityButton('+', () => setZoom(zoom * 1.5));
+  zoomOut.setAttribute('aria-label', 'Zoom out');
+  zoomIn.setAttribute('aria-label', 'Zoom in');
+  const close = communityButton('Close', () => dialog.close());
+  close.autofocus = true;
+
+  function setZoom(value, x = viewport.clientWidth / 2, y = viewport.clientHeight / 2) {
+    const previous = zoom;
+    zoom = Math.max(1, Math.min(4, value));
+    const left = (viewport.scrollLeft + x) * zoom / previous - x;
+    const top = (viewport.scrollTop + y) * zoom / previous - y;
+    frame.style.width = frame.style.height = (zoom * 100) + '%';
+    viewport.scrollLeft = left;
+    viewport.scrollTop = top;
+    zoomOut.disabled = zoom === 1;
+    zoomIn.disabled = zoom === 4;
+  }
+
+  function pinchDistance(touches) {
+    return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+  }
+
+  viewport.addEventListener('touchstart', event => {
+    if (event.touches.length === 2) pinch = {distance:pinchDistance(event.touches), zoom};
+  });
+  viewport.addEventListener('touchmove', event => {
+    if (event.touches.length !== 2 || !pinch?.distance) return;
+    event.preventDefault();
+    const [first, second] = event.touches;
+    const bounds = viewport.getBoundingClientRect();
+    setZoom(pinch.zoom * pinchDistance(event.touches) / pinch.distance,
+      (first.clientX + second.clientX) / 2 - bounds.left, (first.clientY + second.clientY) / 2 - bounds.top);
+  }, {passive:false});
+  viewport.addEventListener('touchend', () => { pinch = null; });
+  viewport.addEventListener('touchcancel', () => { pinch = null; });
+
+  frame.append(image);
+  viewport.append(frame);
+  controls.append(zoomOut, zoomIn, close);
+  dialog.append(controls, viewport);
+  dialog.addEventListener('close', () => dialog.remove(), {once:true});
+  document.body.append(dialog);
+  dialog.showModal();
+  setZoom(1);
+}
+
 async function prepareBullionPhoto(file) {
   if (!file || file.size > 25 * 1024 * 1024) throw new Error('Choose a photo under 25 MB.');
   const url = URL.createObjectURL(file);
@@ -1178,6 +1258,18 @@ function blockBullionCollector(authorId) {
       const result = await supabaseClient.from('community_blocks').insert({blocker_id:currentUser.id, blocked_id:authorId});
       if (result.error && result.error.code !== '23505') throw result.error;
       return 'Collector blocked.';
+    });
+}
+
+function unblockBullionCollector(collector) {
+  const userId = currentUser?.id;
+  if (!userId) return;
+  openCommunityDialog('Unblock ' + collector.display_name + '?',
+    [communityElement('p', '', 'You can see each other’s Community content again. Previous follows won’t be restored.')],
+    'Unblock', async () => {
+      await communityData(supabaseClient.from('community_blocks')
+        .delete().match({blocker_id:userId, blocked_id:collector.blocked_id}));
+      return 'Collector unblocked.';
     });
 }
 

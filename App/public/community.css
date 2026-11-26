@@ -144,7 +144,8 @@
 }
 .communityPostByline{min-width:0;display:grid;gap:2px}
 .communityPostByline .communityAuthor{padding:0;text-align:start;overflow-wrap:anywhere;font-size:14px}
-.communityPostByline time{font-size:11px;color:var(--muted)}
+.communityPostMetadata{display:grid;justify-items:end;gap:4px;text-align:right}
+.communityPostMetadata time{font-size:11px;color:var(--muted);line-height:1.25}
 .communityPostCategory{
   padding:4px 8px;border-radius:99px;background:var(--surface2);color:var(--muted);
   font-size:11px;font-weight:700;line-height:1.35
@@ -152,7 +153,7 @@
 .communityPostBody .communityPostCaption{margin-bottom:8px;white-space:pre-wrap}
 .communityDiscussion .communityPostCaption{font-size:17px}
 .communityPostBody .communityPostActions{column-gap:6px}
-.communityPost > .communityPhoto{border-block:1px solid var(--border)}
+.communityPost > .communityPhotoButton{border-block:1px solid var(--border)}
 
 .communityDialog:has(.communityProfilePreview){padding:clamp(16px,5vw,24px);border-radius:22px;max-height:85dvh;overflow:auto}
 .communityDialog:has(.communityProfilePreview) #communityFormFields{display:grid;gap:14px;margin-top:8px}
@@ -281,3 +282,16 @@ html[data-theme="dark"] .communityPostCategory[data-metal]{
 .communityProfileIdentity{flex:1}
 .communityProfileIdentity .communityAvatar{flex-shrink:0}
 .communityProfileActions{display:flex;align-items:center;gap:10px;flex:none}
+
+.communityPhotoButton{display:block;width:100%;padding:0;border:0;border-radius:0;background:transparent;cursor:zoom-in}
+.communityPhotoDialog{box-sizing:border-box;width:min(100%,960px);max-width:100%;height:100dvh;max-height:100dvh;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);margin:auto;border:0;background:#101112;color:#fff}
+.communityPhotoDialog[open]{display:flex;flex-direction:column}
+.communityPhotoDialog::backdrop{background:#000d}
+.communityPhotoControls{display:flex;justify-content:flex-end;gap:8px;padding:8px 12px}
+.communityPhotoControls button{min-width:44px;min-height:44px}
+.communityPhotoViewport{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;touch-action:pan-x pan-y}
+.communityPhotoFrame{display:grid;place-items:center}
+.communityPhotoFrame .communityPhoto{width:100%;height:100%;max-height:none;aspect-ratio:auto;background:transparent}
+.communityBlockedRow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0}
+.communityBlockedRow strong{overflow-wrap:anywhere}
+#communityBlockedTab[hidden]{display:none}
