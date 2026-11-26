@@ -317,7 +317,8 @@ async function loadBullionGallery(append = false, filterOnly = false) {
     } else if (view === 'review') {
       const [result, flags] = await Promise.all([
         communityData(supabaseClient.from('community_reports')
-          .select('post_id,reason').is('resolved_at', null).limit(100)),
+          .select('post_id,reason,community_posts!inner(status)').is('resolved_at', null)
+          .eq('community_posts.status', 'approved').limit(100)),
         !append ? communityData(supabaseClient.from('community_comment_flags')
           .select('id,comment_id,reason,community_comments!inner(id,body,community_profiles(display_name,avatar_style,avatar_initials),community_posts!inner(caption,status))')
           .is('resolved_at', null).eq('community_comments.community_posts.status', 'approved')
@@ -678,7 +679,7 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
     const reasons = reports.filter(report => report.post_id === post.id).map(report => report.reason);
     if (reasons.length) {
       body.append(communityElement('p', 'communityBadge', 'Reports: ' + reasons.join(', ')));
-      actions.append(communityButton('Resolve reports', () => resolveBullionReports(post.id)));
+      actions.append(communityButton('Resolve and keep post', () => resolveBullionReports(post.id)));
     }
   }
   if (options.childElementCount > 1) actions.append(options);
@@ -1246,7 +1247,8 @@ function reportBullionPost(post) {
   openCommunityDialog('Report this post', [communityFormField('Reason', reason)], 'Send report', async () => {
     const result = await supabaseClient.from('community_reports')
       .insert({post_id:post.id, reporter_id:currentUser.id, reason:reason.value});
-    if (result.error && result.error.code !== '23505') throw result.error;
+    if (result.error?.code === '23505') return 'You already have an open report for this post.';
+    if (result.error) throw result.error;
     return 'Report sent for review.';
   });
 }

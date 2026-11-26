@@ -79,9 +79,21 @@ const id=n=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0');
  await as(3);
  assert.equal(await count('community_reports'),1);
  assert.equal(await count('community_comment_flags'),1);
+ await db.exec(`update community_reports set resolved_at=now()`);
  await db.exec(`update community_comment_flags set resolved_at=now()`);
  await db.exec('reset role');
  await db.exec(fs.readFileSync('supabase/migrations/20261126010000_community_unblock_and_repeat_flags.sql','utf8'));
+ await db.exec(fs.readFileSync('supabase/migrations/20261126153000_community_repeat_post_reports.sql','utf8'));
+ await as(2);
+ const reportAgain = `insert into community_reports(post_id,reporter_id,reason)
+   values ('${id(10)}','${id(2)}','Privacy concern');`;
+ await db.exec(reportAgain);
+ await assert.rejects(db.exec(reportAgain), error => error.code === '23505');
+ await as(3);
+ assert.equal(await count('community_reports'),2);
+ assert.deepEqual(await rows("select reason from community_reports where resolved_at is null"),
+   [{reason:'Privacy concern'}]);
+ assert.equal((await rows(`select status from community_posts where id='${id(10)}'`))[0].status,'approved');
  await as(2);
  const flagAgain = `insert into community_comment_flags(comment_id,reporter_id,reason)
    select id,'${id(2)}','Privacy concern' from community_comments;`;
