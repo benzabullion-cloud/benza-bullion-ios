@@ -201,7 +201,11 @@ function clearCommunityDiscoverFilters() {
   void loadBullionGallery();
 }
 
-function renderCommunitySearch(userId) {
+function filterCommunityBlockedCollectors(query, column, blockedIds) {
+  return blockedIds.length ? query.not(column, 'in', '(' + blockedIds.join(',') + ')') : query;
+}
+
+function renderCommunitySearch(userId, blockedIds) {
   const panel = communityElement('section', 'communityPeopleSearch');
   const form = communityElement('form', 'communityPeopleForm');
   form.setAttribute('role', 'search');
@@ -232,8 +236,9 @@ function renderCommunitySearch(userId) {
     status.textContent = 'Searching…';
     try {
       const literal = term.replace(/[\\%_]/g, character => '\\' + character);
-      const {data} = await communityData(supabaseClient.from('community_profiles')
-        .select('id,display_name,avatar_style,avatar_initials').ilike('display_name', '%' + literal + '%')
+      const query = supabaseClient.from('community_profiles')
+        .select('id,display_name,avatar_style,avatar_initials').ilike('display_name', '%' + literal + '%');
+      const {data} = await communityData(filterCommunityBlockedCollectors(query, 'id', blockedIds)
         .order('display_name').order('id').limit(21));
       if (!panel.isConnected || (currentUser?.id || null) !== userId) return;
       for (const profile of data.slice(0, 20)) {
@@ -274,11 +279,6 @@ async function loadBullionGallery(append = false, filterOnly = false) {
 
   try {
     if (!supabaseClient) throw new Error('Community is unavailable.');
-    if (view === 'people') {
-      communityStatus('');
-      feed.append(renderCommunitySearch(userId));
-      return;
-    }
     if (view === 'blocked') {
       const {data} = await communityData(supabaseClient.rpc('benza_community_blocked_collectors'));
       if (!communityCurrent(request, userId)) return;
@@ -305,6 +305,22 @@ async function loadBullionGallery(append = false, filterOnly = false) {
     bullionCommunity.moderator = !!membership.data;
     communityNode('communityReviewTab').hidden = !bullionCommunity.moderator;
     if (view === 'review' && !bullionCommunity.moderator) return;
+
+    // Moderators still need access to blocked content in the review queue.
+    const blocked = bullionCommunity.moderator && view !== 'review'
+      ? await communityData(supabaseClient.from('community_blocks').select('blocked_id').eq('blocker_id', userId))
+      : {data:[]};
+    if (!communityCurrent(request, userId)) return;
+    const blockedIds = blocked.data.map(row => row.blocked_id);
+    if (view === 'people') {
+      communityStatus('');
+      feed.append(renderCommunitySearch(userId, blockedIds));
+      return;
+    }
+    if (view === 'profile' && blockedIds.includes(author)) {
+      communityStatus('This collector profile is unavailable.');
+      return;
+    }
 
     let reports = [];
     let commentFlags = [];
@@ -348,6 +364,8 @@ async function loadBullionGallery(append = false, filterOnly = false) {
       }
     }
 
+    query = filterCommunityBlockedCollectors(query, 'author_id', blockedIds);
+    query = filterCommunityBlockedCollectors(query, 'community_comments.author_id', blockedIds);
     const dateColumn = view === 'mine' || view === 'review' ? 'created_at' : 'published_at';
     const offset = append ? page * communityPageSize : 0;
     const {data: results} = await communityData(query.order(dateColumn, {ascending: view === 'review'})
@@ -402,7 +420,7 @@ async function loadBullionGallery(append = false, filterOnly = false) {
     const followed = new Set(followRows.data.map(row => row.followed_id));
     const signed = new Map((photos.data || []).map(photo => [photo.path, photo.signedUrl]));
     for (const post of posts) {
-      feed.append(renderBullionPost(post, signed.get(communityPhotoPath(post)), liked, followed, reports));
+      feed.append(renderBullionPost(post, signed.get(communityPhotoPath(post)), liked, followed, reports, blockedIds));
     }
     communityStatus(posts.length || commentFlags.length || append || view === 'mine' ? '' : {
       discover:discoverMetal || discoverType ? 'No posts match these filters.' : 'No published posts yet. Start a bullion discussion or share a photo.',
@@ -597,7 +615,7 @@ function editBullionProfile(authorId, profile) {
   });
 }
 
-function renderBullionPost(post, photoUrl, liked, followed, reports) {
+function renderBullionPost(post, photoUrl, liked, followed, reports, blockedIds) {
   const article = communityElement('article', 'communityPost');
   const heading = communityElement('div', 'communityPostHead');
   const name = post.community_profiles?.display_name || 'Collector';
@@ -653,7 +671,7 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
       count, () => toggleBullionLike(post, heart));
     heart.setAttribute('aria-pressed', selected);
     heart.setAttribute('aria-label', selected ? 'Unlike post' : 'Like post');
-    comments = renderBullionComments(post, post.community_comments?.[0]?.count || 0);
+    comments = renderBullionComments(post, post.community_comments?.[0]?.count || 0, blockedIds);
     actions.append(heart, comments.toggle);
     if (post.author_id !== currentUser?.id) {
       const follows = followed.has(post.author_id);
@@ -689,7 +707,7 @@ function renderBullionPost(post, photoUrl, liked, followed, reports) {
   return article;
 }
 
-function renderBullionComments(post, count) {
+function renderBullionComments(post, count, blockedIds) {
   const thread = communityElement('section', 'communityComments');
   thread.id = 'communityComments-' + post.id;
   thread.hidden = true;
@@ -717,9 +735,11 @@ function renderBullionComments(post, count) {
     const userId = currentUser?.id;
     status.textContent = 'Loading comments…';
     try {
-      const {data} = await communityData(supabaseClient.from('community_comments')
+      const query = supabaseClient.from('community_comments')
         .select('id,author_id,body,community_profiles(display_name,avatar_style,avatar_initials)')
-        .eq('post_id', post.id).order('created_at', {ascending:false})
+        .eq('post_id', post.id);
+      const {data} = await communityData(filterCommunityBlockedCollectors(query, 'author_id', blockedIds)
+        .order('created_at', {ascending:false})
         .order('id', {ascending:false}).limit(limit + 1));
       if (version !== request || currentUser?.id !== userId) return;
       list.replaceChildren(...data.slice(0, limit).map(comment => renderBullionComment(comment)));
