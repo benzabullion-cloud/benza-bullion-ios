@@ -14,6 +14,8 @@
 .communityHeading p{margin:4px 0 0}
 .communityHeading{display:grid;gap:12px}
 .communityToolbar{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.communityComposeButton{display:inline-flex;align-items:center;gap:6px;min-height:44px}
+.communityComposeButton svg{width:17px;height:17px;flex:none}
 #communityReviewTab{border:0;background:transparent;color:var(--text);font:inherit;font-size:13px;text-decoration:underline;text-underline-offset:3px;min-height:44px;cursor:pointer}
 #communityReviewTab[aria-pressed=true]{text-decoration-color:var(--gold);text-decoration-thickness:2px}
 .communityFilters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;border-bottom:1px solid var(--border)}
@@ -37,7 +39,7 @@
 .communityPhotoStatus{padding:12px 14px;margin:0;color:var(--muted);font-size:13px}
 #newsRefreshButton[hidden],#communityPanel[hidden],#communityMarketNews[hidden],#communityReviewTab[hidden],#communityMore[hidden]{display:none}
 #communityMore{display:block;margin:12px auto}
-.communityResources{display:flex;flex-wrap:wrap;gap:0 14px;margin:-8px 0 2px;font-size:12px}
+.communityResources{display:flex;flex-wrap:wrap;gap:0 14px;margin-top:2px;font-size:12px}
 .communityResources a{display:inline-flex;align-items:center;min-height:32px;color:inherit;text-underline-offset:3px}
 .communityResources a:focus-visible,.communityResources a:hover{color:var(--text)}
 
