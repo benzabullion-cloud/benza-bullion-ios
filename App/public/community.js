@@ -741,40 +741,77 @@ function renderBullionComments(post, count, blockedIds) {
   const status = communityElement('p', 'communityCommentStatus');
   status.setAttribute('role', 'status');
   const previewSize = 3;
-  let limit = previewSize;
   let request = 0;
+  let replyTarget = null;
+  const expanded = new Map();
+  const pageSizes = new Map();
+
+  function commentQuery(parentId, columns, options) {
+    let query = supabaseClient.from('community_comments').select(columns, options).eq('post_id', post.id);
+    query = parentId ? query.eq('parent_comment_id', parentId) : query.is('parent_comment_id', null);
+    return filterCommunityBlockedCollectors(query, 'author_id', blockedIds);
+  }
+
+  async function loadBranch(container, parentId, depth, isCurrent) {
+    const size = pageSizes.get(parentId) || previewSize;
+    const {data} = await communityData(commentQuery(parentId,
+      'id,author_id,body,created_at,community_profiles(display_name,avatar_style,avatar_initials)')
+      .order('created_at', {ascending:false}).order('id', {ascending:false}).limit(size + 1));
+    if (!isCurrent()) return;
+    const nodes = await Promise.all(data.slice(0, size).map(async comment => {
+      const branch = communityElement('div', 'communityCommentBranch');
+      const editorSlot = communityElement('div');
+      const reply = currentUser && bullionCommunity.profile ? () => selectReply(comment, editorSlot) : null;
+      branch.append(renderBullionComment(comment, reply), editorSlot);
+      if (replyTarget?.id === comment.id) editorSlot.append(form);
+      const {count:children} = await communityData(commentQuery(comment.id, 'id', {count:'exact', head:true}));
+      if (!children || !isCurrent()) return branch;
+      const group = communityElement('div', 'communityReplies');
+      group.id = 'communityReplies-' + comment.id;
+      let open = expanded.get(comment.id) ?? (depth === 0 && children === 1);
+      let generation = 0;
+      const button = communityButton('', () => {
+        open = !open;
+        expanded.set(comment.id, open);
+        void sync();
+      }, 'communityMoreComments');
+      button.setAttribute('aria-controls', group.id);
+      async function sync() {
+        const token = ++generation;
+        group.hidden = !open;
+        button.setAttribute('aria-expanded', String(open));
+        button.textContent = open ? 'Hide replies' : 'View ' + children + (children === 1 ? ' reply' : ' replies');
+        if (!open) return;
+        const active = () => isCurrent() && generation === token;
+        try {
+          await loadBranch(group, comment.id, depth + 1, active);
+        } catch {
+          if (active()) group.replaceChildren(communityButton('Retry loading replies', sync, 'communityMoreComments'));
+        }
+      }
+      branch.append(button, group);
+      await sync();
+      return branch;
+    }));
+    if (!isCurrent()) return;
+    container.replaceChildren(...nodes);
+    if (data.length > size) container.append(communityButton(parentId ? 'Show older replies' : 'Show older comments', () => {
+      pageSizes.set(parentId, size + previewSize);
+      void loadComments();
+    }, 'communityMoreComments'));
+    return nodes.length;
+  }
 
   async function loadComments() {
     const version = ++request;
     const userId = currentUser?.id;
+    const active = () => version === request && currentUser?.id === userId;
     status.textContent = 'Loading comments…';
     try {
-      const query = supabaseClient.from('community_comments')
-        .select('id,author_id,body,created_at,parent_comment_id,community_profiles(display_name,avatar_style,avatar_initials)')
-        .eq('post_id', post.id);
-      const {data} = await communityData(filterCommunityBlockedCollectors(query, 'author_id', blockedIds)
-        .order('created_at', {ascending:false})
-        .order('id', {ascending:false}).limit(limit + 1));
-      if (version !== request || currentUser?.id !== userId) return;
-      const page = data.slice(0, limit);
-      const parentIds = [...new Set(page.map(comment => comment.parent_comment_id).filter(Boolean))];
-      const parents = new Map();
-      if (parentIds.length) {
-        const lookup = supabaseClient.from('community_comments')
-          .select('id,body,community_profiles(display_name)').eq('post_id', post.id).in('id', parentIds);
-        const result = await communityData(filterCommunityBlockedCollectors(lookup, 'author_id', blockedIds));
-        for (const parent of result.data) parents.set(parent.id, parent);
-      }
-      if (version !== request || currentUser?.id !== userId) return;
-      list.replaceChildren(...page.map(comment => renderBullionComment(comment,
-        parents.get(comment.parent_comment_id), userId && bullionCommunity.profile ? selectReply : null)));
-      if (data.length > limit) list.append(communityButton('Show older comments', () => {
-        limit += previewSize;
-        void loadComments();
-      }, 'communityMoreComments'));
-      status.textContent = data.length ? '' : 'No comments yet.';
+      const visible = await loadBranch(list, null, 0, active);
+      if (active()) status.textContent = visible ? '' : 'No comments yet.';
     } catch {
-      if (version === request) status.textContent = 'Couldn’t load comments. Reopen the thread to try again.';
+      if (active()) status.textContent = 'Couldn’t load comments. Reopen the thread to try again.';
     }
   }
 
@@ -798,17 +835,17 @@ function renderBullionComments(post, count, blockedIds) {
   submit.setAttribute('aria-label', 'Post comment');
   const feedback = communityElement('p', 'communityCommentStatus');
   feedback.setAttribute('role', 'status');
-  let replyTarget = null;
   const context = communityElement('div', 'communityReplyContext');
-  const targetLabel = communityElement('span');
   const cancel = communityButton('Cancel reply', () => selectReply(null), 'communityMoreComments');
-  context.append(targetLabel, cancel);
+  context.append(cancel);
   context.hidden = true;
-  function selectReply(comment) {
+  function selectReply(comment, slot = thread) {
     if (submit.disabled) return;
     replyTarget = comment;
     context.hidden = !comment;
-    targetLabel.textContent = comment ? 'Replying to ' + (comment.community_profiles?.display_name || 'Collector') + ' · ' + comment.body : '';
+    slot.append(form);
+    field.placeholder = comment ? 'Reply to ' + (comment.community_profiles?.display_name || 'collector') + '…' : 'Add a comment…';
+    field.setAttribute('aria-label', field.placeholder);
     submit.textContent = comment ? 'Reply' : 'Post';
     submit.setAttribute('aria-label', comment ? 'Post reply' : 'Post comment');
     field.focus();
@@ -824,6 +861,10 @@ function renderBullionComments(post, count, blockedIds) {
     try {
       await communityData(supabaseClient.from('community_comments')
         .insert({post_id:post.id, author_id:userId, body, parent_comment_id:replyTarget?.id || null}));
+      if (replyTarget) expanded.set(replyTarget.id, true);
+      thread.append(form);
+      field.placeholder = 'Add a comment…';
+      field.setAttribute('aria-label', 'Add a comment');
       replyTarget = null;
       context.hidden = true;
       submit.textContent = 'Post';
@@ -845,7 +886,7 @@ function renderBullionComments(post, count, blockedIds) {
   return {thread, toggle};
 }
 
-function renderBullionComment(comment, parent, onReply) {
+function renderBullionComment(comment, onReply) {
   const item = communityElement('article', 'communityComment communityCommentRow');
   const heading = communityElement('div', 'communityCommentText');
   const byline = communityElement('div', 'communityCommentByline');
@@ -854,8 +895,6 @@ function renderBullionComment(comment, parent, onReply) {
     {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'}));
   time.dateTime = comment.created_at;
   heading.append(byline, time);
-  if (parent) heading.append(communityElement('blockquote', 'communityReplyQuote',
-    (parent.community_profiles?.display_name || 'Collector') + ' · ' + parent.body));
   if (currentUser) {
     const options = communityOptions('Comment options', 'communityCommentOptions');
     options.append(communityButton('Flag comment', () => {
