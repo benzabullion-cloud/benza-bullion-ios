@@ -755,7 +755,7 @@ function renderBullionComments(post, count, blockedIds) {
   async function loadBranch(container, parentId, isCurrent, recipient) {
     const size = pageSizes.get(parentId) || previewSize;
     const {data} = await communityData(commentQuery(parentId,
-      'id,author_id,body,created_at,community_profiles(display_name,avatar_style,avatar_initials)')
+      'id,author_id,body,created_at,community_profiles(display_name,avatar_style,avatar_initials),community_mentions(collector_id,label)')
       .order('created_at', {ascending:false}).order('id', {ascending:false}).limit(size + 1));
     if (!isCurrent()) return;
     const nodes = await Promise.all(data.slice(0, size).map(async comment => {
@@ -852,7 +852,51 @@ function renderBullionComments(post, count, blockedIds) {
     submit.setAttribute('aria-label', comment ? 'Post reply' : 'Post comment');
     field.focus();
   }
-  form.append(context, field, submit, feedback);
+  const picker = communityElement('div', 'communityMentionPicker');
+  const selected = new Map();
+  let timer;
+  let searchVersion = 0;
+  function closePicker() {
+    clearTimeout(timer);
+    searchVersion++;
+    picker.replaceChildren();
+  }
+  form.addEventListener('focusout', event => {
+    if (!form.contains(event.relatedTarget)) closePicker();
+  });
+  field.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closePicker();
+    if (event.key === 'ArrowDown' && picker.firstChild) {
+      event.preventDefault();
+      picker.firstChild.focus();
+    }
+  });
+  field.addEventListener('input', () => {
+    closePicker();
+    const end = field.selectionStart;
+    const match = field.value.slice(0,end).match(/(?:^|\s)@([^@\n]{0,32})$/);
+    if (!match) return;
+    const start = end - match[1].length - 1;
+    const version = searchVersion;
+    timer = setTimeout(async () => {
+      try {
+        const {data} = await communityData(supabaseClient.rpc('community_mention_candidates', {prefix:match[1]}));
+        if (version !== searchVersion || end !== field.selectionStart) return;
+        for (const profile of data) {
+          const token = '@' + profile.display_name;
+          const choice = communityButton(token, () => {
+            field.setRangeText(token + ' ', start, end, 'end');
+            selected.set(token, profile.id);
+            closePicker();
+            field.focus();
+          }, 'communityAuthor');
+          choice.onpointerdown = event => event.preventDefault();
+          picker.append(choice);
+        }
+      } catch { closePicker(); }
+    }, 150);
+  });
+  form.append(context, field, submit, picker, feedback);
   form.onsubmit = async event => {
     event.preventDefault();
     const userId = currentUser?.id;
@@ -861,8 +905,16 @@ function renderBullionComments(post, count, blockedIds) {
     submit.disabled = true;
     feedback.textContent = '';
     try {
-      await communityData(supabaseClient.from('community_comments')
-        .insert({post_id:post.id, author_id:userId, body, parent_comment_id:replyTarget?.id || null}));
+      const targets = [...selected].filter(([token]) => body.includes(token)).map(([,id]) => id);
+      if (targets.length) {
+        await communityData(supabaseClient.rpc('community_post_with_mentions',
+          {post:post.id, parent:replyTarget?.id || null, message:body, targets}));
+      } else {
+        await communityData(supabaseClient.from('community_comments')
+          .insert({post_id:post.id, author_id:userId, body, parent_comment_id:replyTarget?.id || null}));
+      }
+      closePicker();
+      selected.clear();
       if (replyTarget) expanded.set(replyTarget.id, true);
       thread.append(form);
       field.placeholder = 'Add a comment…';
@@ -925,7 +977,19 @@ function renderBullionComment(comment, onReply, actions, recipient) {
     }
     item.append(options);
   }
-  heading.append(communityElement('p', '', comment.body));
+  const body = communityElement('p');
+  const tags = [...(comment.community_mentions || [])].sort((a,b) => b.label.length - a.label.length);
+  let cursor = 0;
+  for (const match of comment.body.matchAll(/@/g)) {
+    if (match.index < cursor) continue;
+    const tag = tags.find(t => comment.body.startsWith(t.label, match.index + 1));
+    if (!tag) continue;
+    body.append(comment.body.slice(cursor, match.index), communityButton('@' + tag.label,
+      () => showBullionGallery('profile', tag.collector_id), 'communityMentionLink'));
+    cursor = match.index + tag.label.length + 1;
+  }
+  body.append(comment.body.slice(cursor));
+  heading.append(body);
   if (onReply) actions.append(communityButton('Reply', () => onReply(comment), 'communityMoreComments'));
   heading.append(actions);
   item.prepend(heading);
@@ -1134,7 +1198,7 @@ function openCommunityList(title, profileId = currentUser?.id, blockedIds = []) 
         const profile = names.get(row.actor || row[key]);
         const name = profile?.display_name || 'Collector';
         const entry = communityElement('div', 'communityListEntry');
-        const label = activity ? name + (row.kind === 'follow' ? ' followed you' : ' liked your post') : name;
+        const label = activity ? name + (row.kind === 'follow' ? ' followed you' : row.kind === 'mention' ? ' mentioned you' : ' liked your post') : name;
         const body = communityElement('div');
         body.append(profile ? communityButton(label, () => {
           dialog.close();
@@ -1167,7 +1231,7 @@ function openCommunityList(title, profileId = currentUser?.id, blockedIds = []) 
       if (!activity && page.length) after = page[page.length - 1][key];
       offset += page.length;
       more.textContent = 'Load more';
-      status.textContent = offset ? '' : ({Activity:'New follows and likes will appear here.', Followers:'No followers yet.', Following:'No collectors followed yet.'})[title];
+      status.textContent = offset ? '' : ({Activity:'New follows, likes and mentions will appear here.', Followers:'No followers yet.', Following:'No collectors followed yet.'})[title];
       more.hidden = data.length <= 30;
     } catch {
       status.textContent = 'Couldn’t load this list.';

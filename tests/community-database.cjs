@@ -28,7 +28,9 @@ const id=n=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0');
   '20261125140000_unique_community_display_names.sql',
   '20261125162000_community_avatars_and_review_alerts.sql',
   '20261127060000_community_comment_replies.sql',
-  '20261127133000_preserve_removed_comment_threads.sql'
+  '20261127133000_preserve_removed_comment_threads.sql',
+  '20261125180000_community_activity.sql',
+  '20261127140000_community_mentions.sql'
  ]) await db.exec(fs.readFileSync('supabase/migrations/'+migration,'utf8'));
  async function as(n){ await db.exec(`reset role; set "request.jwt.claim.sub"='${n?id(n):''}'; set role ${n?'authenticated':'anon'}`); }
  const rows=async(sql)=>(await db.query(sql)).rows;
@@ -72,6 +74,13 @@ const id=n=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0');
  await db.exec(`update community_profiles set bio='I collect silver',avatar_style='silver',avatar_initials='AG' where id='${id(2)}';
    insert into community_comments(post_id,author_id,body) values ('${id(10)}','${id(2)}','Nice coin');`);
  const parent = (await rows("select id from community_comments where body='Nice coin'"))[0].id;
+ assert.equal((await rows("select id from community_mention_candidates('Collector O')"))[0].id,id(1));
+ await db.exec(`select community_post_with_mentions('${id(10)}','${parent}','Hey @Collector One',array['${id(1)}','${id(1)}']::uuid[])`);
+ assert.equal((await rows('select collector_id from community_mentions'))[0].collector_id,id(1));
+ await as(1);
+ assert.equal((await rows("select * from community_personal_activity() where kind='mention'")).length,1);
+ await as(2);
+ await db.exec("delete from community_comments where body='Hey @Collector One'");
  await db.exec(`insert into community_comments(post_id,author_id,body,parent_comment_id)
    values ('${id(10)}','${id(2)}','Reply to Nice coin','${parent}')`);
  assert.equal((await rows("select parent_comment_id from community_comments where body='Reply to Nice coin'"))[0].parent_comment_id,parent);
@@ -130,6 +139,7 @@ const id=n=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0');
  await db.exec(`insert into community_blocks values ('${id(2)}','${id(1)}')`);
  assert.equal(await count('community_posts'),0);
  assert.equal(await count('community_follows'),0);
+ assert.equal((await rows("select * from community_mention_candidates('Collector One')")).length,0);
  assert.equal(await count('community_comments'),0);
  assert.equal(await count('storage.objects'),0);
  assert.deepEqual(await rows('select * from benza_community_blocked_collectors()'),

@@ -308,3 +308,7 @@ html[data-theme="dark"] .communityPostCategory[data-metal]{
 .communityCommentText{padding:2px 0}
 .communityCommentActions{display:flex;flex-wrap:wrap;gap:0 14px}
 .communityCommentActions .communityMoreComments{min-height:30px;padding:2px 0;color:var(--muted)}
+.communityMentionPicker{grid-column:1/-1;display:grid;justify-items:start}
+.communityMentionPicker:empty{display:none}
+.communityMentionLink{border:0;background:none;color:var(--gold);padding:0;font:inherit;text-decoration:underline}
+.communityMentionPicker .communityAuthor{color:var(--gold)}
