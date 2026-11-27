@@ -26,7 +26,8 @@ const id=n=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0');
   '20261124235100_community_profile_edits.sql',
   '20261125013000_community_comments.sql',
   '20261125140000_unique_community_display_names.sql',
-  '20261125162000_community_avatars_and_review_alerts.sql'
+  '20261125162000_community_avatars_and_review_alerts.sql',
+  '20261127060000_community_comment_replies.sql'
  ]) await db.exec(fs.readFileSync('supabase/migrations/'+migration,'utf8'));
  async function as(n){ await db.exec(`reset role; set "request.jwt.claim.sub"='${n?id(n):''}'; set role ${n?'authenticated':'anon'}`); }
  const rows=async(sql)=>(await db.query(sql)).rows;
@@ -69,6 +70,13 @@ const id=n=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0');
  assert.equal(await count('community_reports'),0);
  await db.exec(`update community_profiles set bio='I collect silver',avatar_style='silver',avatar_initials='AG' where id='${id(2)}';
    insert into community_comments(post_id,author_id,body) values ('${id(10)}','${id(2)}','Nice coin');`);
+ const parent = (await rows("select id from community_comments where body='Nice coin'"))[0].id;
+ await db.exec(`insert into community_comments(post_id,author_id,body,parent_comment_id)
+   values ('${id(10)}','${id(2)}','Reply to Nice coin','${parent}')`);
+ assert.equal((await rows("select parent_comment_id from community_comments where body='Reply to Nice coin'"))[0].parent_comment_id,parent);
+ await assert.rejects(db.exec(`insert into community_comments(post_id,author_id,body,parent_comment_id)
+   values ('${id(11)}','${id(2)}','Wrong post','${parent}')`), /Reply target unavailable/);
+ await db.exec("delete from community_comments where body='Reply to Nice coin'");
  await db.exec(`insert into community_comment_flags(comment_id,reporter_id,reason)
    select id,'${id(2)}','Off topic' from community_comments;`);
  assert.equal(await count('community_comment_flags'),0);

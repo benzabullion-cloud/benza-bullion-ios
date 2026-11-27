@@ -297,3 +297,7 @@ html[data-theme="dark"] .communityPostCategory[data-metal]{
 .communityBlockedRow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0}
 .communityBlockedRow strong{overflow-wrap:anywhere}
 #communityBlockedTab[hidden]{display:none}
+.communityCommentTime,.communityReplyQuote,.communityReplyContext{font-size:.82rem;color:var(--muted);overflow-wrap:anywhere}
+.communityReplyQuote{margin:6px 0;padding-inline-start:8px;border-inline-start:2px solid currentColor}
+.communityReplyContext{grid-column:1/-1}
+.communityReplyContext button{margin-inline-start:8px}

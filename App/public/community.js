@@ -387,7 +387,7 @@ async function loadBullionGallery(append = false, filterOnly = false) {
         .eq('follower_id', userId).in('followed_id', authors)) : {data:[]},
       photoPosts.length ? supabaseClient.storage.from('bullion-community').createSignedUrls(photoPosts.map(communityPhotoPath), 120) : {data:[]},
       !append && !filterOnly && (view === 'profile' || view === 'mine')
-        ? getBullionProfile(view === 'mine' ? userId : author)
+        ? getBullionProfile(view === 'mine' ? userId : author, blockedIds)
         : null
     ]);
     if (!communityCurrent(request, userId)) return;
@@ -483,14 +483,14 @@ function renderCommunityProfilePostFilters(view, selected) {
   return section;
 }
 
-async function getBullionProfile(authorId) {
+async function getBullionProfile(authorId, blockedIds) {
   const isOwner = currentUser?.id === authorId;
   const [profile, posts, followers, following, likes] = await Promise.all([
     communityData(supabaseClient.from('community_profiles').select('display_name,bio,avatar_style,avatar_initials').eq('id', authorId).maybeSingle()),
     communityData(supabaseClient.from('community_posts').select('id', {count:'exact', head:true})
       .eq('author_id', authorId).eq('status', 'approved')),
-    communityData(supabaseClient.from('community_follows').select('follower_id', {count:'exact', head:true}).eq('followed_id', authorId)),
-    communityData(supabaseClient.from('community_follows').select('followed_id', {count:'exact', head:true}).eq('follower_id', authorId)),
+    communityData(filterCommunityBlockedCollectors(supabaseClient.from('community_follows').select('follower_id', {count:'exact', head:true}).eq('followed_id', authorId), 'follower_id', blockedIds)),
+    communityData(filterCommunityBlockedCollectors(supabaseClient.from('community_follows').select('followed_id', {count:'exact', head:true}).eq('follower_id', authorId), 'followed_id', blockedIds)),
     communityData(supabaseClient.from('community_likes').select('post_id,community_posts!inner(author_id,status)', {count:'exact', head:true})
       .eq('community_posts.author_id', authorId).eq('community_posts.status', 'approved'))
   ]);
@@ -528,14 +528,15 @@ async function getBullionProfile(authorId) {
       value.dataset.count = String(count ?? 0);
     }
     stat.append(communityElement('dt', '', label), value);
-    if (isOwner && ['Followers','Following'].includes(label)) {
-      const button = communityButton('', () => openCommunityList(label), 'communityStatLink');
+    if (['Followers','Following'].includes(label)) {
+      const button = communityButton('', () => openCommunityList(label, authorId, blockedIds), 'communityStatLink');
       button.setAttribute('aria-label', label + ', ' + (count ?? 0));
+      if (label === 'Followers') button.dataset.followersFor = authorId;
       if (label === 'Following') button.dataset.followingFor = authorId;
       value.replaceChildren(button);
       button.textContent = (count ?? 0).toLocaleString();
     }
-    if (label === 'Followers') value.dataset.followersFor = authorId;
+
     stats.append(stat);
   }
   card.append(header);
@@ -749,13 +750,24 @@ function renderBullionComments(post, count, blockedIds) {
     status.textContent = 'Loading comments…';
     try {
       const query = supabaseClient.from('community_comments')
-        .select('id,author_id,body,community_profiles(display_name,avatar_style,avatar_initials)')
+        .select('id,author_id,body,created_at,parent_comment_id,community_profiles(display_name,avatar_style,avatar_initials)')
         .eq('post_id', post.id);
       const {data} = await communityData(filterCommunityBlockedCollectors(query, 'author_id', blockedIds)
         .order('created_at', {ascending:false})
         .order('id', {ascending:false}).limit(limit + 1));
       if (version !== request || currentUser?.id !== userId) return;
-      list.replaceChildren(...data.slice(0, limit).map(comment => renderBullionComment(comment)));
+      const page = data.slice(0, limit);
+      const parentIds = [...new Set(page.map(comment => comment.parent_comment_id).filter(Boolean))];
+      const parents = new Map();
+      if (parentIds.length) {
+        const lookup = supabaseClient.from('community_comments')
+          .select('id,body,community_profiles(display_name)').eq('post_id', post.id).in('id', parentIds);
+        const result = await communityData(filterCommunityBlockedCollectors(lookup, 'author_id', blockedIds));
+        for (const parent of result.data) parents.set(parent.id, parent);
+      }
+      if (version !== request || currentUser?.id !== userId) return;
+      list.replaceChildren(...page.map(comment => renderBullionComment(comment,
+        parents.get(comment.parent_comment_id), userId && bullionCommunity.profile ? selectReply : null)));
       if (data.length > limit) list.append(communityButton('Show older comments', () => {
         limit += previewSize;
         void loadComments();
@@ -786,7 +798,22 @@ function renderBullionComments(post, count, blockedIds) {
   submit.setAttribute('aria-label', 'Post comment');
   const feedback = communityElement('p', 'communityCommentStatus');
   feedback.setAttribute('role', 'status');
-  form.append(field, submit, feedback);
+  let replyTarget = null;
+  const context = communityElement('div', 'communityReplyContext');
+  const targetLabel = communityElement('span');
+  const cancel = communityButton('Cancel reply', () => selectReply(null), 'communityMoreComments');
+  context.append(targetLabel, cancel);
+  context.hidden = true;
+  function selectReply(comment) {
+    if (submit.disabled) return;
+    replyTarget = comment;
+    context.hidden = !comment;
+    targetLabel.textContent = comment ? 'Replying to ' + (comment.community_profiles?.display_name || 'Collector') + ' · ' + comment.body : '';
+    submit.textContent = comment ? 'Reply' : 'Post';
+    submit.setAttribute('aria-label', comment ? 'Post reply' : 'Post comment');
+    field.focus();
+  }
+  form.append(context, field, submit, feedback);
   form.onsubmit = async event => {
     event.preventDefault();
     const userId = currentUser?.id;
@@ -796,7 +823,11 @@ function renderBullionComments(post, count, blockedIds) {
     feedback.textContent = '';
     try {
       await communityData(supabaseClient.from('community_comments')
-        .insert({post_id:post.id, author_id:userId, body}));
+        .insert({post_id:post.id, author_id:userId, body, parent_comment_id:replyTarget?.id || null}));
+      replyTarget = null;
+      context.hidden = true;
+      submit.textContent = 'Post';
+      submit.setAttribute('aria-label', 'Post comment');
       field.value = '';
       count++;
       updateCommentCount();
@@ -804,6 +835,7 @@ function renderBullionComments(post, count, blockedIds) {
     } catch (error) {
       feedback.textContent = error.message?.includes('community_comment_content_allowed')
         ? 'Edit your comment to remove the abusive or explicit language.'
+        : error.code === '23503' && replyTarget ? 'That comment is unavailable. Cancel the reply or choose another comment.'
         : error.code === '23514' ? 'Leave links and email addresses out of comments.' : 'Couldn’t post your comment. Try again.';
     } finally {
       submit.disabled = false;
@@ -813,12 +845,17 @@ function renderBullionComments(post, count, blockedIds) {
   return {thread, toggle};
 }
 
-function renderBullionComment(comment) {
+function renderBullionComment(comment, parent, onReply) {
   const item = communityElement('article', 'communityComment communityCommentRow');
   const heading = communityElement('div', 'communityCommentText');
   const byline = communityElement('div', 'communityCommentByline');
   byline.append(communityAvatar(comment.community_profiles), communityElement('strong', '', comment.community_profiles?.display_name || 'Collector'));
-  heading.append(byline);
+  const time = communityElement('time', 'communityCommentTime', new Date(comment.created_at).toLocaleString(undefined,
+    {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'}));
+  time.dateTime = comment.created_at;
+  heading.append(byline, time);
+  if (parent) heading.append(communityElement('blockquote', 'communityReplyQuote',
+    (parent.community_profiles?.display_name || 'Collector') + ' · ' + parent.body));
   if (currentUser) {
     const options = communityOptions('Comment options', 'communityCommentOptions');
     options.append(communityButton('Flag comment', () => {
@@ -840,6 +877,7 @@ function renderBullionComment(comment) {
     item.append(options);
   }
   heading.append(communityElement('p', '', comment.body));
+  if (onReply) heading.append(communityButton('Reply', () => onReply(comment), 'communityMoreComments'));
   item.prepend(heading);
   return item;
 }
@@ -955,7 +993,11 @@ async function updateBullionFollow(post, selected, button) {
       ownCount.setAttribute('aria-label', 'Following, ' + next);
     }
     const count = document.querySelector('[data-followers-for="' + post.author_id + '"]');
-    if (count) count.textContent = Math.max(0, Number(count.textContent.replace(/[^0-9]/g,'')) + (selected ? -1 : 1)).toLocaleString();
+    if (count) {
+      const next = Math.max(0, Number(count.textContent.replace(/[^0-9]/g,'')) + (selected ? -1 : 1));
+      count.textContent = next.toLocaleString();
+      count.setAttribute('aria-label', 'Followers, ' + next);
+    }
   } catch {
     if (currentUser?.id !== userId) return;
     paint(selected, false);
@@ -992,9 +1034,9 @@ function refreshVisibleCommunityBadge() {
 setInterval(refreshVisibleCommunityBadge, 30000);
 document.addEventListener('visibilitychange', refreshVisibleCommunityBadge);
 
-function openCommunityList(title) {
+function openCommunityList(title, profileId = currentUser?.id, blockedIds = []) {
   const userId = currentUser?.id;
-  if (!userId) return;
+  if (!profileId) return;
   const activity = title === 'Activity';
   const followers = title === 'Followers';
   const dialog = communityElement('dialog', 'communityListDialog');
@@ -1022,8 +1064,8 @@ function openCommunityList(title) {
     try {
       let query = activity ? supabaseClient.rpc('community_personal_activity')
         .order('occurred_at', {ascending:false}).order('actor').order('kind').order('post_id')
-        : supabaseClient.from('community_follows').select(key)
-          .eq(followers ? 'followed_id' : 'follower_id', userId).order(key);
+        : filterCommunityBlockedCollectors(supabaseClient.from('community_follows').select(key)
+          .eq(followers ? 'followed_id' : 'follower_id', profileId), key, blockedIds).order(key);
       if (!activity && after) query = query.gt(key, after);
       const {data} = await communityData(activity ? query.range(offset, offset + 30) : query.limit(31));
       const page = data.slice(0,30);
@@ -1031,8 +1073,8 @@ function openCommunityList(title) {
       const uniqueIds = [...new Set(ids)];
       const [profiles, relations, incoming] = ids.length ? await Promise.all([
         communityData(supabaseClient.from('community_profiles').select('id,display_name,avatar_style,avatar_initials').in('id',uniqueIds)),
-        communityData(supabaseClient.from('community_follows').select('followed_id').eq('follower_id',userId).in('followed_id',uniqueIds)),
-        followers ? {data:[]} : communityData(supabaseClient.from('community_follows').select('follower_id').eq('followed_id',userId).in('follower_id',uniqueIds))
+        !userId ? {data:[]} : communityData(supabaseClient.from('community_follows').select('followed_id').eq('follower_id',userId).in('followed_id',uniqueIds)),
+        !userId ? {data:[]} : communityData(supabaseClient.from('community_follows').select('follower_id').eq('followed_id',userId).in('follower_id',uniqueIds))
       ]) : [{data:[]},{data:[]},{data:[]}];
       const followed = new Set(relations.data.map(row => row.followed_id));
       const followsMe = new Set(incoming.data.map(row => row.follower_id));
@@ -1054,8 +1096,8 @@ function openCommunityList(title) {
             {month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})));
         }
         entry.append(communityAvatar(profile), body);
-        if (profile && profile.id !== userId) {
-          const inactive = followers || followsMe.has(profile.id) ? 'Follow back' : 'Follow';
+        if (userId && profile && profile.id !== userId) {
+          const inactive = followsMe.has(profile.id) ? 'Follow back' : 'Follow';
           const active = followed.has(profile.id);
           const follow = communityButton(active ? 'Following' : inactive, () =>
             updateBullionFollow({author_id:profile.id}, follow.getAttribute('aria-pressed') === 'true', follow), 'communityRowFollow');
@@ -1075,7 +1117,7 @@ function openCommunityList(title) {
       if (!activity && page.length) after = page[page.length - 1][key];
       offset += page.length;
       more.textContent = 'Load more';
-      status.textContent = offset ? '' : ({Activity:'New follows and likes will appear here.', Followers:'No followers yet.', Following:'You haven’t followed anyone yet.'})[title];
+      status.textContent = offset ? '' : ({Activity:'New follows and likes will appear here.', Followers:'No followers yet.', Following:'No collectors followed yet.'})[title];
       more.hidden = data.length <= 30;
     } catch {
       status.textContent = 'Couldn’t load this list.';
