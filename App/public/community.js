@@ -2,7 +2,7 @@
 
 const bullionCommunity = {
   view: 'discover', author: null, page: 0, request: 0, loading: false,
-  profile: null, moderator: false, account: null, discoverMetal: '', discoverType: '', myPostType: 'all'
+  profile: null, moderator: false, account: null, discoverMetal: '', discoverType: '', myPostType: 'all', profilePostType: 'all'
 };
 const communityPageSize = 12;
 const communityMetals = ['Gold','Silver','Platinum','Palladium','Copper'];
@@ -160,6 +160,9 @@ function communityCurrent(request, userId) {
 
 async function showBullionGallery(view, author = null) {
   if ((view === 'mine' || view === 'following' || view === 'blocked') && !communitySignIn('use Bullion Community')) return;
+  if (view === 'profile' && (bullionCommunity.view !== view || bullionCommunity.author !== author)) {
+    bullionCommunity.profilePostType = 'all';
+  }
   bullionCommunity.view = view;
   bullionCommunity.author = author;
   bullionCommunity.page = 0;
@@ -267,7 +270,8 @@ async function loadMoreBullionPosts() {
 async function loadBullionGallery(append = false, filterOnly = false) {
   const request = ++bullionCommunity.request;
   const userId = currentUser?.id || null;
-  const {view, author, page, discoverMetal, discoverType, myPostType} = bullionCommunity;
+  const {view, author, page, discoverMetal, discoverType} = bullionCommunity;
+  const postType = view === 'mine' ? bullionCommunity.myPostType : bullionCommunity.profilePostType;
   updateCommunityDiscoverFilters();
   communityNode('communityBlockedTab').hidden = !userId;
   const feed = communityNode('communityFeed');
@@ -328,8 +332,6 @@ async function loadBullionGallery(append = false, filterOnly = false) {
       .select('id,author_id,metal,item_type,caption,photo_path,public_photo_path,status,created_at,published_at,review_reason,community_profiles(display_name,avatar_style,avatar_initials),community_likes(count),community_comments(count)');
     if (view === 'mine') {
       query = query.eq('author_id', userId);
-      if (myPostType === 'discussions') query = query.eq('item_type', 'Discussion');
-      if (myPostType === 'photos') query = query.in('item_type', communityPhotoTypes);
     } else if (view === 'review') {
       const [result, flags] = await Promise.all([
         communityData(supabaseClient.from('community_reports')
@@ -364,6 +366,10 @@ async function loadBullionGallery(append = false, filterOnly = false) {
       }
     }
 
+    if (view === 'mine' || view === 'profile') {
+      if (postType === 'discussions') query = query.eq('item_type', 'Discussion');
+      if (postType === 'photos') query = query.in('item_type', communityPhotoTypes);
+    }
     query = filterCommunityBlockedCollectors(query, 'author_id', blockedIds);
     query = filterCommunityBlockedCollectors(query, 'community_comments.author_id', blockedIds);
     const dateColumn = view === 'mine' || view === 'review' ? 'created_at' : 'published_at';
@@ -403,15 +409,20 @@ async function loadBullionGallery(append = false, filterOnly = false) {
       }
       feed.append(profileCard);
     }
-    if (!append && view === 'mine') {
-      if (!filterOnly) feed.append(renderMyCommunityPostFilters(myPostType));
+    const showProfilePosts = view === 'mine' || (view === 'profile' && (profileCard || filterOnly));
+    if (!append && showProfilePosts) {
+      if (!filterOnly) feed.append(renderCommunityProfilePostFilters(view, postType));
       if (!posts.length) {
-        const emptyMessage = {
+        const emptyMessages = view === 'mine' ? {
           all:'You haven’t submitted a post yet.',
           discussions:'You haven’t submitted a discussion yet.',
           photos:'You haven’t submitted a photo post yet.'
-        }[myPostType];
-        const empty = communityElement('p', 'communityStatus communityMyPostsEmpty', emptyMessage);
+        } : {
+          all:'No published posts from this collector yet.',
+          discussions:'No published discussions from this collector yet.',
+          photos:'No published photo posts from this collector yet.'
+        };
+        const empty = communityElement('p', 'communityStatus communityMyPostsEmpty', emptyMessages[postType]);
         empty.setAttribute('role', 'status');
         feed.append(empty);
       }
@@ -422,11 +433,11 @@ async function loadBullionGallery(append = false, filterOnly = false) {
     for (const post of posts) {
       feed.append(renderBullionPost(post, signed.get(communityPhotoPath(post)), liked, followed, reports, blockedIds));
     }
-    communityStatus(posts.length || commentFlags.length || append || view === 'mine' ? '' : {
+    communityStatus(posts.length || commentFlags.length || append || showProfilePosts ? '' : {
       discover:discoverMetal || discoverType ? 'No posts match these filters.' : 'No published posts yet. Start a bullion discussion or share a photo.',
       following:'No approved posts from collectors you follow yet.',
       review:'The review queue is clear.',
-      profile:profileCard ? 'No approved posts from this collector.' : 'This collector profile is unavailable.'
+      profile:'This collector profile is unavailable.'
     }[view]);
     bullionCommunity.page = offset / communityPageSize + 1;
     more.hidden = results.length <= communityPageSize;
@@ -450,16 +461,18 @@ function communityInitials(name) {
     .map(word => Array.from(word)[0].toLocaleUpperCase()).join('') || '•';
 }
 
-function renderMyCommunityPostFilters(selected) {
+function renderCommunityProfilePostFilters(view, selected) {
+  const ownProfile = view === 'mine';
+  const filterKey = ownProfile ? 'myPostType' : 'profilePostType';
   const section = communityElement('section', 'communityMyPostsHeader');
-  const heading = communityElement('h3', 'communityProfilePostsHeading', 'My posts');
+  const heading = communityElement('h3', 'communityProfilePostsHeading', ownProfile ? 'My posts' : 'Posts');
   const filters = communityElement('div', 'communityMyPostFilters');
   filters.setAttribute('role', 'group');
-  filters.setAttribute('aria-label', 'Filter my posts');
+  filters.setAttribute('aria-label', ownProfile ? 'Filter my posts' : 'Filter posts');
   for (const [type, label] of [['all','All'], ['discussions','Discussions'], ['photos','Photos']]) {
     const button = communityButton(label, () => {
-      if (bullionCommunity.view !== 'mine' || bullionCommunity.myPostType === type) return;
-      bullionCommunity.myPostType = type;
+      if (bullionCommunity.view !== view || bullionCommunity[filterKey] === type) return;
+      bullionCommunity[filterKey] = type;
       for (const option of filters.children) option.setAttribute('aria-pressed', option === button);
       void loadBullionGallery(false, true);
     }, 'communityMyPostFilter');
