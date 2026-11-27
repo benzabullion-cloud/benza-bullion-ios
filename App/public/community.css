@@ -324,6 +324,10 @@ html[data-theme="dark"] .communityPostCategory[data-metal]{
 .communityAlertChoice input:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
 .communityAlertChoice input:disabled{opacity:.6}
 #communityDialog:has(.communityProfilePreview){border-radius:22px;background:linear-gradient(155deg,color-mix(in srgb,var(--gold) 8%,var(--surface)),var(--surface) 34%)}
-#communityDialog .communityProfilePreview{background:linear-gradient(105deg,color-mix(in srgb,var(--gold) 14%,var(--surface2)),var(--surface2));border-radius:16px;border-inline-start:3px solid var(--gold)}
 #communityDialog .communityAvatarChoice[aria-pressed=true]{background:color-mix(in srgb,var(--gold) 13%,var(--surface2));font-weight:700}
 .communityCommentBranch[data-alert-target]>.communityCommentRow{border-inline-start:2px solid var(--gold);padding-inline-start:8px}
+
+.communitySettingsDialog[open]{display:flex;flex-direction:column;max-height:min(78dvh,620px)}
+.communitySettingsDialog>.communityProfileHead{flex:none}
+.communitySettingsDialog>.communityListScroll{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch;padding-bottom:max(16px,env(safe-area-inset-bottom))}
+.communitySettingsDialog .communityAlertChoice:first-child{font-weight:700}

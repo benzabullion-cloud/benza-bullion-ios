@@ -65,7 +65,7 @@ function openBullionNewsSection(section) {
 
 function openCommunityProfileSettings(userId, profile) {
   if (currentUser?.id !== userId) return;
-  const dialog = communityElement('dialog', 'communityListDialog');
+  const dialog = communityElement('dialog', 'communityListDialog communitySettingsDialog');
   dialog.setAttribute('aria-label', 'Community settings');
   const head = communityElement('header', 'communityProfileHead');
   const close = communityButton('×', () => dialog.close(), 'communityListClose');
@@ -97,16 +97,19 @@ async function showCommunityAlertSettings(panel, userId) {
     if (currentUser?.id !== userId || !panel.isConnected) return;
     const choices = [['reply','Replies to me'],['mention','@mentions'],['comment','Comments on my posts'],['likes','Likes on my posts'],['follows','New followers']];
     if (membership.data) choices.push(['moderator','Moderator review and report alerts']);
-    for (const [key,label] of choices) {
+    const switches = new Map();
+    const selected = key => key === 'moderator' ? membership.data?.review_alerts_since : prefs.data?.[key];
+    for (const [key,label] of [['all','Community notifications'], ...choices]) {
       const input = communityElement('input');
       input.type = 'checkbox';
       input.setAttribute('role','switch');
-      input.checked = !!(key === 'moderator' ? membership.data.review_alerts_since : prefs.data?.[key]);
+      switches.set(key,input);
+      input.checked = key === 'all' ? choices.some(([kind]) => selected(kind)) : !!selected(key);
       const row = communityElement('label','communityAlertChoice');
       row.append(label,input);
       panel.insertBefore(row,message);
       input.onchange = async () => {
-        input.disabled = true;
+        for (const control of switches.values()) control.disabled = true;
         const enabled = input.checked;
         try {
           if (enabled && isBenzaNativeRuntime()) {
@@ -126,14 +129,24 @@ async function showCommunityAlertSettings(panel, userId) {
           }
           if (currentUser?.id !== userId) return;
           const since = enabled ? new Date().toISOString() : null;
-          await communityData(key === 'moderator'
-            ? supabaseClient.from('community_moderators').update({review_alerts_since:since}).eq('user_id',userId).select('user_id').single()
-            : supabaseClient.from('community_alert_preferences').upsert({user_id:userId,[key]:since},{defaultToNull:false}));
+          const changed = key === 'all' ? choices.filter(([kind]) => switches.get(kind).checked !== enabled) : [[key]];
+          const fields = Object.fromEntries(changed.filter(([kind]) => kind !== 'moderator').map(([kind]) => [kind,since]));
+          if (Object.keys(fields).length) {
+            await communityData(supabaseClient.from('community_alert_preferences').upsert({user_id:userId,...fields},{defaultToNull:false}));
+            for (const kind of Object.keys(fields)) switches.get(kind).checked = enabled;
+          }
+          if (changed.some(([kind]) => kind === 'moderator') && currentUser?.id === userId) {
+            await communityData(supabaseClient.from('community_moderators').update({review_alerts_since:since}).eq('user_id',userId).select('user_id').single());
+            switches.get('moderator').checked = enabled;
+          }
           message.textContent = 'Preference saved.';
         } catch (error) {
-          input.checked = !enabled;
-          message.textContent = error.message?.includes('iPhone Settings') ? error.message : 'Couldn’t save this preference.';
-        } finally { input.disabled = false; }
+          if (key !== 'all') input.checked = !enabled;
+          message.textContent = error.message?.includes('iPhone Settings') ? error.message : 'Couldn’t save every change. Please try again.';
+        } finally {
+          switches.get('all').checked = choices.some(([kind]) => switches.get(kind).checked);
+          for (const control of switches.values()) control.disabled = false;
+        }
       };
     }
   } catch { message.textContent = 'Couldn’t load notification preferences. Reopen settings to retry.'; }
