@@ -63,6 +63,28 @@ function openBullionNewsSection(section) {
   }
 }
 
+function openCommunityProfileSettings(userId, profile) {
+  if (currentUser?.id !== userId) return;
+  const dialog = communityElement('dialog', 'communityListDialog');
+  dialog.setAttribute('aria-label', 'Community settings');
+  const head = communityElement('header', 'communityProfileHead');
+  const close = communityButton('×', () => dialog.close(), 'communityListClose');
+  close.setAttribute('aria-label', 'Close Community settings');
+  head.append(communityElement('h3', '', 'Community settings'), close);
+  const scroll = communityElement('div', 'communityListScroll');
+  const edit = communityButton('Edit profile', () => {
+    dialog.close();
+    if (currentUser?.id === userId) editBullionProfile(userId, profile);
+  });
+  const preferences = communityElement('section', 'communityAlertSettings');
+  scroll.append(edit, communityElement('h4', '', 'Notifications'), preferences);
+  dialog.append(head, scroll);
+  dialog.onclose = () => dialog.remove();
+  document.body.append(dialog);
+  dialog.showModal();
+  void showCommunityAlertSettings(preferences, userId);
+}
+
 async function showCommunityAlertSettings(panel, userId) {
   const message = communityElement('p', 'communityStatus');
   message.setAttribute('role','status');
@@ -78,6 +100,7 @@ async function showCommunityAlertSettings(panel, userId) {
     for (const [key,label] of choices) {
       const input = communityElement('input');
       input.type = 'checkbox';
+      input.setAttribute('role','switch');
       input.checked = !!(key === 'moderator' ? membership.data.review_alerts_since : prefs.data?.[key]);
       const row = communityElement('label','communityAlertChoice');
       row.append(label,input);
@@ -535,8 +558,10 @@ async function getBullionProfile(authorId, blockedIds) {
   identity.append(avatar, communityElement('h3', '', name));
   header.append(identity);
   if (isOwner) {
-    const edit = communityButton('Edit', () => editBullionProfile(authorId, profile.data), 'communityProfileAction');
-    edit.setAttribute('aria-label', 'Edit profile');
+    const settings = communityButton('', () => openCommunityProfileSettings(authorId, profile.data), 'communityReaction communitySettingsCog');
+    settings.setAttribute('aria-label', 'Community settings');
+    settings.setAttribute('aria-haspopup', 'dialog');
+    settings.append(document.querySelector('.settingsIconButton svg').cloneNode(true));
     const bell = communityReactionButton('M18 8a6 6 0 0 0-12 0c0 7-3 8-3 9h18c0-1-3-2-3-9ZM10 20a2 2 0 0 0 4 0', '', () => openCommunityList('Activity'));
     bell.classList.add('communityBell');
     bell.dataset.activityOwner = authorId;
@@ -545,7 +570,7 @@ async function getBullionProfile(authorId, blockedIds) {
     void refreshCommunityBadge(bell);
     bell.setAttribute('aria-label', 'Community activity');
     const actions = communityElement('div', 'communityProfileActions');
-    actions.append(bell, edit);
+    actions.append(bell, settings);
     header.append(actions);
   }
   const stats = communityElement('dl', 'communityProfileStats');
@@ -1221,23 +1246,11 @@ function openCommunityList(title, profileId = currentUser?.id, blockedIds = []) 
   close.setAttribute('aria-label', 'Close ' + title);
   const head = communityElement('header', 'communityProfileHead');
   head.append(communityElement('h3', '', title));
-  const preferences = communityElement('section','communityAlertSettings');
-  preferences.hidden = true;
-  if (activity) {
-    const settings = communityButton('Notifications', () => {
-      preferences.hidden = !preferences.hidden;
-      scroll.hidden = !preferences.hidden;
-      settings.setAttribute('aria-expanded',String(!preferences.hidden));
-      if (!preferences.hidden) void showCommunityAlertSettings(preferences,userId);
-    }, 'communityProfileAction');
-    settings.setAttribute('aria-expanded','false');
-    head.append(settings);
-  }
   head.append(close);
   dialog.setAttribute('aria-label', title);
   const scroll = communityElement('div', 'communityListScroll');
   scroll.append(list, status, more);
-  dialog.append(head, preferences, scroll);
+  dialog.append(head, scroll);
   dialog.onclose = () => dialog.remove();
   document.body.append(dialog);
   dialog.showModal();
