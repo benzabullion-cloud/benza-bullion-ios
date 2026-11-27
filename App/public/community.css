@@ -299,7 +299,7 @@ html[data-theme="dark"] .communityPostCategory[data-metal]{
 #communityBlockedTab[hidden]{display:none}
 .communityCommentTime,.communityReplyContext{font-size:.82rem;color:var(--muted);overflow-wrap:anywhere}
 .communityReplies{margin-inline-start:12px;padding-inline-start:8px;border-inline-start:1px solid var(--border)}
-.communityReplies .communityReplies .communityReplies{margin-inline-start:0;padding-inline-start:0}
+.communityReplies .communityReplies{margin-inline-start:0;padding-inline-start:0;border:0}
 .communityReplyContext{grid-column:1/-1}
 .communityReplyContext button{margin-inline-start:8px}
 .communityCommentByline{flex-wrap:wrap;gap:2px 6px}

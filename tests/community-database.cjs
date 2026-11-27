@@ -27,7 +27,8 @@ const id=n=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0');
   '20261125013000_community_comments.sql',
   '20261125140000_unique_community_display_names.sql',
   '20261125162000_community_avatars_and_review_alerts.sql',
-  '20261127060000_community_comment_replies.sql'
+  '20261127060000_community_comment_replies.sql',
+  '20261127133000_preserve_removed_comment_threads.sql'
  ]) await db.exec(fs.readFileSync('supabase/migrations/'+migration,'utf8'));
  async function as(n){ await db.exec(`reset role; set "request.jwt.claim.sub"='${n?id(n):''}'; set role ${n?'authenticated':'anon'}`); }
  const rows=async(sql)=>(await db.query(sql)).rows;
@@ -76,7 +77,18 @@ const id=n=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0');
  assert.equal((await rows("select parent_comment_id from community_comments where body='Reply to Nice coin'"))[0].parent_comment_id,parent);
  await assert.rejects(db.exec(`insert into community_comments(post_id,author_id,body,parent_comment_id)
    values ('${id(11)}','${id(2)}','Wrong post','${parent}')`), /Reply target unavailable/);
- await db.exec("delete from community_comments where body='Reply to Nice coin'");
+ const middle=(await rows("select id from community_comments where body='Reply to Nice coin'"))[0].id;
+ await db.exec(`insert into community_comments(post_id,author_id,body,parent_comment_id)
+   values ('${id(10)}','${id(2)}','Nested reply','${middle}')`);
+ await as(1);
+ await assert.rejects(db.exec(`select community_remove_comment('${middle}')`));
+ await as(2);
+ await db.exec(`select community_remove_comment('${middle}')`);
+ assert.deepEqual((await rows(`select author_id,body,parent_comment_id from community_comments where id='${middle}'`))[0],
+   {author_id:null,body:'Comment removed',parent_comment_id:parent});
+ assert.equal((await rows("select parent_comment_id from community_comments where body='Nested reply'"))[0].parent_comment_id,middle);
+ await db.exec("select community_remove_comment(id) from community_comments where body='Nested reply'");
+ assert.equal((await rows(`select id from community_comments where id='${middle}'`)).length,0);
  await db.exec(`insert into community_comment_flags(comment_id,reporter_id,reason)
    select id,'${id(2)}','Off topic' from community_comments;`);
  assert.equal(await count('community_comment_flags'),0);
