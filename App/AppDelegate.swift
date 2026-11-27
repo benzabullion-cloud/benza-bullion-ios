@@ -12,7 +12,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
               let payload = response.notification.request.content.userInfo["benza"] as? [String: Any],
               let tag = payload["tag"] as? String,
-              tag.hasPrefix("community-review-") else { return }
+              tag.hasPrefix("community-review-") || tag.hasPrefix("community-thread/") else { return }
+        UserDefaults.standard.set(tag, forKey: communityReviewTapKey + ".route")
         UserDefaults.standard.set(true, forKey: communityReviewTapKey)
         NotificationCenter.default.post(name: communityReviewTap, object: nil)
     }

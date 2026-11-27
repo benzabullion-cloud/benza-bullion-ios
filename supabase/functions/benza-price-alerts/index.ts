@@ -441,6 +441,31 @@ async function processCommunityReviewAlerts() {
   return sent;
 }
 
+async function processCommunityActivityPush() {
+  const {data,error} = await supabase.rpc("benza_pending_community_activity_push");
+  if (error) throw error;
+  const messages: Record<string,string> = {
+    reply:"Someone replied to your comment.", mention:"A collector mentioned you.",
+    comment:"There’s new discussion on your post.", report:"Published Community content needs review."
+  };
+  for (const row of data ?? []) {
+    const event = {user_id:row.user_id, event_type:"community_" + row.kind, event_key:row.event_key};
+    const reserved = await supabase.from("notification_events").insert(event);
+    if (reserved.error?.code === "23505") continue;
+    if (reserved.error) throw reserved.error;
+    const report = row.kind === "report";
+    const route = report ? "community-review" : "community-thread/" + row.post_id + "/" + row.comment_id;
+    let delivered = false;
+    try {
+      const result = await sendPush(row.user_id, {title:"Benza Bullion Community",body:messages[row.kind],
+        tag:report ? "community-review-report-" + row.event_key : route,url:APP_URL + "/#" + route});
+      delivered = result.sent > 0;
+    } finally {
+      if (!delivered) await supabase.from("notification_events").delete().match(event);
+    }
+  }
+}
+
 async function processCommunityReviewReminders() {
   const { data, error } = await supabase.rpc("benza_pending_community_review_reminders");
   if (error) throw error;
@@ -1040,6 +1065,11 @@ Deno.serve(async (req) => {
       vapid.privateKey,
     );
 
+    try {
+      await processCommunityActivityPush();
+    } catch (error) {
+      console.error("Community activity push failed", error);
+    }
     let communityReviews = 0;
     try {
       communityReviews = await processCommunityReviewAlerts();

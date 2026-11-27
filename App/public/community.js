@@ -63,46 +63,65 @@ function openBullionNewsSection(section) {
   }
 }
 
-async function loadCommunityReviewAlertPreference() {
-  const row = communityNode('communityReviewAlertsRow');
-  const toggle = communityNode('communityReviewAlertsToggle');
-  const userId = currentUser?.id;
-  if (!row || !toggle || !userId || toggle.disabled) return;
+async function showCommunityAlertSettings(panel, userId) {
+  const message = communityElement('p', 'communityStatus');
+  message.setAttribute('role','status');
+  panel.replaceChildren(message);
   try {
-    const {data} = await communityData(supabaseClient.from('community_moderators')
-      .select('review_alerts_since').eq('user_id', userId).maybeSingle());
-    if (currentUser?.id !== userId || toggle.disabled) return;
-    row.hidden = !data;
-    toggle.classList.toggle('on', !!data?.review_alerts_since);
-    toggle.setAttribute('aria-pressed', String(!!data?.review_alerts_since));
-  } catch {
-    if (currentUser?.id === userId) row.hidden = true;
-  }
+    const [prefs, membership] = await Promise.all([
+      communityData(supabaseClient.from('community_alert_preferences').select('reply,mention,comment').eq('user_id',userId).maybeSingle()),
+      communityData(supabaseClient.from('community_moderators').select('review_alerts_since').eq('user_id',userId).maybeSingle())
+    ]);
+    if (currentUser?.id !== userId || !panel.isConnected) return;
+    const choices = [['reply','Replies to me'],['mention','@mentions'],['comment','Comments on my posts']];
+    if (membership.data) choices.push(['moderator','Moderator review and report alerts']);
+    for (const [key,label] of choices) {
+      const input = communityElement('input');
+      input.type = 'checkbox';
+      input.checked = !!(key === 'moderator' ? membership.data.review_alerts_since : prefs.data?.[key]);
+      const row = communityElement('label','communityAlertChoice');
+      row.append(label,input);
+      panel.insertBefore(row,message);
+      input.onchange = async () => {
+        input.disabled = true;
+        const enabled = input.checked;
+        try {
+          if (enabled && isBenzaNativeRuntime()) {
+            const result = await nativeBenzaNotifications().enable();
+            if (result.permission !== 'granted' || !result.token) throw new Error('Enable notifications in iPhone Settings first.');
+            if (currentUser?.id !== userId) return;
+            await saveNativeBenzaSubscription(result.token);
+          } else if (enabled) {
+            if (!('Notification' in window) || !navigator.serviceWorker) throw new Error('Push unavailable');
+            const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+            if (permission !== 'granted') throw new Error('Push permission required');
+            const publicKey = await getBenzaVapidPublicKey(true);
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(publicKey)});
+            if (currentUser?.id !== userId) return;
+            await saveBenzaPushSubscription(sub);
+          }
+          if (currentUser?.id !== userId) return;
+          const since = enabled ? new Date().toISOString() : null;
+          await communityData(key === 'moderator'
+            ? supabaseClient.from('community_moderators').update({review_alerts_since:since}).eq('user_id',userId).select('user_id').single()
+            : supabaseClient.from('community_alert_preferences').upsert({user_id:userId,[key]:since},{defaultToNull:false}));
+          message.textContent = 'Preference saved.';
+        } catch (error) {
+          input.checked = !enabled;
+          message.textContent = error.message?.includes('iPhone Settings') ? error.message : 'Couldn’t save this preference.';
+        } finally { input.disabled = false; }
+      };
+    }
+  } catch { message.textContent = 'Couldn’t load notification preferences. Reopen settings to retry.'; }
 }
 
-async function toggleCommunityReviewAlerts() {
-  const row = communityNode('communityReviewAlertsRow');
-  const toggle = communityNode('communityReviewAlertsToggle');
-  const status = communityNode('notificationPrefsStatus');
-  const userId = currentUser?.id;
-  if (!userId || row.hidden || toggle.disabled) return;
-  const enable = toggle.getAttribute('aria-pressed') !== 'true';
-  toggle.disabled = true;
-  try {
-    await communityData(supabaseClient.from('community_moderators')
-      .update({review_alerts_since:enable ? new Date().toISOString() : null})
-      .eq('user_id', userId).select('user_id').single());
-    if (currentUser?.id === userId) {
-      toggle.classList.toggle('on', enable);
-      toggle.setAttribute('aria-pressed', String(enable));
-      status.textContent = enable ? 'Community review alerts enabled.' : 'Community review alerts disabled.';
-    }
-  } catch {
-    if (currentUser?.id === userId) status.textContent = 'Could not save this setting. Please try again.';
-  } finally {
-    toggle.disabled = false;
-    if (currentUser?.id !== userId) void loadCommunityReviewAlertPreference();
-  }
+async function openCommunityConversation(postId, commentId) {
+  if (!currentUser || !/^[a-f0-9-]{36}$/i.test(postId)) return;
+  openNews();
+  bullionCommunity.alertPost = postId;
+  bullionCommunity.alertComment = commentId;
+  await showBullionGallery('conversation');
 }
 
 async function openCommunityReviewFromAlert() {
@@ -132,7 +151,12 @@ async function connectCommunityNotificationRoute() {
   async function consumeTap() {
     if (!currentUser) return;
     try {
-      const {pending} = await plugin.consumeCommunityReviewTap();
+      const {pending, route} = await plugin.consumeCommunityReviewTap();
+      if (route?.startsWith("community-thread/")) {
+        const [,post,comment] = route.split("/");
+        await openCommunityConversation(post,comment);
+        return;
+      }
       if (pending) await openCommunityReviewFromAlert();
     } catch (error) {
       console.warn('Could not read Community notification route:', error);
@@ -350,6 +374,7 @@ async function loadBullionGallery(append = false, filterOnly = false) {
         : query.eq('status', 'pending');
     } else {
       query = query.eq('status', 'approved');
+      if (view === 'conversation') query = query.eq('id', bullionCommunity.alertPost);
       if (view === 'discover') {
         if (discoverMetal) query = query.eq('metal', discoverMetal.toLowerCase());
         if (discoverType) query = query.eq('item_type', discoverType);
@@ -434,6 +459,7 @@ async function loadBullionGallery(append = false, filterOnly = false) {
       feed.append(renderBullionPost(post, signed.get(communityPhotoPath(post)), liked, followed, reports, blockedIds));
     }
     communityStatus(posts.length || commentFlags.length || append || showProfilePosts ? '' : {
+      conversation:'This conversation is no longer available.',
       discover:discoverMetal || discoverType ? 'No posts match these filters.' : 'No published posts yet. Start a bullion discussion or share a photo.',
       following:'No approved posts from collectors you follow yet.',
       review:'The review queue is clear.',
@@ -745,6 +771,29 @@ function renderBullionComments(post, count, blockedIds) {
   let replyTarget = null;
   const expanded = new Map();
   const pageSizes = new Map();
+  const focusPath = new Map();
+  const focusId = bullionCommunity.view === 'conversation' && bullionCommunity.alertPost === post.id ? bullionCommunity.alertComment : null;
+  if (focusId) queueMicrotask(async () => {
+    if (!thread.isConnected) return;
+    let id = focusId;
+    const seen = new Set();
+    try {
+      while (id && !seen.has(id)) {
+        seen.add(id);
+        const {data} = await communityData(supabaseClient.from('community_comments')
+          .select('id,parent_comment_id,author_id,body,created_at,community_profiles(display_name,avatar_style,avatar_initials),community_mentions(collector_id,label)')
+          .eq('post_id',post.id).eq('id',id).maybeSingle());
+        if (!data || blockedIds.includes(data.author_id) || !thread.isConnected) throw new Error();
+        focusPath.set(data.parent_comment_id,data);
+        id = data.parent_comment_id;
+        if (id) expanded.set(id,true);
+      }
+      thread.hidden = false;
+      toggle.setAttribute('aria-expanded','true');
+      await loadComments();
+      thread.querySelector('[data-alert-target]')?.scrollIntoView({block:'center'});
+    } catch { if (thread.isConnected) communityStatus('This comment is no longer available.'); }
+  });
 
   function commentQuery(parentId, columns, options) {
     let query = supabaseClient.from('community_comments').select(columns, options).eq('post_id', post.id);
@@ -758,8 +807,12 @@ function renderBullionComments(post, count, blockedIds) {
       'id,author_id,body,created_at,community_profiles(display_name,avatar_style,avatar_initials),community_mentions(collector_id,label)')
       .order('created_at', {ascending:false}).order('id', {ascending:false}).limit(size + 1));
     if (!isCurrent()) return;
-    const nodes = await Promise.all(data.slice(0, size).map(async comment => {
+    const page = data.slice(0,size);
+    const target = focusPath.get(parentId);
+    if (target && !page.some(row => row.id === target.id)) page.push(target);
+    const nodes = await Promise.all(page.map(async comment => {
       const branch = communityElement('div', 'communityCommentBranch');
+      if (comment.id === focusId) branch.dataset.alertTarget = 'true';
       const editorSlot = communityElement('div');
       const reply = currentUser && bullionCommunity.profile ? () => selectReply(comment, editorSlot) : null;
       const actions = communityElement('div', 'communityCommentActions');
@@ -1131,7 +1184,7 @@ async function refreshCommunityBadge(bell) {
   const key = communitySeenKey(id);
   try {
     const seen = localStorage.getItem(key);
-    let query = supabaseClient.rpc('community_personal_activity', {}, {head:true,count:'exact'});
+    let query = supabaseClient.rpc('community_activity_feed', {}, {head:true,count:'exact'});
     if (seen) query = query.gt('occurred_at', seen);
     const {count} = await communityData(query);
     if (currentUser?.id !== id || localStorage.getItem(key) !== seen) return;
@@ -1161,11 +1214,24 @@ function openCommunityList(title, profileId = currentUser?.id, blockedIds = []) 
   const close = communityButton('×', () => dialog.close(), 'communityListClose');
   close.setAttribute('aria-label', 'Close ' + title);
   const head = communityElement('header', 'communityProfileHead');
-  head.append(communityElement('h3', '', title), close);
+  head.append(communityElement('h3', '', title));
+  const preferences = communityElement('section','communityAlertSettings');
+  preferences.hidden = true;
+  if (activity) {
+    const settings = communityButton('Notifications', () => {
+      preferences.hidden = !preferences.hidden;
+      scroll.hidden = !preferences.hidden;
+      settings.setAttribute('aria-expanded',String(!preferences.hidden));
+      if (!preferences.hidden) void showCommunityAlertSettings(preferences,userId);
+    }, 'communityProfileAction');
+    settings.setAttribute('aria-expanded','false');
+    head.append(settings);
+  }
+  head.append(close);
   dialog.setAttribute('aria-label', title);
   const scroll = communityElement('div', 'communityListScroll');
   scroll.append(list, status, more);
-  dialog.append(head, scroll);
+  dialog.append(head, preferences, scroll);
   dialog.onclose = () => dialog.remove();
   document.body.append(dialog);
   dialog.showModal();
@@ -1176,14 +1242,14 @@ function openCommunityList(title, profileId = currentUser?.id, blockedIds = []) 
     status.textContent = 'Loading…';
     const key = followers ? 'follower_id' : 'followed_id';
     try {
-      let query = activity ? supabaseClient.rpc('community_personal_activity')
+      let query = activity ? supabaseClient.rpc('community_activity_feed')
         .order('occurred_at', {ascending:false}).order('actor').order('kind').order('post_id')
         : filterCommunityBlockedCollectors(supabaseClient.from('community_follows').select(key)
           .eq(followers ? 'followed_id' : 'follower_id', profileId), key, blockedIds).order(key);
       if (!activity && after) query = query.gt(key, after);
       const {data} = await communityData(activity ? query.range(offset, offset + 30) : query.limit(31));
       const page = data.slice(0,30);
-      const ids = page.map(row => row.actor || row[key]);
+      const ids = page.map(row => row.actor || row[key]).filter(Boolean);
       const uniqueIds = [...new Set(ids)];
       const [profiles, relations, incoming] = ids.length ? await Promise.all([
         communityData(supabaseClient.from('community_profiles').select('id,display_name,avatar_style,avatar_initials').in('id',uniqueIds)),
@@ -1198,12 +1264,16 @@ function openCommunityList(title, profileId = currentUser?.id, blockedIds = []) 
         const profile = names.get(row.actor || row[key]);
         const name = profile?.display_name || 'Collector';
         const entry = communityElement('div', 'communityListEntry');
-        const label = activity ? name + (row.kind === 'follow' ? ' followed you' : row.kind === 'mention' ? ' mentioned you' : ' liked your post') : name;
+        const labels = {reply:' replied to your comment',comment:' commented on your post',mention:' mentioned you',follow:' followed you',like:' liked your post'};
+        const decision = row.kind === 'approved' || row.kind === 'declined';
+        const label = decision ? 'Your post was ' + row.kind : activity ? name + labels[row.kind] : name;
         const body = communityElement('div');
-        body.append(profile ? communityButton(label, () => {
+        body.append(communityButton(label, () => {
           dialog.close();
-          void showBullionGallery('profile', profile.id);
-        }, 'communityAuthor') : communityElement('strong','',label));
+          if (decision) void showBullionGallery('mine');
+          else if (row.post_id) void openCommunityConversation(row.post_id,row.comment_id);
+          else if (profile) void showBullionGallery('profile', profile.id);
+        }, 'communityAuthor'));
         if (activity) {
           if (row.caption) body.append(communityElement('p','',row.caption));
           body.append(communityElement('small','',new Date(row.occurred_at).toLocaleString(undefined,

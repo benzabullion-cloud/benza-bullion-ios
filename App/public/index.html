@@ -6619,10 +6619,7 @@ html:not([data-theme="dark"]) .benzaGuestLockCreate{color:#FFFDF8}
             <div class="settingsNotificationTypeText"><div class="settingsNotificationTypeName">Portfolio Milestones</div><div class="settingsNotificationTypeDesc">Celebrate when your bullion portfolio reaches a new value milestone.</div></div>
             <button id="notifyMilestones" class="settingsToggle" type="button" onclick="toggleNotificationPreference('portfolio_milestones')" aria-label="Toggle Portfolio Milestones"><span class="settingsToggleTrack"></span><span class="settingsToggleKnob"></span></button>
           </div>
-          <div id="communityReviewAlertsRow" class="settingsNotificationTypeRow" hidden>
-            <div class="settingsNotificationTypeText"><div class="settingsNotificationTypeName">Community review alerts</div><div class="settingsNotificationTypeDesc">Notify me when another collector submits a post for review.</div></div>
-            <button id="communityReviewAlertsToggle" class="settingsToggle" type="button" onclick="toggleCommunityReviewAlerts()" aria-label="Toggle Community review alerts" aria-pressed="false"><span class="settingsToggleTrack"></span><span class="settingsToggleKnob"></span></button>
-          </div>
+
         </div>
         <div id="notificationPrefsStatus" role="status" aria-live="polite" class="settingsNotificationPrefsStatus"></div>
         <button id="notificationTestButton" class="settingsNotificationTest" type="button" onclick="this.textContent='Sending…';this.disabled=true;sendBenzaTestNotification().finally(()=>{this.disabled=false;this.textContent='Send Test Notification';})" style="display:none">Send Test Notification</button>
@@ -9553,6 +9550,12 @@ function handleBenzaDeepLink(){
   const params=new URLSearchParams(location.search);
   const requested=params.get('open');
   let tab=null;
+  if(location.hash.startsWith('#community-thread/')){
+    const [,post,comment]=location.hash.split('/');
+    history.replaceState(null,'',location.pathname+location.search);
+    void openCommunityConversation(post,comment);
+    return;
+  }
   if(location.hash==='#community-review'){
     history.replaceState(null,'',location.pathname+location.search);
     void openCommunityReviewFromAlert();

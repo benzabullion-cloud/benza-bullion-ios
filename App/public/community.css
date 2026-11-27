@@ -312,3 +312,10 @@ html[data-theme="dark"] .communityPostCategory[data-metal]{
 .communityMentionPicker:empty{display:none}
 .communityMentionLink{border:0;background:none;color:var(--gold);padding:0;font:inherit;text-decoration:underline}
 .communityMentionPicker .communityAuthor{color:var(--gold)}
+.communityAlertSettings{padding:8px 18px}
+.communityAlertChoice{display:flex;align-items:center;justify-content:space-between;min-height:48px;border-bottom:1px solid var(--border)}
+.communityAlertChoice input{accent-color:var(--gold);width:22px;height:22px}
+#communityDialog:has(.communityProfilePreview){border-radius:22px;background:linear-gradient(155deg,color-mix(in srgb,var(--gold) 8%,var(--surface)),var(--surface) 34%)}
+#communityDialog .communityProfilePreview{background:linear-gradient(105deg,color-mix(in srgb,var(--gold) 14%,var(--surface2)),var(--surface2));border-radius:16px;border-inline-start:3px solid var(--gold)}
+#communityDialog .communityAvatarChoice[aria-pressed=true]{background:color-mix(in srgb,var(--gold) 13%,var(--surface2));font-weight:700}
+.communityCommentBranch[data-alert-target]>.communityCommentRow{border-inline-start:2px solid var(--gold);padding-inline-start:8px}

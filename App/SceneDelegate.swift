@@ -100,7 +100,10 @@ final class BenzaNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
             let defaults = UserDefaults.standard
             let pending = defaults.bool(forKey: AppDelegate.communityReviewTapKey)
             defaults.removeObject(forKey: AppDelegate.communityReviewTapKey)
-            call.resolve(["pending": pending])
+            let key = AppDelegate.communityReviewTapKey + ".route"
+            let route = defaults.string(forKey: key) ?? ""
+            defaults.removeObject(forKey: key)
+            call.resolve(["pending": pending, "route": route])
         }
     }
 
