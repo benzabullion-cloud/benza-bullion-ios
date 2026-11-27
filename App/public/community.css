@@ -314,7 +314,9 @@ html[data-theme="dark"] .communityPostCategory[data-metal]{
 .communityMentionPicker .communityAuthor{color:var(--gold)}
 .communitySettingsCog{min-width:44px;min-height:44px;justify-content:center}
 .communityListScroll>.communitySecondary{margin-top:12px}
-.communityListScroll>h4{margin:16px 0 2px}
+.communitySettingsDialog .communityEditPill{margin-top:12px;border-radius:999px;padding-inline:18px;min-height:44px}
+.communityNotificationSection{margin-top:16px;padding-top:14px;border-top:1px solid var(--border)}
+.communityNotificationSection>h4{margin:0 0 4px;color:var(--text);font-size:1.125rem;font-weight:700}
 .communityAlertChoice{display:flex;align-items:center;justify-content:space-between;min-height:48px;border-bottom:1px solid var(--border)}
 .communityAlertChoice{cursor:pointer;gap:12px}
 .communityAlertChoice input[role=switch]{appearance:none;-webkit-appearance:none;box-sizing:border-box;flex:none;position:relative;width:44px;height:26px;margin:0;padding:0;border:1px solid var(--muted);border-radius:20px;background:var(--card);cursor:pointer}

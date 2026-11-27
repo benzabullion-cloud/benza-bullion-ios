@@ -75,9 +75,14 @@ function openCommunityProfileSettings(userId, profile) {
   const edit = communityButton('Edit profile', () => {
     dialog.close();
     if (currentUser?.id === userId) editBullionProfile(userId, profile);
-  });
+  }, 'communityPrimary communityEditPill');
   const preferences = communityElement('section', 'communityAlertSettings');
-  scroll.append(edit, communityElement('h4', '', 'Notifications'), preferences);
+  const notifications = communityElement('section', 'communityNotificationSection');
+  const heading = communityElement('h4', '', 'Notifications');
+  heading.id = 'communityNotificationHeading';
+  notifications.setAttribute('aria-labelledby', heading.id);
+  notifications.append(heading, preferences);
+  scroll.append(edit, notifications);
   dialog.append(head, scroll);
   dialog.onclose = () => dialog.remove();
   document.body.append(dialog);
