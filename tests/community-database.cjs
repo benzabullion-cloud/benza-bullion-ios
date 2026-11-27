@@ -31,7 +31,8 @@ const id=n=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0');
   '20261127133000_preserve_removed_comment_threads.sql',
   '20261125180000_community_activity.sql',
   '20261127140000_community_mentions.sql',
-  '20261127150000_community_activity_alerts.sql'
+  '20261127150000_community_activity_alerts.sql',
+  '20261127151500_community_social_push.sql'
  ]) await db.exec(fs.readFileSync('supabase/migrations/'+migration,'utf8'));
  async function as(n){ await db.exec(`reset role; set "request.jwt.claim.sub"='${n?id(n):''}'; set role ${n?'authenticated':'anon'}`); }
  const rows=async(sql)=>(await db.query(sql)).rows;
@@ -84,6 +85,11 @@ const id=n=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0');
  await db.exec(`insert into community_alert_preferences(user_id,mention) values ('${id(1)}',now()-interval '1 hour')`);
  await db.exec(`reset role; insert into notification_subscriptions values ('${id(1)}',true); set role service_role`);
  assert.equal((await rows("select * from benza_pending_community_activity_push() where kind='mention'")).length,1);
+ assert.equal((await rows("select * from benza_pending_community_activity_push() where kind in ('follow','like')")).length,0);
+ await as(1);
+ await db.exec(`update community_alert_preferences set likes=now()-interval '1 hour',follows=now()-interval '1 hour' where user_id='${id(1)}'`);
+ await db.exec('reset role; set role service_role');
+ assert.deepEqual((await rows("select kind from benza_pending_community_activity_push() where kind in ('follow','like') order by kind")).map(r=>r.kind),['follow','like']);
  await as(1);
  await db.exec(`select community_post_with_mentions('${id(10)}','${parent}','Reply @Collector Two',array['${id(2)}']::uuid[])`);
  await as(2);

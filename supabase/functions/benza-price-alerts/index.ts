@@ -445,6 +445,7 @@ async function processCommunityActivityPush() {
   const {data,error} = await supabase.rpc("benza_pending_community_activity_push");
   if (error) throw error;
   const messages: Record<string,string> = {
+    follow:"A collector followed you.", like:"A collector liked your post.",
     reply:"Someone replied to your comment.", mention:"A collector mentioned you.",
     comment:"There’s new discussion on your post.", report:"Published Community content needs review."
   };
@@ -454,7 +455,9 @@ async function processCommunityActivityPush() {
     if (reserved.error?.code === "23505") continue;
     if (reserved.error) throw reserved.error;
     const report = row.kind === "report";
-    const route = report ? "community-review" : "community-thread/" + row.post_id + "/" + row.comment_id;
+    let route = "community-thread/" + row.post_id + "/" + (row.comment_id ?? "");
+    if (report) route = "community-review";
+    if (row.kind === "follow") route = "community-thread/profile/" + row.event_key;
     let delivered = false;
     try {
       const result = await sendPush(row.user_id, {title:"Benza Bullion Community",body:messages[row.kind],

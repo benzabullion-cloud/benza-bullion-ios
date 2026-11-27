@@ -69,11 +69,11 @@ async function showCommunityAlertSettings(panel, userId) {
   panel.replaceChildren(message);
   try {
     const [prefs, membership] = await Promise.all([
-      communityData(supabaseClient.from('community_alert_preferences').select('reply,mention,comment').eq('user_id',userId).maybeSingle()),
+      communityData(supabaseClient.from('community_alert_preferences').select('reply,mention,comment,likes,follows').eq('user_id',userId).maybeSingle()),
       communityData(supabaseClient.from('community_moderators').select('review_alerts_since').eq('user_id',userId).maybeSingle())
     ]);
     if (currentUser?.id !== userId || !panel.isConnected) return;
-    const choices = [['reply','Replies to me'],['mention','@mentions'],['comment','Comments on my posts']];
+    const choices = [['reply','Replies to me'],['mention','@mentions'],['comment','Comments on my posts'],['likes','Likes on my posts'],['follows','New followers']];
     if (membership.data) choices.push(['moderator','Moderator review and report alerts']);
     for (const [key,label] of choices) {
       const input = communityElement('input');
@@ -117,7 +117,13 @@ async function showCommunityAlertSettings(panel, userId) {
 }
 
 async function openCommunityConversation(postId, commentId) {
-  if (!currentUser || !/^[a-f0-9-]{36}$/i.test(postId)) return;
+  if (!currentUser) return;
+  if (postId === 'profile' && /^[a-f0-9-]{36}$/i.test(commentId)) {
+    openNews();
+    await showBullionGallery('profile',commentId);
+    return;
+  }
+  if (!/^[a-f0-9-]{36}$/i.test(postId)) return;
   openNews();
   bullionCommunity.alertPost = postId;
   bullionCommunity.alertComment = commentId;
