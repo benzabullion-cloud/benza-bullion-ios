@@ -740,7 +740,7 @@ function renderBullionComments(post, count, blockedIds) {
   const list = communityElement('div', 'communityCommentList');
   const status = communityElement('p', 'communityCommentStatus');
   status.setAttribute('role', 'status');
-  const previewSize = 3;
+  const previewSize = 2;
   let request = 0;
   let replyTarget = null;
   const expanded = new Map();
@@ -752,7 +752,7 @@ function renderBullionComments(post, count, blockedIds) {
     return filterCommunityBlockedCollectors(query, 'author_id', blockedIds);
   }
 
-  async function loadBranch(container, parentId, depth, isCurrent) {
+  async function loadBranch(container, parentId, isCurrent) {
     const size = pageSizes.get(parentId) || previewSize;
     const {data} = await communityData(commentQuery(parentId,
       'id,author_id,body,created_at,community_profiles(display_name,avatar_style,avatar_initials)')
@@ -762,13 +762,14 @@ function renderBullionComments(post, count, blockedIds) {
       const branch = communityElement('div', 'communityCommentBranch');
       const editorSlot = communityElement('div');
       const reply = currentUser && bullionCommunity.profile ? () => selectReply(comment, editorSlot) : null;
-      branch.append(renderBullionComment(comment, reply), editorSlot);
+      const actions = communityElement('div', 'communityCommentActions');
+      branch.append(renderBullionComment(comment, reply, actions), editorSlot);
       if (replyTarget?.id === comment.id) editorSlot.append(form);
       const {count:children} = await communityData(commentQuery(comment.id, 'id', {count:'exact', head:true}));
       if (!children || !isCurrent()) return branch;
       const group = communityElement('div', 'communityReplies');
       group.id = 'communityReplies-' + comment.id;
-      let open = expanded.get(comment.id) ?? (depth === 0 && children === 1);
+      let open = expanded.get(comment.id) === true;
       let generation = 0;
       const button = communityButton('', () => {
         open = !open;
@@ -784,12 +785,13 @@ function renderBullionComments(post, count, blockedIds) {
         if (!open) return;
         const active = () => isCurrent() && generation === token;
         try {
-          await loadBranch(group, comment.id, depth + 1, active);
+          await loadBranch(group, comment.id, active);
         } catch {
           if (active()) group.replaceChildren(communityButton('Retry loading replies', sync, 'communityMoreComments'));
         }
       }
-      branch.append(button, group);
+      actions.append(button);
+      branch.append(group);
       await sync();
       return branch;
     }));
@@ -808,7 +810,7 @@ function renderBullionComments(post, count, blockedIds) {
     const active = () => version === request && currentUser?.id === userId;
     status.textContent = 'Loading comments…';
     try {
-      const visible = await loadBranch(list, null, 0, active);
+      const visible = await loadBranch(list, null, active);
       if (active()) status.textContent = visible ? '' : 'No comments yet.';
     } catch {
       if (active()) status.textContent = 'Couldn’t load comments. Reopen the thread to try again.';
@@ -886,15 +888,17 @@ function renderBullionComments(post, count, blockedIds) {
   return {thread, toggle};
 }
 
-function renderBullionComment(comment, onReply) {
+function renderBullionComment(comment, onReply, actions) {
   const item = communityElement('article', 'communityComment communityCommentRow');
   const heading = communityElement('div', 'communityCommentText');
   const byline = communityElement('div', 'communityCommentByline');
   byline.append(communityAvatar(comment.community_profiles), communityElement('strong', '', comment.community_profiles?.display_name || 'Collector'));
   const time = communityElement('time', 'communityCommentTime', new Date(comment.created_at).toLocaleString(undefined,
-    {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'}));
+    {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'}));
   time.dateTime = comment.created_at;
-  heading.append(byline, time);
+  time.title = new Date(comment.created_at).toLocaleString();
+  byline.append(time);
+  heading.append(byline);
   if (currentUser) {
     const options = communityOptions('Comment options', 'communityCommentOptions');
     options.append(communityButton('Flag comment', () => {
@@ -916,7 +920,8 @@ function renderBullionComment(comment, onReply) {
     item.append(options);
   }
   heading.append(communityElement('p', '', comment.body));
-  if (onReply) heading.append(communityButton('Reply', () => onReply(comment), 'communityMoreComments'));
+  if (onReply) actions.append(communityButton('Reply', () => onReply(comment), 'communityMoreComments'));
+  heading.append(actions);
   item.prepend(heading);
   return item;
 }

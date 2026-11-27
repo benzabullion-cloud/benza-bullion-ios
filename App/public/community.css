@@ -302,3 +302,9 @@ html[data-theme="dark"] .communityPostCategory[data-metal]{
 .communityReplies .communityReplies .communityReplies{margin-inline-start:0;padding-inline-start:0}
 .communityReplyContext{grid-column:1/-1}
 .communityReplyContext button{margin-inline-start:8px}
+.communityCommentByline{flex-wrap:wrap;gap:2px 6px}
+.communityCommentByline .communityAvatar{width:20px;height:20px}
+.communityCommentByline .communityCommentTime{font-size:11px}
+.communityCommentText{padding:2px 0}
+.communityCommentActions{display:flex;flex-wrap:wrap;gap:0 14px}
+.communityCommentActions .communityMoreComments{min-height:30px;padding:2px 0;color:var(--muted)}
